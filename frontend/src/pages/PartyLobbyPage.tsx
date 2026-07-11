@@ -7,6 +7,7 @@ import { ClassSelector } from '../features/party/components/ClassSelector'
 import { TurnOrderEditor } from '../features/party/components/TurnOrderEditor'
 import { QrCodeCard } from '../features/party/components/QrCodeCard'
 import { selectClass, setTurnOrder } from '../features/party/api'
+import { selectClassAsFakeMember } from '../features/dev/api'
 import type { CharacterClass } from '../features/party/types'
 
 export function PartyLobbyPage() {
@@ -14,6 +15,7 @@ export function PartyLobbyPage() {
   const { user } = useAuth()
   const { party, error } = usePartyState(code.toUpperCase())
   const [classError, setClassError] = useState<string | null>(null)
+  const [actingAsId, setActingAsId] = useState<string | null>(null)
 
   if (error) {
     return (
@@ -34,11 +36,16 @@ export function PartyLobbyPage() {
 
   const self = party.members.find((member) => member.userId === user.id)
   const isLeader = self?.leader ?? false
+  const effectiveActingAsId = actingAsId ?? user.id
 
   async function handleSelectClass(characterClass: CharacterClass) {
     setClassError(null)
     try {
-      await selectClass(party!.code, characterClass)
+      if (effectiveActingAsId === user!.id) {
+        await selectClass(party!.code, characterClass)
+      } else {
+        await selectClassAsFakeMember(party!.code, effectiveActingAsId, characterClass)
+      }
     } catch {
       setClassError('That class was just taken. Pick another one.')
     }
@@ -58,9 +65,27 @@ export function PartyLobbyPage() {
         <PartyMemberList members={party.members} />
       </section>
 
+      {import.meta.env.DEV && party.members.some((member) => member.bot) && (
+        <section className="card dev-panel">
+          <h2 className="section-title">Playing as (dev)</h2>
+          <select
+            className="input"
+            value={effectiveActingAsId}
+            onChange={(event) => setActingAsId(event.target.value)}
+          >
+            {party.members.map((member) => (
+              <option key={member.userId} value={member.userId}>
+                {member.displayName}
+                {member.bot ? ' (bot)' : member.userId === user.id ? ' (you)' : ''}
+              </option>
+            ))}
+          </select>
+        </section>
+      )}
+
       <section className="card">
         <h2 className="section-title">Choose your class</h2>
-        <ClassSelector members={party.members} selfUserId={user.id} onSelect={handleSelectClass} />
+        <ClassSelector members={party.members} selfUserId={effectiveActingAsId} onSelect={handleSelectClass} />
         {classError && (
           <p className="alert" role="alert">
             {classError}

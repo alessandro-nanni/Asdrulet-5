@@ -4,6 +4,7 @@ import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.InvalidTurnOrderException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
+import com.asdru.asdrulet5.party.exception.PartyFullException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -117,5 +118,69 @@ class PartyTest {
         party.setTurnOrder("leader-1", List.of("player-2", "leader-1"));
 
         assertThat(party.turnOrder()).containsExactly("player-2", "leader-1");
+    }
+
+    @Test
+    void addFakeMemberCreatesNonLeaderBotWithUniqueId() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+
+        PartyMember bot1 = party.addFakeMember("Grog");
+        PartyMember bot2 = party.addFakeMember("Brynn");
+
+        assertThat(bot1.bot()).isTrue();
+        assertThat(bot1.leader()).isFalse();
+        assertThat(bot1.userId()).isNotEqualTo(bot2.userId());
+        assertThat(party.members()).hasSize(3);
+    }
+
+    @Test
+    void selectClassWorksForFakeMembersLikeAnyOtherMember() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        PartyMember bot = party.addFakeMember("Grog");
+
+        party.selectClass(bot.userId(), CharacterClass.TANK);
+
+        PartyMember updated = party.members().stream()
+                .filter(member -> member.userId().equals(bot.userId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(updated.characterClass()).isEqualTo(CharacterClass.TANK);
+    }
+
+    @Test
+    void addMemberRejectsJoiningBeyondMaxMembers() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMember("player-2", "Player Two", "avatar2.png");
+        party.addMember("player-3", "Player Three", "avatar3.png");
+        party.addMember("player-4", "Player Four", "avatar4.png");
+
+        assertThatThrownBy(() -> party.addMember("player-5", "Player Five", "avatar5.png"))
+                .isInstanceOf(PartyFullException.class);
+        assertThat(party.members()).hasSize(Party.MAX_MEMBERS);
+    }
+
+    @Test
+    void addMemberStaysIdempotentEvenWhenPartyIsFull() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMember("player-2", "Player Two", "avatar2.png");
+        party.addMember("player-3", "Player Three", "avatar3.png");
+        party.addMember("player-4", "Player Four", "avatar4.png");
+
+        PartyMember rejoined = party.addMember("player-2", "Player Two", "avatar2.png");
+
+        assertThat(rejoined.userId()).isEqualTo("player-2");
+        assertThat(party.members()).hasSize(Party.MAX_MEMBERS);
+    }
+
+    @Test
+    void addFakeMemberRejectsBeyondMaxMembers() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addFakeMember("Grog");
+        party.addFakeMember("Brynn");
+        party.addFakeMember("Thistle");
+
+        assertThatThrownBy(() -> party.addFakeMember("Kael"))
+                .isInstanceOf(PartyFullException.class);
+        assertThat(party.members()).hasSize(Party.MAX_MEMBERS);
     }
 }

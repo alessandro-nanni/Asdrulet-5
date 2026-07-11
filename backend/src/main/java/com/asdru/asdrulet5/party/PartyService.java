@@ -1,8 +1,12 @@
 package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
+import com.asdru.asdrulet5.party.dev.FakeNameGenerator;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.Party;
+import com.asdru.asdrulet5.party.domain.PartyMember;
+import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
+import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
 import com.asdru.asdrulet5.party.web.PartyMapper;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
@@ -46,6 +50,27 @@ public class PartyService {
 
     public PartyStateDto getState(String code) {
         return PartyMapper.toDto(getOrThrow(code));
+    }
+
+    public PartyStateDto addFakeMembers(String code, int count) {
+        Party party = getOrThrow(code);
+        for (int i = 0; i < count; i++) {
+            party.addFakeMember(FakeNameGenerator.next());
+        }
+        return broadcast(party);
+    }
+
+    public PartyStateDto selectClassAsFakeMember(String code, String fakeMemberId, CharacterClass characterClass) {
+        Party party = getOrThrow(code);
+        PartyMember target = party.members().stream()
+                .filter(member -> member.userId().equals(fakeMemberId))
+                .findFirst()
+                .orElseThrow(() -> new NotPartyMemberException(code, fakeMemberId));
+        if (!target.bot()) {
+            throw new NotAFakeMemberException(code, fakeMemberId);
+        }
+        party.selectClass(fakeMemberId, characterClass);
+        return broadcast(party);
     }
 
     private Party getOrThrow(String code) {

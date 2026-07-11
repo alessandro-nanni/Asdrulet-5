@@ -24,7 +24,8 @@ public class PartyMapper {
                 member.displayName(),
                 member.avatarUrl(),
                 member.characterClass(),
-                member.leader()
+                member.leader(),
+                member.bot()
         );
     }
 }

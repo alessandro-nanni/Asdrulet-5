@@ -3,6 +3,7 @@ package com.asdru.asdrulet5.party;
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
+import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
@@ -96,5 +97,36 @@ class PartyServiceTest {
         PartyStateDto updated = partyService.setTurnOrder(created.code(), leader, List.of("player-2", "leader-1"));
 
         assertThat(updated.turnOrder()).containsExactly("player-2", "leader-1");
+    }
+
+    @Test
+    void addFakeMembersAddsBotsFlaggedAsSuch() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+
+        PartyStateDto updated = partyService.addFakeMembers(created.code(), 3);
+
+        assertThat(updated.members()).hasSize(4);
+        assertThat(updated.members().stream().filter(m -> m.bot())).hasSize(3);
+        assertThat(updated.members().stream().filter(m -> !m.bot())).hasSize(1);
+    }
+
+    @Test
+    void selectClassAsFakeMemberUpdatesTheBot() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto withBots = partyService.addFakeMembers(created.code(), 1);
+        String botId = withBots.members().stream().filter(m -> m.bot()).findFirst().orElseThrow().userId();
+
+        PartyStateDto updated = partyService.selectClassAsFakeMember(created.code(), botId, CharacterClass.MAGE);
+
+        assertThat(updated.members().stream().filter(m -> m.userId().equals(botId)).findFirst().orElseThrow().characterClass())
+                .isEqualTo(CharacterClass.MAGE);
+    }
+
+    @Test
+    void selectClassAsFakeMemberRejectsRealMemberTarget() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+
+        assertThatThrownBy(() -> partyService.selectClassAsFakeMember(created.code(), "leader-1", CharacterClass.MAGE))
+                .isInstanceOf(NotAFakeMemberException.class);
     }
 }

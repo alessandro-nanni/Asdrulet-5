@@ -5,10 +5,11 @@ public record PartyMember(
         String displayName,
         String avatarUrl,
         CharacterClass characterClass,
-        boolean leader
+        boolean leader,
+        boolean bot
 ) {
 
     public PartyMember withCharacterClass(CharacterClass newClass) {
-        return new PartyMember(userId, displayName, avatarUrl, newClass, leader);
+        return new PartyMember(userId, displayName, avatarUrl, newClass, leader, bot);
     }
 }

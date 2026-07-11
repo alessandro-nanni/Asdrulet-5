@@ -6,6 +6,7 @@ export interface PartyMember {
   avatarUrl: string
   characterClass: CharacterClass | null
   leader: boolean
+  bot: boolean
 }
 
 export interface PartyState {

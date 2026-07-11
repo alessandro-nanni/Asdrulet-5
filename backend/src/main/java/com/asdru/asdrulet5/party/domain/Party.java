@@ -4,6 +4,7 @@ import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.InvalidTurnOrderException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
+import com.asdru.asdrulet5.party.exception.PartyFullException;
 import lombok.Getter;
 import lombok.Synchronized;
 import lombok.experimental.Accessors;
@@ -12,8 +13,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Party {
+
+    /**
+     * Fixed lobby size cap, independent of how many CharacterClass values
+     * exist — the two happen to match today but must not be coupled.
+     */
+    public static final int MAX_MEMBERS = 4;
 
     @Getter
     @Accessors(fluent = true)
@@ -24,18 +32,45 @@ public class Party {
     private final String leaderId;
 
     private final Map<String, PartyMember> members = new LinkedHashMap<>();
+    private final AtomicInteger fakeMemberSequence = new AtomicInteger();
     private List<String> turnOrder = List.of();
 
     public Party(String code, String leaderId, String leaderDisplayName, String leaderAvatarUrl) {
         this.code = code;
         this.leaderId = leaderId;
-        members.put(leaderId, new PartyMember(leaderId, leaderDisplayName, leaderAvatarUrl, null, true));
+        members.put(leaderId, new PartyMember(leaderId, leaderDisplayName, leaderAvatarUrl, null, true, false));
     }
 
     @Synchronized
     public PartyMember addMember(String userId, String displayName, String avatarUrl) {
-        return members.computeIfAbsent(userId,
-                id -> new PartyMember(id, displayName, avatarUrl, null, id.equals(leaderId)));
+        PartyMember existing = members.get(userId);
+        if (existing != null) {
+            return existing;
+        }
+        requireRoom();
+        PartyMember member = new PartyMember(userId, displayName, avatarUrl, null, userId.equals(leaderId), false);
+        members.put(userId, member);
+        return member;
+    }
+
+    /**
+     * Adds a locally-simulated party member with no real identity behind it,
+     * used only by the dev-only "quick game" tooling to test multi-member
+     * flows without needing separate logged-in devices.
+     */
+    @Synchronized
+    public PartyMember addFakeMember(String displayName) {
+        requireRoom();
+        String fakeId = "bot-" + code + "-" + fakeMemberSequence.incrementAndGet();
+        PartyMember member = new PartyMember(fakeId, displayName, null, null, false, true);
+        members.put(fakeId, member);
+        return member;
+    }
+
+    private void requireRoom() {
+        if (members.size() >= MAX_MEMBERS) {
+            throw new PartyFullException(code, MAX_MEMBERS);
+        }
     }
 
     @Synchronized

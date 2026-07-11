@@ -5,6 +5,7 @@ import { LoginButton } from '../features/auth/LoginButton'
 import { useUsername } from '../features/identity/useUsername'
 import { UsernameField } from '../features/identity/UsernameField'
 import { InstallAppButton } from '../features/pwa/InstallAppButton'
+import { QuickGameButton } from '../features/dev/QuickGameButton'
 import { createParty, joinParty } from '../features/party/api'
 
 export function LandingPage() {
@@ -97,6 +98,7 @@ export function LandingPage() {
         )}
 
         <InstallAppButton />
+        <QuickGameButton />
       </div>
     </div>
   )

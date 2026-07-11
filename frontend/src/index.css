@@ -176,6 +176,25 @@ p {
   color: var(--text);
 }
 
+.btn-dev {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255, 92, 92, 0.15),
+    rgba(255, 92, 92, 0.15) 8px,
+    rgba(255, 92, 92, 0.25) 8px,
+    rgba(255, 92, 92, 0.25) 16px
+  );
+  border: 1px dashed rgba(255, 92, 92, 0.5);
+  color: #ffb3b3;
+}
+
+.dev-panel {
+  border: 1px dashed rgba(255, 92, 92, 0.4);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: rgba(255, 92, 92, 0.06);
+}
+
 .icon-btn {
   appearance: none;
   border: 1px solid var(--surface-border);
