@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.party.domain;
 
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.InvalidTurnOrderException;
+import com.asdru.asdrulet5.party.exception.MissingClassSelectionException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
 import com.asdru.asdrulet5.party.exception.PartyFullException;
@@ -99,6 +100,10 @@ public class Party {
         boolean sameMembers = order.size() == members.size() && Set.copyOf(order).equals(members.keySet());
         if (!sameMembers) {
             throw new InvalidTurnOrderException(code);
+        }
+        boolean everyoneHasAClass = members.values().stream().allMatch(member -> member.characterClass() != null);
+        if (!everyoneHasAClass) {
+            throw new MissingClassSelectionException(code);
         }
         this.turnOrder = List.copyOf(order);
         this.status = PartyStatus.IN_PROGRESS;

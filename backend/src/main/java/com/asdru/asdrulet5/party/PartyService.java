@@ -1,6 +1,7 @@
 package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
+import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.party.dev.FakeNameGenerator;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.Party;
@@ -22,6 +23,7 @@ public class PartyService {
 
     private final PartyRepository partyRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final CombatService combatService;
 
     public PartyStateDto createParty(AuthenticatedUser leader, String displayName) {
         String code = partyRepository.generateUniqueCode();
@@ -45,7 +47,9 @@ public class PartyService {
     public PartyStateDto startGame(String code, AuthenticatedUser user, List<String> order) {
         Party party = getOrThrow(code);
         party.start(user.id(), order);
-        return broadcast(party);
+        PartyStateDto dto = broadcast(party);
+        combatService.startCombat(party.code(), party.members(), party.turnOrder());
+        return dto;
     }
 
     public PartyStateDto getState(String code) {

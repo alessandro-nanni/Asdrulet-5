@@ -3,6 +3,7 @@ package com.asdru.asdrulet5.party.web;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.DevToolsDisabledException;
 import com.asdru.asdrulet5.party.exception.InvalidTurnOrderException;
+import com.asdru.asdrulet5.party.exception.MissingClassSelectionException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
@@ -35,6 +36,11 @@ public class PartyExceptionHandler {
 
     @ExceptionHandler(InvalidTurnOrderException.class)
     public ResponseEntity<Map<String, String>> handleInvalidTurnOrder(InvalidTurnOrderException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MissingClassSelectionException.class)
+    public ResponseEntity<Map<String, String>> handleMissingClassSelection(MissingClassSelectionException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
     }
 

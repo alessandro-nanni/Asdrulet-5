@@ -461,6 +461,107 @@ p {
   box-shadow: 0 0 0 3px rgba(160, 107, 255, 0.25);
 }
 
+/* Class details panel */
+
+.class-details-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-border);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.class-flavor {
+  font-style: italic;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.stat-bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.stat-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.stat-bar.class-healer .stat-bar-fill {
+  background: var(--class-healer);
+}
+.stat-bar.class-tank .stat-bar-fill {
+  background: var(--class-tank);
+}
+.stat-bar.class-warrior .stat-bar-fill {
+  background: var(--class-warrior);
+}
+.stat-bar.class-mage .stat-bar-fill {
+  background: var(--class-mage);
+}
+
+.ability-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ability-card {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-border);
+  padding: 10px 12px;
+}
+
+.ability-card.is-ultimate {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(255, 183, 3, 0.25);
+}
+
+.ability-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ability-name {
+  font-weight: 700;
+}
+
+.ability-description {
+  margin: 4px 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.ability-meta {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.badge-ultimate {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
 /* QR code */
 
 .qr-card {
@@ -541,4 +642,345 @@ p {
   cursor: grab;
   touch-action: none;
   user-select: none;
+}
+
+/* Battle screen */
+
+.battle-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.battlefield {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-border);
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255, 92, 92, 0.14), transparent 65%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, rgba(53, 208, 142, 0.14), transparent 65%),
+    rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.battlefield-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.battlefield-divider {
+  height: 1px;
+  margin: 4px 24px;
+  background: linear-gradient(90deg, transparent, var(--surface-border), transparent);
+}
+
+.combatant-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 92px;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+}
+
+.combatant-card.is-current-turn {
+  border-color: var(--accent);
+  animation: turn-pulse 1.6s ease-in-out infinite;
+}
+
+.combatant-card.is-defeated {
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+
+.combatant-card.is-selectable {
+  cursor: pointer;
+  border-color: rgba(255, 183, 3, 0.5);
+  animation: selectable-pulse 1.1s ease-in-out infinite;
+}
+
+.combatant-card.is-selectable:active {
+  transform: scale(0.95);
+}
+
+.combatant-card.is-attacking {
+  animation-duration: 0.5s;
+  animation-timing-function: ease;
+  z-index: 2;
+}
+
+.battlefield-row-allies .combatant-card.is-attacking {
+  animation-name: attack-lunge-up;
+}
+
+.battlefield-row-enemies .combatant-card.is-attacking {
+  animation-name: attack-lunge-down;
+}
+
+.combatant-card.is-hit {
+  animation: hit-shake 0.5s ease;
+}
+
+.combatant-card.is-healed {
+  animation: heal-glow 0.6s ease;
+}
+
+@keyframes turn-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(255, 183, 3, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 183, 3, 0.4);
+  }
+}
+
+@keyframes selectable-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(255, 183, 3, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 183, 3, 0.55);
+  }
+}
+
+@keyframes attack-lunge-up {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-18px) scale(1.08);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes attack-lunge-down {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(18px) scale(1.08);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes hit-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes heal-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(53, 208, 142, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(53, 208, 142, 0);
+  }
+}
+
+.combatant-fx-layer {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  height: 0;
+}
+
+.floating-text {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-weight: 800;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  animation: float-up 1.1s ease-out forwards;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.floating-text-damage {
+  color: #ff5c5c;
+}
+
+.floating-text-heal {
+  color: #35d08e;
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(0) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-6px) scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-38px) scale(1);
+  }
+}
+
+.enemy-portrait {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--surface-border);
+}
+
+.combatant-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.combatant-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.combatant-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.combatant-bar-health .combatant-bar-fill {
+  background: #35d08e;
+}
+
+.combatant-bar-stamina .combatant-bar-fill {
+  background: #4f8fe0;
+}
+
+.combatant-bar-charge .combatant-bar-fill {
+  background: var(--accent);
+}
+
+.combatant-bar-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.battle-result {
+  text-align: center;
+}
+
+.battle-waiting {
+  text-align: center;
+}
+
+.action-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+}
+
+.action-prompt {
+  margin: 0;
+  font-weight: 600;
+  text-align: center;
+}
+
+.ability-choice-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.ability-choice {
+  appearance: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--surface-border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  transition:
+    transform 0.08s ease,
+    border-color 0.15s ease;
+}
+
+.ability-choice:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.ability-choice:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ability-choice.is-ultimate {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(255, 183, 3, 0.25);
+}
+
+.ability-choice-icon {
+  font-size: 1.3rem;
+}
+
+.ability-choice-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ability-choice-cost {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.action-confirm-row {
+  display: flex;
+  gap: 10px;
+}
+
+.action-confirm-row .btn {
+  flex: 1;
 }

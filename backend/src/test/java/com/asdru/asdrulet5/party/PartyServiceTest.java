@@ -1,12 +1,14 @@
 package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
+import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.PartyStatus;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
+import com.asdru.asdrulet5.party.web.dto.PartyMemberDto;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +33,7 @@ class PartyServiceTest {
     @BeforeEach
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
-        partyService = new PartyService(new InMemoryPartyRepository(), messagingTemplate);
+        partyService = new PartyService(new InMemoryPartyRepository(), messagingTemplate, mock(CombatService.class));
     }
 
     @Test
@@ -41,7 +43,7 @@ class PartyServiceTest {
         assertThat(dto.code()).isNotBlank();
         assertThat(dto.leaderId()).isEqualTo("leader-1");
         assertThat(dto.members()).hasSize(1);
-        assertThat(dto.members().get(0).displayName()).isEqualTo("Leader");
+        assertThat(dto.members().getFirst().displayName()).isEqualTo("Leader");
     }
 
     @Test
@@ -68,7 +70,7 @@ class PartyServiceTest {
 
         PartyStateDto updated = partyService.selectClass(created.code(), leader, CharacterClass.HEALER);
 
-        assertThat(updated.members().get(0).characterClass()).isEqualTo(CharacterClass.HEALER);
+        assertThat(updated.members().getFirst().characterClass()).isEqualTo(CharacterClass.HEALER);
     }
 
     @Test
@@ -94,6 +96,8 @@ class PartyServiceTest {
     void leaderStartsGameSuccessfully() {
         PartyStateDto created = partyService.createParty(leader, "Leader");
         partyService.joinParty(created.code(), member, "Player Two");
+        partyService.selectClass(created.code(), leader, CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), member, CharacterClass.HEALER);
         assertThat(created.status()).isEqualTo(PartyStatus.LOBBY);
 
         PartyStateDto updated = partyService.startGame(created.code(), leader, List.of("player-2", "leader-1"));
@@ -109,7 +113,7 @@ class PartyServiceTest {
         PartyStateDto updated = partyService.addFakeMembers(created.code(), 3);
 
         assertThat(updated.members()).hasSize(4);
-        assertThat(updated.members().stream().filter(m -> m.bot())).hasSize(3);
+        assertThat(updated.members().stream().filter(PartyMemberDto::bot)).hasSize(3);
         assertThat(updated.members().stream().filter(m -> !m.bot())).hasSize(1);
     }
 
@@ -117,7 +121,7 @@ class PartyServiceTest {
     void selectClassAsFakeMemberUpdatesTheBot() {
         PartyStateDto created = partyService.createParty(leader, "Leader");
         PartyStateDto withBots = partyService.addFakeMembers(created.code(), 1);
-        String botId = withBots.members().stream().filter(m -> m.bot()).findFirst().orElseThrow().userId();
+        String botId = withBots.members().stream().filter(PartyMemberDto::bot).findFirst().orElseThrow().userId();
 
         PartyStateDto updated = partyService.selectClassAsFakeMember(created.code(), botId, CharacterClass.MAGE);
 

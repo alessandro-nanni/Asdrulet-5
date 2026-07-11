@@ -37,7 +37,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         RequestMatcher apiOrWsMatcher = new OrRequestMatcher(
                 PathPatternRequestMatcher.pathPattern("/api/**"),
                 PathPatternRequestMatcher.pathPattern("/ws")

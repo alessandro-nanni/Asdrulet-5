@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.party.domain;
 
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.InvalidTurnOrderException;
+import com.asdru.asdrulet5.party.exception.MissingClassSelectionException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
 import com.asdru.asdrulet5.party.exception.PartyFullException;
@@ -19,7 +20,7 @@ class PartyTest {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
 
         assertThat(party.members()).hasSize(1);
-        PartyMember leader = party.members().get(0);
+        PartyMember leader = party.members().getFirst();
         assertThat(leader.userId()).isEqualTo("leader-1");
         assertThat(leader.leader()).isTrue();
         assertThat(leader.characterClass()).isNull();
@@ -52,7 +53,7 @@ class PartyTest {
 
         party.selectClass("leader-1", CharacterClass.MAGE);
 
-        assertThat(party.members().get(0).characterClass()).isEqualTo(CharacterClass.MAGE);
+        assertThat(party.members().getFirst().characterClass()).isEqualTo(CharacterClass.MAGE);
     }
 
     @Test
@@ -80,7 +81,7 @@ class PartyTest {
 
         party.selectClass("leader-1", CharacterClass.WARRIOR);
 
-        assertThat(party.members().get(0).characterClass()).isEqualTo(CharacterClass.WARRIOR);
+        assertThat(party.members().getFirst().characterClass()).isEqualTo(CharacterClass.WARRIOR);
     }
 
     @Test
@@ -112,9 +113,22 @@ class PartyTest {
     }
 
     @Test
+    void startWithMemberMissingClassSelectionThrows() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMember("player-2", "Player Two", "avatar2.png");
+        party.selectClass("leader-1", CharacterClass.WARRIOR);
+
+        assertThatThrownBy(() -> party.start("leader-1", List.of("player-2", "leader-1")))
+                .isInstanceOf(MissingClassSelectionException.class);
+        assertThat(party.status()).isEqualTo(PartyStatus.LOBBY);
+    }
+
+    @Test
     void startByLeaderWithValidPermutationSetsOrderAndStatus() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
+        party.selectClass("leader-1", CharacterClass.WARRIOR);
+        party.selectClass("player-2", CharacterClass.HEALER);
         assertThat(party.status()).isEqualTo(PartyStatus.LOBBY);
 
         party.start("leader-1", List.of("player-2", "leader-1"));

@@ -8,12 +8,15 @@ import { TurnOrderEditor } from '../features/party/components/TurnOrderEditor'
 import { QrCodeCard } from '../features/party/components/QrCodeCard'
 import { selectClass, startGame } from '../features/party/api'
 import { selectClassAsFakeMember } from '../features/dev/api'
+import { useClassDefinitions } from '../features/classes/useClassDefinitions'
+import { BattleScreen } from '../features/combat/components/BattleScreen'
 import type { CharacterClass } from '../features/party/types'
 
 export function PartyLobbyPage() {
   const { code = '' } = useParams()
   const { user } = useAuth()
   const { party, error } = usePartyState(code.toUpperCase())
+  const { definitions } = useClassDefinitions()
   const [classError, setClassError] = useState<string | null>(null)
   const [actingAsId, setActingAsId] = useState<string | null>(null)
 
@@ -60,22 +63,30 @@ export function PartyLobbyPage() {
           <h1 className="party-code">{party.code}</h1>
         </header>
 
-        <section className="card">
-          <h2 className="section-title">The adventure begins...</h2>
-          <p className="muted">Combat isn't built yet — this is just confirming the party has started.</p>
-        </section>
+        {import.meta.env.DEV && party.members.some((member) => member.bot) && (
+          <section className="card dev-panel">
+            <h2 className="section-title">Playing as (dev)</h2>
+            <select
+              className="input"
+              value={effectiveActingAsId}
+              onChange={(event) => setActingAsId(event.target.value)}
+            >
+              {party.members.map((member) => (
+                <option key={member.userId} value={member.userId}>
+                  {member.displayName}
+                  {member.bot ? ' (bot)' : member.userId === user.id ? ' (you)' : ''}
+                </option>
+              ))}
+            </select>
+          </section>
+        )}
 
-        <section className="card">
-          <h2 className="section-title">Turn order</h2>
-          <ol className="turn-order-list">
-            {party.turnOrder.map((userId, index) => (
-              <li key={userId} className="turn-order-item">
-                <span className="turn-order-index">{index + 1}</span>
-                {party.members.find((member) => member.userId === userId)?.displayName ?? userId}
-              </li>
-            ))}
-          </ol>
-        </section>
+        <BattleScreen
+          code={party.code}
+          members={party.members}
+          actingAsId={effectiveActingAsId}
+          selfUserId={user.id}
+        />
       </div>
     )
   }
@@ -114,7 +125,12 @@ export function PartyLobbyPage() {
 
       <section className="card">
         <h2 className="section-title">Choose your class</h2>
-        <ClassSelector members={party.members} selfUserId={effectiveActingAsId} onSelect={handleSelectClass} />
+        <ClassSelector
+          members={party.members}
+          selfUserId={effectiveActingAsId}
+          onSelect={handleSelectClass}
+          definitions={definitions}
+        />
         {classError && (
           <p className="alert" role="alert">
             {classError}
