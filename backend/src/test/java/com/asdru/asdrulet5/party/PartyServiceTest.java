@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
+import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
@@ -19,8 +20,8 @@ import static org.mockito.Mockito.verify;
 
 class PartyServiceTest {
 
-    private final AuthenticatedUser leader = new AuthenticatedUser("leader-1", "Leader", "leader.png");
-    private final AuthenticatedUser member = new AuthenticatedUser("player-2", "Player Two", "player2.png");
+    private final AuthenticatedUser leader = new AuthenticatedUser("leader-1", "Google Name", "leader.png");
+    private final AuthenticatedUser member = new AuthenticatedUser("player-2", "Google Name Two", "player2.png");
 
     private PartyService partyService;
     private SimpMessagingTemplate messagingTemplate;
@@ -33,33 +34,35 @@ class PartyServiceTest {
 
     @Test
     void createPartyReturnsCodeWithLeaderAsOnlyMember() {
-        PartyStateDto dto = partyService.createParty(leader);
+        PartyStateDto dto = partyService.createParty(leader, "Leader");
 
         assertThat(dto.code()).isNotBlank();
         assertThat(dto.leaderId()).isEqualTo("leader-1");
         assertThat(dto.members()).hasSize(1);
+        assertThat(dto.members().get(0).displayName()).isEqualTo("Leader");
     }
 
     @Test
-    void joinPartyAddsMemberAndBroadcastsState() {
-        PartyStateDto created = partyService.createParty(leader);
+    void joinPartyAddsMemberWithChosenDisplayNameAndBroadcastsState() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
 
-        PartyStateDto joined = partyService.joinParty(created.code(), member);
+        PartyStateDto joined = partyService.joinParty(created.code(), member, "Player Two");
 
         assertThat(joined.members()).hasSize(2);
+        assertThat(joined.members().get(1).displayName()).isEqualTo("Player Two");
         verify(messagingTemplate, times(1))
                 .convertAndSend("/topic/party/" + created.code(), joined);
     }
 
     @Test
     void joinUnknownPartyThrows() {
-        assertThatThrownBy(() -> partyService.joinParty("NOPE99", member))
+        assertThatThrownBy(() -> partyService.joinParty("NOPE99", member, "Player Two"))
                 .isInstanceOf(PartyNotFoundException.class);
     }
 
     @Test
     void selectClassPersistsChoice() {
-        PartyStateDto created = partyService.createParty(leader);
+        PartyStateDto created = partyService.createParty(leader, "Leader");
 
         PartyStateDto updated = partyService.selectClass(created.code(), leader, CharacterClass.HEALER);
 
@@ -67,9 +70,19 @@ class PartyServiceTest {
     }
 
     @Test
+    void selectClassAlreadyTakenByAnotherMemberThrows() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        partyService.joinParty(created.code(), member, "Player Two");
+        partyService.selectClass(created.code(), leader, CharacterClass.MAGE);
+
+        assertThatThrownBy(() -> partyService.selectClass(created.code(), member, CharacterClass.MAGE))
+                .isInstanceOf(ClassAlreadyTakenException.class);
+    }
+
+    @Test
     void onlyLeaderCanSetTurnOrder() {
-        PartyStateDto created = partyService.createParty(leader);
-        partyService.joinParty(created.code(), member);
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        partyService.joinParty(created.code(), member, "Player Two");
 
         assertThatThrownBy(() -> partyService.setTurnOrder(created.code(), member, List.of("leader-1", "player-2")))
                 .isInstanceOf(NotPartyLeaderException.class);
@@ -77,8 +90,8 @@ class PartyServiceTest {
 
     @Test
     void leaderSetsTurnOrderSuccessfully() {
-        PartyStateDto created = partyService.createParty(leader);
-        partyService.joinParty(created.code(), member);
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        partyService.joinParty(created.code(), member, "Player Two");
 
         PartyStateDto updated = partyService.setTurnOrder(created.code(), leader, List.of("player-2", "leader-1"));
 

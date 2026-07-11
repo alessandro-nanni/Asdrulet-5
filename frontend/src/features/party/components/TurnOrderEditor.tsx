@@ -28,24 +28,33 @@ export function TurnOrderEditor({ members, onSubmit }: Props) {
 
   return (
     <div>
-      <ol>
+      <ol className="turn-order-editor">
         {order.map((userId, index) => (
-          <li key={userId}>
-            {nameFor(userId)}
-            <button type="button" onClick={() => move(index, -1)} disabled={index === 0}>
-              Up
+          <li key={userId} className="turn-order-editor-item">
+            <span className="turn-order-index">{index + 1}</span>
+            <span className="turn-order-editor-name">{nameFor(userId)}</span>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => move(index, -1)}
+              disabled={index === 0}
+              aria-label="Move up"
+            >
+              ▲
             </button>
             <button
               type="button"
+              className="icon-btn"
               onClick={() => move(index, 1)}
               disabled={index === order.length - 1}
+              aria-label="Move down"
             >
-              Down
+              ▼
             </button>
           </li>
         ))}
       </ol>
-      <button type="button" onClick={() => onSubmit(order)}>
+      <button type="button" className="btn btn-primary btn-block" onClick={() => onSubmit(order)}>
         Confirm turn order
       </button>
     </div>

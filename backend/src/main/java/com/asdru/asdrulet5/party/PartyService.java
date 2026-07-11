@@ -6,32 +6,29 @@ import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
 import com.asdru.asdrulet5.party.web.PartyMapper;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
+import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class PartyService {
 
     private final PartyRepository partyRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public PartyService(PartyRepository partyRepository, SimpMessagingTemplate messagingTemplate) {
-        this.partyRepository = partyRepository;
-        this.messagingTemplate = messagingTemplate;
-    }
-
-    public PartyStateDto createParty(AuthenticatedUser leader) {
+    public PartyStateDto createParty(AuthenticatedUser leader, String displayName) {
         String code = partyRepository.generateUniqueCode();
-        Party party = new Party(code, leader.id(), leader.displayName(), leader.avatarUrl());
+        Party party = new Party(code, leader.id(), displayName, leader.avatarUrl());
         partyRepository.save(party);
         return PartyMapper.toDto(party);
     }
 
-    public PartyStateDto joinParty(String code, AuthenticatedUser user) {
+    public PartyStateDto joinParty(String code, AuthenticatedUser user, String displayName) {
         Party party = getOrThrow(code);
-        party.addMember(user.id(), user.displayName(), user.avatarUrl());
+        party.addMember(user.id(), displayName, user.avatarUrl());
         return broadcast(party);
     }
 

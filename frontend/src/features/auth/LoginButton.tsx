@@ -4,7 +4,7 @@ export function LoginButton() {
   }
 
   return (
-    <button type="button" onClick={handleLogin}>
+    <button type="button" className="btn btn-primary btn-block" onClick={handleLogin}>
       Sign in with Google
     </button>
   )

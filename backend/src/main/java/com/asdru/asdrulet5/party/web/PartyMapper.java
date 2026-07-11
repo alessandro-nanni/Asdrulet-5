@@ -4,13 +4,12 @@ import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import com.asdru.asdrulet5.party.web.dto.PartyMemberDto;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
+import lombok.experimental.UtilityClass;
 
-public final class PartyMapper {
+@UtilityClass
+public class PartyMapper {
 
-    private PartyMapper() {
-    }
-
-    public static PartyStateDto toDto(Party party) {
+    public PartyStateDto toDto(Party party) {
         return new PartyStateDto(
                 party.code(),
                 party.leaderId(),
@@ -19,7 +18,7 @@ public final class PartyMapper {
         );
     }
 
-    private static PartyMemberDto toDto(PartyMember member) {
+    private PartyMemberDto toDto(PartyMember member) {
         return new PartyMemberDto(
                 member.userId(),
                 member.displayName(),

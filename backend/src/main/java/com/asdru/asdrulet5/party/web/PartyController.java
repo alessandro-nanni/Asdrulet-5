@@ -2,10 +2,13 @@ package com.asdru.asdrulet5.party.web;
 
 import com.asdru.asdrulet5.auth.web.AuthenticatedUserMapper;
 import com.asdru.asdrulet5.party.PartyService;
+import com.asdru.asdrulet5.party.web.dto.CreatePartyRequest;
+import com.asdru.asdrulet5.party.web.dto.JoinPartyRequest;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
 import com.asdru.asdrulet5.party.web.dto.SelectClassRequest;
 import com.asdru.asdrulet5.party.web.dto.SetTurnOrderRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -18,17 +21,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/parties")
+@RequiredArgsConstructor
 public class PartyController {
 
     private final PartyService partyService;
 
-    public PartyController(PartyService partyService) {
-        this.partyService = partyService;
-    }
-
     @PostMapping
-    public ResponseEntity<PartyStateDto> createParty(@AuthenticationPrincipal OidcUser principal) {
-        PartyStateDto dto = partyService.createParty(AuthenticatedUserMapper.from(principal));
+    public ResponseEntity<PartyStateDto> createParty(@AuthenticationPrincipal OidcUser principal,
+                                                       @Valid @RequestBody CreatePartyRequest request) {
+        PartyStateDto dto = partyService.createParty(AuthenticatedUserMapper.from(principal), request.displayName());
         return ResponseEntity.status(201).body(dto);
     }
 
@@ -38,8 +39,10 @@ public class PartyController {
     }
 
     @PostMapping("/{code}/join")
-    public PartyStateDto joinParty(@PathVariable String code, @AuthenticationPrincipal OidcUser principal) {
-        return partyService.joinParty(code.toUpperCase(), AuthenticatedUserMapper.from(principal));
+    public PartyStateDto joinParty(@PathVariable String code,
+                                    @AuthenticationPrincipal OidcUser principal,
+                                    @Valid @RequestBody JoinPartyRequest request) {
+        return partyService.joinParty(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.displayName());
     }
 
     @PostMapping("/{code}/class")

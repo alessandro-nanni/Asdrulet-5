@@ -1,8 +1,12 @@
 package com.asdru.asdrulet5.party.domain;
 
+import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.InvalidTurnOrderException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
+import lombok.Getter;
+import lombok.Synchronized;
+import lombok.experimental.Accessors;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,8 +15,14 @@ import java.util.Set;
 
 public class Party {
 
+    @Getter
+    @Accessors(fluent = true)
     private final String code;
+
+    @Getter
+    @Accessors(fluent = true)
     private final String leaderId;
+
     private final Map<String, PartyMember> members = new LinkedHashMap<>();
     private List<String> turnOrder = List.of();
 
@@ -22,20 +32,28 @@ public class Party {
         members.put(leaderId, new PartyMember(leaderId, leaderDisplayName, leaderAvatarUrl, null, true));
     }
 
-    public synchronized PartyMember addMember(String userId, String displayName, String avatarUrl) {
+    @Synchronized
+    public PartyMember addMember(String userId, String displayName, String avatarUrl) {
         return members.computeIfAbsent(userId,
                 id -> new PartyMember(id, displayName, avatarUrl, null, id.equals(leaderId)));
     }
 
-    public synchronized void selectClass(String userId, CharacterClass characterClass) {
+    @Synchronized
+    public void selectClass(String userId, CharacterClass characterClass) {
         PartyMember member = members.get(userId);
         if (member == null) {
             throw new NotPartyMemberException(code, userId);
         }
+        boolean takenByAnotherMember = members.values().stream()
+                .anyMatch(other -> !other.userId().equals(userId) && other.characterClass() == characterClass);
+        if (characterClass != null && takenByAnotherMember) {
+            throw new ClassAlreadyTakenException(code, characterClass);
+        }
         members.put(userId, member.withCharacterClass(characterClass));
     }
 
-    public synchronized void setTurnOrder(String requesterId, List<String> order) {
+    @Synchronized
+    public void setTurnOrder(String requesterId, List<String> order) {
         if (!leaderId.equals(requesterId)) {
             throw new NotPartyLeaderException(code, requesterId);
         }
@@ -46,19 +64,13 @@ public class Party {
         this.turnOrder = List.copyOf(order);
     }
 
-    public synchronized List<PartyMember> members() {
+    @Synchronized
+    public List<PartyMember> members() {
         return List.copyOf(members.values());
     }
 
-    public synchronized List<String> turnOrder() {
+    @Synchronized
+    public List<String> turnOrder() {
         return turnOrder;
-    }
-
-    public String code() {
-        return code;
-    }
-
-    public String leaderId() {
-        return leaderId;
     }
 }

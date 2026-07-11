@@ -26,6 +26,12 @@ public class SecurityConfig {
 
     private final String frontendUrl;
 
+    // Kept as a plain constructor: Lombok's @RequiredArgsConstructor would copy
+    // @Value onto the generated constructor parameter (via lombok.config), but
+    // @Value stays on the field too, causing Spring to *also* reflectively
+    // inject the same final field, which triggers a "final field mutated
+    // reflectively" JVM warning (a hard error in future JDKs). Not worth it
+    // for one field.
     public SecurityConfig(@Value("${app.frontend-url}") String frontendUrl) {
         this.frontendUrl = frontendUrl;
     }

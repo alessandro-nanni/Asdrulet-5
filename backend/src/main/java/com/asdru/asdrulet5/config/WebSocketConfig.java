@@ -13,6 +13,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final String frontendUrl;
 
+    // See SecurityConfig for why this stays a plain constructor instead of
+    // @RequiredArgsConstructor + field-level @Value.
     public WebSocketConfig(@Value("${app.frontend-url}") String frontendUrl) {
         this.frontendUrl = frontendUrl;
     }
