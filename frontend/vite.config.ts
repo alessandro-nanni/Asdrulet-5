@@ -34,6 +34,13 @@ export default defineConfig({
       devOptions: {
         enabled: true,
       },
+      workbox: {
+        // Workbox's SPA fallback intercepts every browser navigation and serves
+        // the cached index.html — including full-page redirects to the backend
+        // (OAuth2 login/callback) that aren't part of the React app at all.
+        // Excluded paths pass straight through to the network instead.
+        navigateFallbackDenylist: [/^\/api/, /^\/oauth2/, /^\/login/, /^\/ws/],
+      },
     }),
   ],
   build: {
