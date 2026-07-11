@@ -6,7 +6,7 @@ import com.asdru.asdrulet5.party.web.dto.CreatePartyRequest;
 import com.asdru.asdrulet5.party.web.dto.JoinPartyRequest;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
 import com.asdru.asdrulet5.party.web.dto.SelectClassRequest;
-import com.asdru.asdrulet5.party.web.dto.SetTurnOrderRequest;
+import com.asdru.asdrulet5.party.web.dto.StartGameRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -52,10 +52,10 @@ public class PartyController {
         return partyService.selectClass(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.characterClass());
     }
 
-    @PostMapping("/{code}/turn-order")
-    public PartyStateDto setTurnOrder(@PathVariable String code,
-                                       @AuthenticationPrincipal OidcUser principal,
-                                       @Valid @RequestBody SetTurnOrderRequest request) {
-        return partyService.setTurnOrder(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.memberIds());
+    @PostMapping("/{code}/start")
+    public PartyStateDto startGame(@PathVariable String code,
+                                    @AuthenticationPrincipal OidcUser principal,
+                                    @Valid @RequestBody StartGameRequest request) {
+        return partyService.startGame(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.memberIds());
     }
 }

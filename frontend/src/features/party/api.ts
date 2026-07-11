@@ -17,6 +17,6 @@ export function selectClass(code: string, characterClass: CharacterClass): Promi
   return apiClient.post<PartyState>(`/api/parties/${code}/class`, { characterClass })
 }
 
-export function setTurnOrder(code: string, memberIds: string[]): Promise<PartyState> {
-  return apiClient.post<PartyState>(`/api/parties/${code}/turn-order`, { memberIds })
+export function startGame(code: string, memberIds: string[]): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/start`, { memberIds })
 }

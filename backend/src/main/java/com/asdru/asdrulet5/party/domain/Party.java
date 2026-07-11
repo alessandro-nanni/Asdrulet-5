@@ -35,6 +35,10 @@ public class Party {
     private final AtomicInteger fakeMemberSequence = new AtomicInteger();
     private List<String> turnOrder = List.of();
 
+    @Getter
+    @Accessors(fluent = true)
+    private PartyStatus status = PartyStatus.LOBBY;
+
     public Party(String code, String leaderId, String leaderDisplayName, String leaderAvatarUrl) {
         this.code = code;
         this.leaderId = leaderId;
@@ -88,7 +92,7 @@ public class Party {
     }
 
     @Synchronized
-    public void setTurnOrder(String requesterId, List<String> order) {
+    public void start(String requesterId, List<String> order) {
         if (!leaderId.equals(requesterId)) {
             throw new NotPartyLeaderException(code, requesterId);
         }
@@ -97,6 +101,7 @@ public class Party {
             throw new InvalidTurnOrderException(code);
         }
         this.turnOrder = List.copyOf(order);
+        this.status = PartyStatus.IN_PROGRESS;
     }
 
     @Synchronized

@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
+import com.asdru.asdrulet5.party.domain.PartyStatus;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
@@ -81,22 +82,24 @@ class PartyServiceTest {
     }
 
     @Test
-    void onlyLeaderCanSetTurnOrder() {
+    void onlyLeaderCanStartGame() {
         PartyStateDto created = partyService.createParty(leader, "Leader");
         partyService.joinParty(created.code(), member, "Player Two");
 
-        assertThatThrownBy(() -> partyService.setTurnOrder(created.code(), member, List.of("leader-1", "player-2")))
+        assertThatThrownBy(() -> partyService.startGame(created.code(), member, List.of("leader-1", "player-2")))
                 .isInstanceOf(NotPartyLeaderException.class);
     }
 
     @Test
-    void leaderSetsTurnOrderSuccessfully() {
+    void leaderStartsGameSuccessfully() {
         PartyStateDto created = partyService.createParty(leader, "Leader");
         partyService.joinParty(created.code(), member, "Player Two");
+        assertThat(created.status()).isEqualTo(PartyStatus.LOBBY);
 
-        PartyStateDto updated = partyService.setTurnOrder(created.code(), leader, List.of("player-2", "leader-1"));
+        PartyStateDto updated = partyService.startGame(created.code(), leader, List.of("player-2", "leader-1"));
 
         assertThat(updated.turnOrder()).containsExactly("player-2", "leader-1");
+        assertThat(updated.status()).isEqualTo(PartyStatus.IN_PROGRESS);
     }
 
     @Test

@@ -6,7 +6,7 @@ import { PartyMemberList } from '../features/party/components/PartyMemberList'
 import { ClassSelector } from '../features/party/components/ClassSelector'
 import { TurnOrderEditor } from '../features/party/components/TurnOrderEditor'
 import { QrCodeCard } from '../features/party/components/QrCodeCard'
-import { selectClass, setTurnOrder } from '../features/party/api'
+import { selectClass, startGame } from '../features/party/api'
 import { selectClassAsFakeMember } from '../features/dev/api'
 import type { CharacterClass } from '../features/party/types'
 
@@ -37,6 +37,7 @@ export function PartyLobbyPage() {
   const self = party.members.find((member) => member.userId === user.id)
   const isLeader = self?.leader ?? false
   const effectiveActingAsId = actingAsId ?? user.id
+  const everyoneHasAClass = party.members.every((member) => member.characterClass !== null)
 
   async function handleSelectClass(characterClass: CharacterClass) {
     setClassError(null)
@@ -49,6 +50,34 @@ export function PartyLobbyPage() {
     } catch {
       setClassError('That class was just taken. Pick another one.')
     }
+  }
+
+  if (party.status === 'IN_PROGRESS') {
+    return (
+      <div className="page">
+        <header className="lobby-header">
+          <p className="eyebrow">Party code</p>
+          <h1 className="party-code">{party.code}</h1>
+        </header>
+
+        <section className="card">
+          <h2 className="section-title">The adventure begins...</h2>
+          <p className="muted">Combat isn't built yet — this is just confirming the party has started.</p>
+        </section>
+
+        <section className="card">
+          <h2 className="section-title">Turn order</h2>
+          <ol className="turn-order-list">
+            {party.turnOrder.map((userId, index) => (
+              <li key={userId} className="turn-order-item">
+                <span className="turn-order-index">{index + 1}</span>
+                {party.members.find((member) => member.userId === userId)?.displayName ?? userId}
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    )
   }
 
   return (
@@ -96,26 +125,16 @@ export function PartyLobbyPage() {
       {isLeader && (
         <section className="card">
           <h2 className="section-title">Set turn order</h2>
-          <TurnOrderEditor
-            members={party.members}
-            onSubmit={(order) => {
-              void setTurnOrder(party.code, order)
-            }}
-          />
-        </section>
-      )}
-
-      {party.turnOrder.length > 0 && (
-        <section className="card">
-          <h2 className="section-title">Turn order</h2>
-          <ol className="turn-order-list">
-            {party.turnOrder.map((userId, index) => (
-              <li key={userId} className="turn-order-item">
-                <span className="turn-order-index">{index + 1}</span>
-                {party.members.find((member) => member.userId === userId)?.displayName ?? userId}
-              </li>
-            ))}
-          </ol>
+          {everyoneHasAClass ? (
+            <TurnOrderEditor
+              members={party.members}
+              onSubmit={(order) => {
+                void startGame(party.code, order)
+              }}
+            />
+          ) : (
+            <p className="muted">Waiting for everyone to choose a class...</p>
+          )}
         </section>
       )}
     </div>

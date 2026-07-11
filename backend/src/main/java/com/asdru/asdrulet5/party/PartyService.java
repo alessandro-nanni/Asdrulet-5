@@ -42,9 +42,9 @@ public class PartyService {
         return broadcast(party);
     }
 
-    public PartyStateDto setTurnOrder(String code, AuthenticatedUser user, List<String> order) {
+    public PartyStateDto startGame(String code, AuthenticatedUser user, List<String> order) {
         Party party = getOrThrow(code);
-        party.setTurnOrder(user.id(), order);
+        party.start(user.id(), order);
         return broadcast(party);
     }
 

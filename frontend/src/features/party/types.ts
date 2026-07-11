@@ -1,5 +1,7 @@
 export type CharacterClass = 'HEALER' | 'TANK' | 'WARRIOR' | 'MAGE'
 
+export type PartyStatus = 'LOBBY' | 'IN_PROGRESS'
+
 export interface PartyMember {
   userId: string
   displayName: string
@@ -14,4 +16,5 @@ export interface PartyState {
   leaderId: string
   members: PartyMember[]
   turnOrder: string[]
+  status: PartyStatus
 }

@@ -84,40 +84,43 @@ class PartyTest {
     }
 
     @Test
-    void setTurnOrderByNonLeaderThrows() {
+    void startByNonLeaderThrows() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
 
-        assertThatThrownBy(() -> party.setTurnOrder("player-2", List.of("leader-1", "player-2")))
+        assertThatThrownBy(() -> party.start("player-2", List.of("leader-1", "player-2")))
                 .isInstanceOf(NotPartyLeaderException.class);
+        assertThat(party.status()).isEqualTo(PartyStatus.LOBBY);
     }
 
     @Test
-    void setTurnOrderWithMissingMemberThrows() {
+    void startWithMissingMemberThrows() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
 
-        assertThatThrownBy(() -> party.setTurnOrder("leader-1", List.of("leader-1")))
+        assertThatThrownBy(() -> party.start("leader-1", List.of("leader-1")))
                 .isInstanceOf(InvalidTurnOrderException.class);
     }
 
     @Test
-    void setTurnOrderWithDuplicateThrows() {
+    void startWithDuplicateThrows() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
 
-        assertThatThrownBy(() -> party.setTurnOrder("leader-1", List.of("leader-1", "leader-1")))
+        assertThatThrownBy(() -> party.start("leader-1", List.of("leader-1", "leader-1")))
                 .isInstanceOf(InvalidTurnOrderException.class);
     }
 
     @Test
-    void setTurnOrderByLeaderWithValidPermutationSucceeds() {
+    void startByLeaderWithValidPermutationSetsOrderAndStatus() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
+        assertThat(party.status()).isEqualTo(PartyStatus.LOBBY);
 
-        party.setTurnOrder("leader-1", List.of("player-2", "leader-1"));
+        party.start("leader-1", List.of("player-2", "leader-1"));
 
         assertThat(party.turnOrder()).containsExactly("player-2", "leader-1");
+        assertThat(party.status()).isEqualTo(PartyStatus.IN_PROGRESS);
     }
 
     @Test

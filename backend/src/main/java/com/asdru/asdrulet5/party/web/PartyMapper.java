@@ -14,7 +14,8 @@ public class PartyMapper {
                 party.code(),
                 party.leaderId(),
                 party.members().stream().map(PartyMapper::toDto).toList(),
-                party.turnOrder()
+                party.turnOrder(),
+                party.status()
         );
     }
 

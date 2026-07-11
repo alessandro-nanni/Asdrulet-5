@@ -9,18 +9,45 @@ interface Props {
 export function TurnOrderEditor({ members, onSubmit }: Props) {
   const memberIds = members.map((member) => member.userId).join(',')
   const [order, setOrder] = useState<string[]>(members.map((member) => member.userId))
+  const [draggedId, setDraggedId] = useState<string | null>(null)
 
   useEffect(() => {
     setOrder(memberIds ? memberIds.split(',') : [])
   }, [memberIds])
 
-  function move(index: number, direction: -1 | 1) {
-    const target = index + direction
-    if (target < 0 || target >= order.length) return
-    const next = [...order]
-    ;[next[index], next[target]] = [next[target], next[index]]
-    setOrder(next)
-  }
+  useEffect(() => {
+    if (!draggedId) return
+
+    function handleMove(event: PointerEvent) {
+      const target = document.elementFromPoint(event.clientX, event.clientY)
+      const item = target?.closest<HTMLElement>('[data-user-id]')
+      const overId = item?.dataset.userId
+      if (!overId || overId === draggedId) return
+
+      setOrder((current) => {
+        const from = current.indexOf(draggedId!)
+        const to = current.indexOf(overId)
+        if (from === -1 || to === -1 || from === to) return current
+        const next = [...current]
+        next.splice(from, 1)
+        next.splice(to, 0, draggedId!)
+        return next
+      })
+    }
+
+    function handleUp() {
+      setDraggedId(null)
+    }
+
+    document.addEventListener('pointermove', handleMove)
+    document.addEventListener('pointerup', handleUp)
+    document.addEventListener('pointercancel', handleUp)
+    return () => {
+      document.removeEventListener('pointermove', handleMove)
+      document.removeEventListener('pointerup', handleUp)
+      document.removeEventListener('pointercancel', handleUp)
+    }
+  }, [draggedId])
 
   function nameFor(userId: string) {
     return members.find((member) => member.userId === userId)?.displayName ?? userId
@@ -30,32 +57,25 @@ export function TurnOrderEditor({ members, onSubmit }: Props) {
     <div>
       <ol className="turn-order-editor">
         {order.map((userId, index) => (
-          <li key={userId} className="turn-order-editor-item">
+          <li
+            key={userId}
+            data-user-id={userId}
+            className={`turn-order-editor-item ${draggedId === userId ? 'is-dragging' : ''}`}
+          >
             <span className="turn-order-index">{index + 1}</span>
             <span className="turn-order-editor-name">{nameFor(userId)}</span>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => move(index, -1)}
-              disabled={index === 0}
-              aria-label="Move up"
+            <span
+              className="drag-handle"
+              aria-label={`Drag to reorder ${nameFor(userId)}`}
+              onPointerDown={() => setDraggedId(userId)}
             >
-              ▲
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => move(index, 1)}
-              disabled={index === order.length - 1}
-              aria-label="Move down"
-            >
-              ▼
-            </button>
+              ⠿
+            </span>
           </li>
         ))}
       </ol>
       <button type="button" className="btn btn-primary btn-block" onClick={() => onSubmit(order)}>
-        Confirm turn order
+        Start
       </button>
     </div>
   )

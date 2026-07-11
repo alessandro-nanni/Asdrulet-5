@@ -306,6 +306,51 @@ p {
   font-weight: 600;
 }
 
+.member-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-avatar-wrap {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.member-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface);
+  border: 2px solid var(--surface-border);
+}
+
+.member-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.class-hat {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-6deg);
+  pointer-events: none;
+}
+
+.crown-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
 .badge {
   font-size: 0.7rem;
   font-weight: 700;
@@ -313,11 +358,6 @@ p {
   border-radius: 999px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.badge-leader {
-  background: rgba(255, 183, 3, 0.2);
-  color: var(--accent);
 }
 
 .badge-pending {
@@ -483,4 +523,22 @@ p {
 .turn-order-editor-name {
   flex: 1;
   font-weight: 600;
+}
+
+.turn-order-editor-item.is-dragging {
+  opacity: 0.5;
+  border: 1px dashed var(--accent);
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
