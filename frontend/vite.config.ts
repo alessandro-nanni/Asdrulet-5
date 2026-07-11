@@ -15,6 +15,10 @@ export default defineConfig({
         target: 'ws://localhost:8080',
         ws: true,
       },
+      // Spring Security's OAuth2 login endpoints, so the login button can use
+      // a plain relative URL in both dev (via this proxy) and prod (same origin).
+      '/oauth2': 'http://localhost:8080',
+      '/login': 'http://localhost:8080',
     },
   },
 })
