@@ -4,7 +4,6 @@ public record StatsDto(
         int maxHealth,
         int damage,
         int defense,
-        int speed,
         int maxStamina
 ) {
 }

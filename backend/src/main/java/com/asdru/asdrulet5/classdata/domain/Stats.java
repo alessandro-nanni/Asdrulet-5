@@ -4,7 +4,6 @@ public record Stats(
         int maxHealth,
         int damage,
         int defense,
-        int speed,
         int maxStamina
 ) {
     public Stats {
@@ -16,9 +15,6 @@ public record Stats(
         }
         if (defense < 0) {
             throw new IllegalArgumentException("defense must not be negative");
-        }
-        if (speed <= 0) {
-            throw new IllegalArgumentException("speed must be positive");
         }
         if (maxStamina < 0) {
             throw new IllegalArgumentException("maxStamina must not be negative");

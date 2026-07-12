@@ -41,6 +41,5 @@ class ClassDefinitionRegistryTest {
         ClassDefinition definition = registry.get(characterClass);
 
         assertThat(definition.stats().maxHealth()).isPositive();
-        assertThat(definition.stats().speed()).isPositive();
     }
 }

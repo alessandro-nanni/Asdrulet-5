@@ -1,13 +1,6 @@
 package com.asdru.asdrulet5.combat.domain;
 
-import com.asdru.asdrulet5.classdata.domain.Ability;
-import com.asdru.asdrulet5.classdata.domain.BasicAbility;
-import com.asdru.asdrulet5.classdata.domain.BuffDamageEffect;
-import com.asdru.asdrulet5.classdata.domain.BuffDefenseEffect;
-import com.asdru.asdrulet5.classdata.domain.DamageEffect;
-import com.asdru.asdrulet5.classdata.domain.HealEffect;
-import com.asdru.asdrulet5.classdata.domain.TargetType;
-import com.asdru.asdrulet5.classdata.domain.UltimateAbility;
+import com.asdru.asdrulet5.classdata.domain.*;
 import com.asdru.asdrulet5.combat.exception.CombatNotInProgressException;
 import com.asdru.asdrulet5.combat.exception.InsufficientResourceException;
 import com.asdru.asdrulet5.combat.exception.NotYourTurnException;
@@ -56,6 +49,10 @@ class CombatTest {
 
     private static Combat twoPlayersOneEnemy(Combatant p1, Combatant p2, Combatant enemy) {
         return new Combat("ABC123", List.of(p1, p2, enemy), List.of(p1.id(), p2.id(), enemy.id()));
+    }
+
+    private static Combatant findCombatant(Combat combat, String id) {
+        return combat.combatants().stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow();
     }
 
     @Test
@@ -266,9 +263,5 @@ class CombatTest {
 
         assertThat(findCombatant(combat, "enemyA").currentHealth()).isEqualTo(200 - 15);
         assertThat(findCombatant(combat, "enemyB").currentHealth()).isEqualTo(200 - 15);
-    }
-
-    private static Combatant findCombatant(Combat combat, String id) {
-        return combat.combatants().stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow();
     }
 }

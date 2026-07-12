@@ -33,22 +33,22 @@ public final class Combatant implements EffectTarget {
     private final boolean enemy;
     private final CharacterClass characterClass;
     private final int maxHealth;
-    private int currentHealth;
     private final int maxStamina;
-    private int currentStamina;
     private final int baseDefense;
-    private int ultimateCharge;
     private final int ultimateChargeThreshold;
     private final List<ActiveEffect> activeEffects = new ArrayList<>();
     private final List<Ability> abilities;
     private final String attackName;
     private final String attackDescription;
     private final AbilityEffect attackEffect;
+    private int currentHealth;
+    private int currentStamina;
+    private int ultimateCharge;
 
     public Combatant(String id, String displayName, boolean enemy, CharacterClass characterClass,
-                      int maxHealth, int maxStamina, int baseDefense, int ultimateChargeThreshold,
-                      List<Ability> abilities, String attackName, String attackDescription,
-                      AbilityEffect attackEffect) {
+                     int maxHealth, int maxStamina, int baseDefense, int ultimateChargeThreshold,
+                     List<Ability> abilities, String attackName, String attackDescription,
+                     AbilityEffect attackEffect) {
         this.id = id;
         this.displayName = displayName;
         this.enemy = enemy;

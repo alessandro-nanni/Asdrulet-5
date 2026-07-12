@@ -7,11 +7,7 @@ import com.asdru.asdrulet5.party.exception.DevToolsDisabledException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * Dev-only tooling mirroring PartyDevController: lets a locally-simulated bot
@@ -30,8 +26,8 @@ public class CombatDevController {
 
     @PostMapping("/actions")
     public CombatStateDto useAbilityAsFakeMember(@PathVariable String code,
-                                                  @PathVariable String memberId,
-                                                  @Valid @RequestBody UseAbilityRequest request) {
+                                                 @PathVariable String memberId,
+                                                 @Valid @RequestBody UseAbilityRequest request) {
         requireDevToolsEnabled();
         return combatService.useAbility(code.toUpperCase(), memberId, request.abilityId(), request.targetId());
     }

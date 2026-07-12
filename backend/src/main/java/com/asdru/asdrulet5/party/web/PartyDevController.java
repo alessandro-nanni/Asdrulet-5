@@ -8,11 +8,7 @@ import com.asdru.asdrulet5.party.web.dto.SelectClassRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * Dev-only tooling to test multi-member party flows from a single logged-in
@@ -38,8 +34,8 @@ public class PartyDevController {
 
     @PostMapping("/{memberId}/class")
     public PartyStateDto selectClassAsFakeMember(@PathVariable String code,
-                                                  @PathVariable String memberId,
-                                                  @Valid @RequestBody SelectClassRequest request) {
+                                                 @PathVariable String memberId,
+                                                 @Valid @RequestBody SelectClassRequest request) {
         requireDevToolsEnabled();
         return partyService.selectClassAsFakeMember(code.toUpperCase(), memberId, request.characterClass());
     }

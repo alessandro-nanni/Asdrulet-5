@@ -1,11 +1,6 @@
 package com.asdru.asdrulet5.party.domain;
 
-import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
-import com.asdru.asdrulet5.party.exception.InvalidTurnOrderException;
-import com.asdru.asdrulet5.party.exception.MissingClassSelectionException;
-import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
-import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
-import com.asdru.asdrulet5.party.exception.PartyFullException;
+import com.asdru.asdrulet5.party.exception.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

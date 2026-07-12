@@ -11,11 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
@@ -48,16 +44,16 @@ public class PartyDevSessionController {
 
     @PostMapping("/{code}/{memberId}/class")
     public PartyStateDto selectClass(@PathVariable String code,
-                                      @PathVariable String memberId,
-                                      @Valid @RequestBody SelectClassRequest request) {
+                                     @PathVariable String memberId,
+                                     @Valid @RequestBody SelectClassRequest request) {
         requireDevToolsEnabled();
         return partyService.selectClassAsMember(code.toUpperCase(), memberId, request.characterClass());
     }
 
     @PostMapping("/{code}/{memberId}/start")
     public PartyStateDto startGame(@PathVariable String code,
-                                    @PathVariable String memberId,
-                                    @Valid @RequestBody StartGameRequest request) {
+                                   @PathVariable String memberId,
+                                   @Valid @RequestBody StartGameRequest request) {
         requireDevToolsEnabled();
         return partyService.startGame(code.toUpperCase(), memberId, request.memberIds());
     }

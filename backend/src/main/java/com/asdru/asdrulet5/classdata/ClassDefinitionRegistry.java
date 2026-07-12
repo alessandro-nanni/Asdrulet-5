@@ -27,18 +27,6 @@ public class ClassDefinitionRegistry {
 
     private static final Map<CharacterClass, ClassDefinition> DEFINITIONS = buildDefinitions();
 
-    public List<ClassDefinition> all() {
-        return List.copyOf(DEFINITIONS.values());
-    }
-
-    public ClassDefinition get(CharacterClass characterClass) {
-        ClassDefinition definition = DEFINITIONS.get(characterClass);
-        if (definition == null) {
-            throw new UnknownClassDefinitionException(characterClass);
-        }
-        return definition;
-    }
-
     private static Map<CharacterClass, ClassDefinition> buildDefinitions() {
         return Stream.of(
                         HealerClassDefinition.define(),
@@ -50,5 +38,17 @@ public class ClassDefinitionRegistry {
                             throw new IllegalStateException("duplicate class definition");
                         },
                         () -> new EnumMap<>(CharacterClass.class)));
+    }
+
+    public List<ClassDefinition> all() {
+        return List.copyOf(DEFINITIONS.values());
+    }
+
+    public ClassDefinition get(CharacterClass characterClass) {
+        ClassDefinition definition = DEFINITIONS.get(characterClass);
+        if (definition == null) {
+            throw new UnknownClassDefinitionException(characterClass);
+        }
+        return definition;
     }
 }

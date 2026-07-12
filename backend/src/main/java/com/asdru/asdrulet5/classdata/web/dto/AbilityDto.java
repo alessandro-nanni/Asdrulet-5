@@ -16,5 +16,5 @@ public record AbilityDto(
         Integer chargeThreshold,
         EffectDto effect
 ) {
-    public enum AbilityKind { BASIC, ULTIMATE }
+    public enum AbilityKind {BASIC, ULTIMATE}
 }

@@ -1,12 +1,6 @@
 package com.asdru.asdrulet5.classdata.classes;
 
-import com.asdru.asdrulet5.classdata.domain.BasicAbility;
-import com.asdru.asdrulet5.classdata.domain.BuffDamageEffect;
-import com.asdru.asdrulet5.classdata.domain.ClassDefinition;
-import com.asdru.asdrulet5.classdata.domain.DamageEffect;
-import com.asdru.asdrulet5.classdata.domain.Stats;
-import com.asdru.asdrulet5.classdata.domain.TargetType;
-import com.asdru.asdrulet5.classdata.domain.UltimateAbility;
+import com.asdru.asdrulet5.classdata.domain.*;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import lombok.experimental.UtilityClass;
 
@@ -20,7 +14,7 @@ public class WarriorClassDefinition {
                 CharacterClass.WARRIOR,
                 "Warrior",
                 "Charges in first and asks questions never.",
-                new Stats(120, 18, 10, 10, 100),
+                new Stats(120, 18, 10, 100),
                 List.of(
                         new BasicAbility("warrior.cleave", "Cleave",
                                 "A wide sweeping strike that cuts through an enemy's guard.",

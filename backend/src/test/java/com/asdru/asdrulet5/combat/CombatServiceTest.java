@@ -18,24 +18,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 class CombatServiceTest {
 
     private CombatService combatService;
     private SimpMessagingTemplate messagingTemplate;
 
+    private static PartyMember member(String id, CharacterClass characterClass) {
+        return new PartyMember(id, id, null, characterClass, false, false);
+    }
+
     @BeforeEach
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
         combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(),
                 new EnemyDefinitionRegistry(), messagingTemplate);
-    }
-
-    private static PartyMember member(String id, CharacterClass characterClass) {
-        return new PartyMember(id, id, null, characterClass, false, false);
     }
 
     @Test

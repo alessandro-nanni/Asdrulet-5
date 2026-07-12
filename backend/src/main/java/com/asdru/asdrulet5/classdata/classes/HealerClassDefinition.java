@@ -1,12 +1,6 @@
 package com.asdru.asdrulet5.classdata.classes;
 
-import com.asdru.asdrulet5.classdata.domain.BasicAbility;
-import com.asdru.asdrulet5.classdata.domain.ClassDefinition;
-import com.asdru.asdrulet5.classdata.domain.HealEffect;
-import com.asdru.asdrulet5.classdata.domain.DamageEffect;
-import com.asdru.asdrulet5.classdata.domain.Stats;
-import com.asdru.asdrulet5.classdata.domain.TargetType;
-import com.asdru.asdrulet5.classdata.domain.UltimateAbility;
+import com.asdru.asdrulet5.classdata.domain.*;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import lombok.experimental.UtilityClass;
 
@@ -20,7 +14,7 @@ public class HealerClassDefinition {
                 CharacterClass.HEALER,
                 "Healer",
                 "A steady hand that keeps the party standing when everything else falls apart.",
-                new Stats(80, 8, 4, 9, 100),
+                new Stats(80, 8, 4, 100),
                 List.of(
                         new BasicAbility("healer.mending-light", "Mending Light",
                                 "Channels restorative light into a single ally.",

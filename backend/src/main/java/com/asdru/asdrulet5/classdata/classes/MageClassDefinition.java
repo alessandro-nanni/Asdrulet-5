@@ -14,7 +14,7 @@ public class MageClassDefinition {
                 CharacterClass.MAGE,
                 "Mage",
                 "Fragile, but the last thing a lot of enemies ever see.",
-                new Stats(70, 22, 3, 8, 110),
+                new Stats(70, 22, 3, 110),
                 List.of(
                         new BasicAbility("mage.firebolt", "Firebolt",
                                 "Launches a bolt of searing flame at an enemy.",

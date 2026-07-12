@@ -1,14 +1,6 @@
 package com.asdru.asdrulet5.party.web;
 
-import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
-import com.asdru.asdrulet5.party.exception.DevToolsDisabledException;
-import com.asdru.asdrulet5.party.exception.InvalidTurnOrderException;
-import com.asdru.asdrulet5.party.exception.MissingClassSelectionException;
-import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
-import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
-import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
-import com.asdru.asdrulet5.party.exception.PartyFullException;
-import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
+import com.asdru.asdrulet5.party.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

@@ -22,6 +22,22 @@ public class EnemyDefinitionRegistry {
 
     private static final Map<String, EnemyDefinition> DEFINITIONS = buildDefinitions();
 
+    private static Map<String, EnemyDefinition> buildDefinitions() {
+        return Stream.of(goblinMarauder())
+                .collect(Collectors.toMap(EnemyDefinition::id, Function.identity()));
+    }
+
+    private static EnemyDefinition goblinMarauder() {
+        return new EnemyDefinition(
+                DEFAULT_ENEMY_ID,
+                "Goblin Marauder",
+                new Stats(220, 15, 8, 0),
+                "Rusty Cleaver",
+                "Swings a notched blade at whoever's closest.",
+                new DamageEffect(15)
+        );
+    }
+
     public List<EnemyDefinition> all() {
         return List.copyOf(DEFINITIONS.values());
     }
@@ -32,21 +48,5 @@ public class EnemyDefinitionRegistry {
             throw new IllegalArgumentException("No enemy definition registered for " + id);
         }
         return definition;
-    }
-
-    private static Map<String, EnemyDefinition> buildDefinitions() {
-        return Stream.of(goblinMarauder())
-                .collect(Collectors.toMap(EnemyDefinition::id, Function.identity()));
-    }
-
-    private static EnemyDefinition goblinMarauder() {
-        return new EnemyDefinition(
-                DEFAULT_ENEMY_ID,
-                "Goblin Marauder",
-                new Stats(220, 15, 8, 7, 0),
-                "Rusty Cleaver",
-                "Swings a notched blade at whoever's closest.",
-                new DamageEffect(15)
-        );
     }
 }

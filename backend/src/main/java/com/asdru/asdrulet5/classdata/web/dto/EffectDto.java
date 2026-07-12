@@ -10,5 +10,5 @@ public record EffectDto(
         int power,
         int durationTurns
 ) {
-    public enum Kind { DAMAGE, HEAL, BUFF_DEFENSE, BUFF_DAMAGE }
+    public enum Kind {DAMAGE, HEAL, BUFF_DEFENSE, BUFF_DAMAGE}
 }

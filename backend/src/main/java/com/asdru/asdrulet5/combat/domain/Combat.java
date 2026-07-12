@@ -1,15 +1,7 @@
 package com.asdru.asdrulet5.combat.domain;
 
-import com.asdru.asdrulet5.classdata.domain.Ability;
-import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
-import com.asdru.asdrulet5.classdata.domain.BasicAbility;
-import com.asdru.asdrulet5.classdata.domain.TargetType;
-import com.asdru.asdrulet5.classdata.domain.UltimateAbility;
-import com.asdru.asdrulet5.combat.exception.CombatNotInProgressException;
-import com.asdru.asdrulet5.combat.exception.InsufficientResourceException;
-import com.asdru.asdrulet5.combat.exception.InvalidTargetException;
-import com.asdru.asdrulet5.combat.exception.NotYourTurnException;
-import com.asdru.asdrulet5.combat.exception.UnknownAbilityException;
+import com.asdru.asdrulet5.classdata.domain.*;
+import com.asdru.asdrulet5.combat.exception.*;
 import lombok.Getter;
 import lombok.Synchronized;
 import lombok.experimental.Accessors;

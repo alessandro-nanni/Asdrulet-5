@@ -1,11 +1,6 @@
 package com.asdru.asdrulet5.combat.web;
 
-import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
-import com.asdru.asdrulet5.combat.exception.CombatNotInProgressException;
-import com.asdru.asdrulet5.combat.exception.InsufficientResourceException;
-import com.asdru.asdrulet5.combat.exception.InvalidTargetException;
-import com.asdru.asdrulet5.combat.exception.NotYourTurnException;
-import com.asdru.asdrulet5.combat.exception.UnknownAbilityException;
+import com.asdru.asdrulet5.combat.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
