@@ -228,6 +228,7 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
               key={combatant.id}
               combatant={combatant}
               isCurrentTurn={combat.currentTurnCombatantId === combatant.id}
+              isEngaged={combat.currentTurnCombatantId === combatant.id && hasActedThisTurn}
               selectable={selectableIds?.has(combatant.id) ?? false}
               isInvalidTarget={selectableIds != null && !selectableIds.has(combatant.id) && combatant.alive}
               onSelect={() => handleFieldTargetClick(combatant.id)}
@@ -247,6 +248,7 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
                 combatant={combatant}
                 member={member}
                 isCurrentTurn={combat.currentTurnCombatantId === combatant.id}
+                isEngaged={combat.currentTurnCombatantId === combatant.id && hasActedThisTurn}
                 selectable={selectableIds?.has(combatant.id) ?? false}
                 isInvalidTarget={selectableIds != null && !selectableIds.has(combatant.id) && combatant.alive}
                 onSelect={() => handleFieldTargetClick(combatant.id)}

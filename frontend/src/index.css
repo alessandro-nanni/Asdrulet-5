@@ -744,6 +744,7 @@ p {
 }
 
 .combatant-card {
+  --engage-offset: 0px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -753,17 +754,24 @@ p {
   padding: 10px 8px;
   border-radius: var(--radius-md);
   border: 2px solid transparent;
-  transition: transform 0.2s ease;
+  transform: translateY(var(--engage-offset));
+  transition: transform 0.3s ease, border-color 0.2s ease;
 }
 
-.battlefield-row-enemies .combatant-card.is-current-turn {
-  transform: translateY(18px);
+.combatant-card.is-current-turn {
+  border-color: var(--accent);
   z-index: 2;
 }
 
-.battlefield-row-allies .combatant-card.is-current-turn {
-  transform: translateY(-18px);
-  z-index: 2;
+/* Position only moves once the current-turn combatant actually acts (see
+   .is-engaged below) — not merely because it's their turn — and holds there
+   until their turn ends, rather than snapping back after every ability. */
+.battlefield-row-enemies .combatant-card.is-engaged {
+  --engage-offset: 18px;
+}
+
+.battlefield-row-allies .combatant-card.is-engaged {
+  --engage-offset: -18px;
 }
 
 .combatant-card.is-defeated {
@@ -778,7 +786,7 @@ p {
 }
 
 .combatant-card.is-selectable:active {
-  transform: scale(0.95);
+  transform: translateY(var(--engage-offset)) scale(0.95);
 }
 
 .combatant-card.is-invalid-target {
@@ -812,11 +820,11 @@ p {
 @keyframes attack-flash {
   0%,
   100% {
-    transform: scale(1);
+    transform: translateY(var(--engage-offset)) scale(1);
     filter: brightness(1);
   }
   40% {
-    transform: scale(1.06);
+    transform: translateY(var(--engage-offset)) scale(1.06);
     filter: brightness(1.35);
   }
 }

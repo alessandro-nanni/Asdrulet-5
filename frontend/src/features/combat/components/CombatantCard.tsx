@@ -31,6 +31,7 @@ interface Props {
   combatant: Combatant
   member?: PartyMember
   isCurrentTurn: boolean
+  isEngaged?: boolean
   selectable?: boolean
   isInvalidTarget?: boolean
   onSelect?: () => void
@@ -43,6 +44,7 @@ export function CombatantCard({
   combatant,
   member,
   isCurrentTurn,
+  isEngaged = false,
   selectable = false,
   isInvalidTarget = false,
   onSelect,
@@ -57,6 +59,7 @@ export function CombatantCard({
   const classNames = [
     'combatant-card',
     isCurrentTurn ? 'is-current-turn' : '',
+    isEngaged ? 'is-engaged' : '',
     combatant.alive ? '' : 'is-defeated',
     selectable ? 'is-selectable' : '',
     isInvalidTarget ? 'is-invalid-target' : '',
