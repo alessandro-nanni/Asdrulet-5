@@ -298,6 +298,50 @@ class CombatTest {
     }
 
     @Test
+    void multiHitAbilityRecordsOneEventPerHitNotOneCombinedEvent() {
+        Combatant p1 = player("p1", List.of(MULTI_STRIKE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 2, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.multi-strike", "enemy");
+
+        List<CombatEvent> events = combat.lastEvents();
+        assertThat(events).hasSize(4);
+        assertThat(events).allSatisfy(event -> {
+            assertThat(event.targetId()).isEqualTo("enemy");
+            assertThat(event.kind()).isEqualTo(CombatEvent.Kind.DAMAGE);
+            assertThat(event.amount()).isEqualTo(5);
+        });
+    }
+
+    @Test
+    void lastEventsReplacedEachCallIncludingEnemyAutoAttack() {
+        Combatant p1 = player("p1", List.of(STRIKE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 12);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.strike", "enemy");
+        assertThat(combat.lastEvents()).hasSize(1);
+        assertThat(combat.lastEvents().get(0).targetId()).isEqualTo("enemy");
+
+        combat.endTurn("p1");
+        // Nothing happened advancing to p2's turn: no enemy action yet, no active effects to tick.
+        assertThat(combat.lastEvents()).isEmpty();
+
+        combat.endTurn("p2");
+        // Enemy's turn resolves automatically within this call; the p1-vs-enemy event from
+        // the earlier useAbility call is gone, replaced by just the enemy's attack.
+        List<CombatEvent> events = combat.lastEvents();
+        assertThat(events).hasSize(1);
+        CombatEvent event = events.get(0);
+        assertThat(event.kind()).isEqualTo(CombatEvent.Kind.DAMAGE);
+        // round(12 * 25/30) = 10 damage against 5 defense.
+        assertThat(event.amount()).isEqualTo(10);
+    }
+
+    @Test
     void damageOverTimeTicksOnHolderTurnStartAndExpiresAfterDuration() {
         Combatant p1 = player("p1", List.of(POISON_DART));
         Combatant p2 = player("p2", List.of(STRIKE));

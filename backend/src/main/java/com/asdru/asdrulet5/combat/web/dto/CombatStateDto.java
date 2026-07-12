@@ -8,6 +8,7 @@ public record CombatStateDto(
         String code,
         CombatStatus status,
         List<CombatantDto> combatants,
-        String currentTurnCombatantId
+        String currentTurnCombatantId,
+        List<CombatEventDto> recentEvents
 ) {
 }

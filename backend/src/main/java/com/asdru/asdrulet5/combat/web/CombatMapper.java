@@ -2,8 +2,10 @@ package com.asdru.asdrulet5.combat.web;
 
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.combat.domain.Combat;
+import com.asdru.asdrulet5.combat.domain.CombatEvent;
 import com.asdru.asdrulet5.combat.domain.Combatant;
 import com.asdru.asdrulet5.combat.web.dto.ActiveEffectDto;
+import com.asdru.asdrulet5.combat.web.dto.CombatEventDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatantDto;
 import lombok.experimental.UtilityClass;
@@ -16,7 +18,8 @@ public class CombatMapper {
                 combat.code(),
                 combat.status(),
                 combat.combatants().stream().map(CombatMapper::toDto).toList(),
-                combat.currentTurnCombatantId()
+                combat.currentTurnCombatantId(),
+                combat.lastEvents().stream().map(CombatMapper::toDto).toList()
         );
     }
 
@@ -43,5 +46,9 @@ public class CombatMapper {
     private ActiveEffectDto toDto(ActiveEffect activeEffect) {
         return new ActiveEffectDto(
                 activeEffect.name(), activeEffect.description(), activeEffect.icon(), activeEffect.remainingTurns());
+    }
+
+    private CombatEventDto toDto(CombatEvent event) {
+        return new CombatEventDto(event.targetId(), event.kind(), event.amount());
     }
 }

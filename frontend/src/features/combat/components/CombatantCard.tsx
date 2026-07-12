@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, CSSProperties } from 'react'
 import { useState } from 'react'
 import { HeartIcon } from '../../../shared/ui/HeartIcon'
 import { PoisonIcon } from '../../../shared/ui/PoisonIcon'
@@ -15,6 +15,8 @@ export interface FloatingText {
   key: string
   text: string
   kind: 'damage' | 'heal'
+  offsetX: number
+  delayMs: number
 }
 
 // Backend sends a stable icon key per effect (see ActiveEffect.java); unrecognized
@@ -79,7 +81,16 @@ export function CombatantCard({
     >
       <div className="combatant-fx-layer" aria-hidden="true">
         {floatingTexts.map((floating) => (
-          <span key={floating.key} className={`floating-text floating-text-${floating.kind}`}>
+          <span
+            key={floating.key}
+            className={`floating-text floating-text-${floating.kind}`}
+            style={
+              {
+                '--float-offset-x': `${floating.offsetX}px`,
+                animationDelay: `${floating.delayMs}ms`,
+              } as CSSProperties
+            }
+          >
             {floating.text}
           </span>
         ))}

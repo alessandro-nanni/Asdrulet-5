@@ -867,9 +867,10 @@ p {
 }
 
 .floating-text {
+  --float-offset-x: 0px;
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--float-offset-x)));
   font-weight: 800;
   font-size: 0.95rem;
   white-space: nowrap;
@@ -888,15 +889,15 @@ p {
 @keyframes float-up {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(0) scale(0.8);
+    transform: translateX(calc(-50% + var(--float-offset-x))) translateY(0) scale(0.8);
   }
   15% {
     opacity: 1;
-    transform: translateX(-50%) translateY(-6px) scale(1.05);
+    transform: translateX(calc(-50% + var(--float-offset-x))) translateY(-6px) scale(1.05);
   }
   100% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-38px) scale(1);
+    transform: translateX(calc(-50% + var(--float-offset-x))) translateY(-38px) scale(1);
   }
 }
 

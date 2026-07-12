@@ -37,6 +37,7 @@ public final class Combatant implements EffectTarget {
     private final int baseDefense;
     private final int ultimateChargeThreshold;
     private final List<ActiveEffect> activeEffects = new ArrayList<>();
+    private final List<CombatEvent> events = new ArrayList<>();
     private final List<Ability> abilities;
     private final String attackName;
     private final String attackDescription;
@@ -96,12 +97,29 @@ public final class Combatant implements EffectTarget {
 
     @Override
     public void applyDamage(int amount) {
+        int before = currentHealth;
         currentHealth = Math.max(0, currentHealth - amount);
+        recordEvent(CombatEvent.Kind.DAMAGE, before - currentHealth);
     }
 
     @Override
     public void applyHeal(int amount) {
+        int before = currentHealth;
         currentHealth = Math.min(maxHealth, currentHealth + amount);
+        recordEvent(CombatEvent.Kind.HEAL, currentHealth - before);
+    }
+
+    /**
+     * Records the actual health change (post-clamp, e.g. an overkill hit or
+     * an overheal only records however much health really moved) so the
+     * event matches what shows on the health bar rather than the effect's
+     * raw input. Zero-change applications (already dead, already full) are
+     * dropped rather than recorded as no-op events.
+     */
+    private void recordEvent(CombatEvent.Kind kind, int actualAmount) {
+        if (actualAmount > 0) {
+            events.add(new CombatEvent(id, kind, actualAmount));
+        }
     }
 
     @Override
@@ -128,6 +146,13 @@ public final class Combatant implements EffectTarget {
 
     void resetUltimateCharge() {
         ultimateCharge = 0;
+    }
+
+    /** Returns and clears the events recorded since the last drain. */
+    List<CombatEvent> drainEvents() {
+        List<CombatEvent> drained = List.copyOf(events);
+        events.clear();
+        return drained;
     }
 
     void tickActiveEffects() {

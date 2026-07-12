@@ -19,6 +19,8 @@ interface Props {
 const REACTION_DURATION_MS = 650
 const ATTACK_DURATION_MS = 500
 const FLOAT_DURATION_MS = 1100
+const FLOAT_SPREAD_PX = 22
+const FLOAT_STAGGER_MS = 90
 
 export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActions = false }: Props) {
   const { combat, error } = useCombatState(code)
@@ -60,7 +62,6 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
     if (previous) {
       const hitTargets: string[] = []
       const healedTargets: string[] = []
-      const newFloats: { combatantId: string; entry: FloatingText }[] = []
 
       for (const current of combat.combatants) {
         const before = previous.combatants.find((candidate) => candidate.id === current.id)
@@ -68,19 +69,11 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
           continue
         }
         const delta = current.currentHealth - before.currentHealth
-        if (delta === 0) {
-          continue
-        }
-        const kind: 'damage' | 'heal' = delta < 0 ? 'damage' : 'heal'
-        if (kind === 'damage') {
+        if (delta < 0) {
           hitTargets.push(current.id)
-        } else {
+        } else if (delta > 0) {
           healedTargets.push(current.id)
         }
-        newFloats.push({
-          combatantId: current.id,
-          entry: { key: `f${floatingKeyRef.current++}`, text: delta > 0 ? `+${delta}` : `${delta}`, kind },
-        })
       }
 
       if (hitTargets.length > 0 || healedTargets.length > 0) {
@@ -108,22 +101,44 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
             return next
           })
         }, REACTION_DURATION_MS)
+      }
 
-        setFloatingByCombatant((current) => {
-          const next = { ...current }
-          for (const { combatantId, entry } of newFloats) {
-            next[combatantId] = [...(next[combatantId] ?? []), entry]
+      // One floating-text popup per individual event (not one per net health
+      // delta), so a multi-hit ability shows a popup per hit instead of a
+      // single combined number. Events on the same target are fanned out
+      // horizontally and staggered slightly in time so they read as
+      // separate hits rather than one illegible stack.
+      const eventsByTarget = new Map<string, typeof combat.recentEvents>()
+      for (const event of combat.recentEvents) {
+        const list = eventsByTarget.get(event.targetId) ?? []
+        list.push(event)
+        eventsByTarget.set(event.targetId, list)
+      }
+
+      for (const [combatantId, events] of eventsByTarget) {
+        events.forEach((event, index) => {
+          const kind: 'damage' | 'heal' = event.kind === 'HEAL' ? 'heal' : 'damage'
+          const entry: FloatingText = {
+            key: `f${floatingKeyRef.current++}`,
+            text: kind === 'heal' ? `+${event.amount}` : `-${event.amount}`,
+            kind,
+            offsetX: (index - (events.length - 1) / 2) * FLOAT_SPREAD_PX,
+            delayMs: index * FLOAT_STAGGER_MS,
           }
-          return next
+          setFloatingByCombatant((current) => ({
+            ...current,
+            [combatantId]: [...(current[combatantId] ?? []), entry],
+          }))
+          setTimeout(
+            () => {
+              setFloatingByCombatant((current) => ({
+                ...current,
+                [combatantId]: (current[combatantId] ?? []).filter((floating) => floating.key !== entry.key),
+              }))
+            },
+            FLOAT_DURATION_MS + entry.delayMs,
+          )
         })
-        for (const { combatantId, entry } of newFloats) {
-          setTimeout(() => {
-            setFloatingByCombatant((current) => ({
-              ...current,
-              [combatantId]: (current[combatantId] ?? []).filter((floating) => floating.key !== entry.key),
-            }))
-          }, FLOAT_DURATION_MS)
-        }
       }
     }
     previousCombatRef.current = combat

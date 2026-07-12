@@ -27,9 +27,16 @@ export interface Combatant {
   attackEffectSummary: string | null
 }
 
+export interface CombatEvent {
+  targetId: string
+  kind: 'DAMAGE' | 'HEAL'
+  amount: number
+}
+
 export interface CombatState {
   code: string
   status: CombatStatus
   combatants: Combatant[]
   currentTurnCombatantId: string
+  recentEvents: CombatEvent[]
 }

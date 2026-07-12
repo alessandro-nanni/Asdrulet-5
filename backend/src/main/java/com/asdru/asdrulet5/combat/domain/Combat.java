@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Synchronized;
 import lombok.experimental.Accessors;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +33,18 @@ public class Combat {
     @Getter
     @Accessors(fluent = true)
     private CombatStatus status = CombatStatus.IN_PROGRESS;
+
+    /**
+     * The hit/heal events produced by the most recent {@link #useAbility} or
+     * {@link #endTurn} call — replaced (not accumulated) on every such call,
+     * including with an empty list when nothing happened. Lets the frontend
+     * render one popup per individual hit (e.g. each strike of a multi-hit
+     * ability) instead of inferring a single net change from before/after
+     * health totals.
+     */
+    @Getter
+    @Accessors(fluent = true)
+    private List<CombatEvent> lastEvents = List.of();
 
     public Combat(String code, List<Combatant> combatants, List<String> turnSequence) {
         this.code = code;
@@ -84,6 +97,7 @@ public class Combat {
             effect.apply(actor, target);
         }
         checkWinLoss();
+        lastEvents = drainAllEvents();
     }
 
     @Synchronized
@@ -91,6 +105,15 @@ public class Combat {
         requireInProgress();
         requireCurrentTurn(actorId);
         advanceTurn();
+        lastEvents = drainAllEvents();
+    }
+
+    private List<CombatEvent> drainAllEvents() {
+        List<CombatEvent> drained = new ArrayList<>();
+        for (Combatant combatant : combatants.values()) {
+            drained.addAll(combatant.drainEvents());
+        }
+        return List.copyOf(drained);
     }
 
     private List<Combatant> resolveTargets(Combatant actor, TargetType targetType, String targetId) {
