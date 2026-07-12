@@ -2,7 +2,7 @@ package com.asdru.asdrulet5.combat.domain;
 
 import com.asdru.asdrulet5.classdata.domain.Ability;
 import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
-import com.asdru.asdrulet5.classdata.domain.BuffKind;
+import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.classdata.domain.EffectTarget;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import lombok.Getter;
@@ -40,6 +40,7 @@ public final class Combatant implements EffectTarget {
     private final List<Ability> abilities;
     private final String attackName;
     private final String attackDescription;
+    private final String attackEffectSummary;
     private final AbilityEffect attackEffect;
     private int currentHealth;
     private int currentStamina;
@@ -48,7 +49,7 @@ public final class Combatant implements EffectTarget {
     public Combatant(String id, String displayName, boolean enemy, CharacterClass characterClass,
                      int maxHealth, int maxStamina, int baseDefense, int ultimateChargeThreshold,
                      List<Ability> abilities, String attackName, String attackDescription,
-                     AbilityEffect attackEffect) {
+                     String attackEffectSummary, AbilityEffect attackEffect) {
         this.id = id;
         this.displayName = displayName;
         this.enemy = enemy;
@@ -63,6 +64,7 @@ public final class Combatant implements EffectTarget {
         this.abilities = List.copyOf(abilities);
         this.attackName = attackName;
         this.attackDescription = attackDescription;
+        this.attackEffectSummary = attackEffectSummary;
         this.attackEffect = attackEffect;
     }
 
@@ -76,12 +78,12 @@ public final class Combatant implements EffectTarget {
 
     @Override
     public int effectiveDefense() {
-        return baseDefense + sumActive(BuffKind.DEFENSE);
+        return baseDefense + activeEffects.stream().mapToInt(ActiveEffect::defenseBonus).sum();
     }
 
     @Override
     public int bonusDamage() {
-        return sumActive(BuffKind.DAMAGE);
+        return activeEffects.stream().mapToInt(ActiveEffect::damageBonus).sum();
     }
 
     public boolean hasStamina(int amount) {
@@ -90,10 +92,6 @@ public final class Combatant implements EffectTarget {
 
     public boolean ultimateReady() {
         return ultimateCharge >= ultimateChargeThreshold;
-    }
-
-    private int sumActive(BuffKind kind) {
-        return activeEffects.stream().filter(effect -> effect.kind() == kind).mapToInt(ActiveEffect::power).sum();
     }
 
     @Override
@@ -107,8 +105,12 @@ public final class Combatant implements EffectTarget {
     }
 
     @Override
-    public void addActiveEffect(BuffKind kind, int power, int durationTurns) {
-        activeEffects.add(new ActiveEffect(kind, power, durationTurns));
+    public void addActiveEffect(ActiveEffect effect) {
+        // Reapplying an effect with the same name (see ActiveEffect's
+        // identity contract) refreshes it in place rather than stacking a
+        // duplicate copy.
+        activeEffects.removeIf(existing -> existing.name().equals(effect.name()));
+        activeEffects.add(effect);
     }
 
     @Override
@@ -129,14 +131,14 @@ public final class Combatant implements EffectTarget {
     }
 
     void tickActiveEffects() {
-        // Filter before decrementing: ActiveEffect requires remainingTurns > 0,
-        // so an effect on its last turn (remainingTurns == 1) is dropped here
-        // rather than ticked down to an invalid 0.
-        List<ActiveEffect> ticked = activeEffects.stream()
-                .filter(effect -> effect.remainingTurns() > 1)
-                .map(ActiveEffect::withTurnElapsed)
-                .toList();
+        List<ActiveEffect> stillActive = new ArrayList<>();
+        for (ActiveEffect effect : activeEffects) {
+            boolean expired = effect.tick(this);
+            if (!expired) {
+                stillActive.add(effect);
+            }
+        }
         activeEffects.clear();
-        activeEffects.addAll(ticked);
+        activeEffects.addAll(stillActive);
     }
 }

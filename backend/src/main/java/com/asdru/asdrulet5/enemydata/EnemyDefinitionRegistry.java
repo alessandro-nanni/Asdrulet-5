@@ -1,6 +1,6 @@
 package com.asdru.asdrulet5.enemydata;
 
-import com.asdru.asdrulet5.classdata.domain.DamageEffect;
+import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
 import com.asdru.asdrulet5.classdata.domain.Stats;
 import com.asdru.asdrulet5.enemydata.domain.EnemyDefinition;
 import org.springframework.stereotype.Component;
@@ -34,7 +34,8 @@ public class EnemyDefinitionRegistry {
                 new Stats(220, 15, 8, 0),
                 "Rusty Cleaver",
                 "Swings a notched blade at whoever's closest.",
-                new DamageEffect(15)
+                "15 damage",
+                AbilityEffect.damage(15)
         );
     }
 

@@ -149,17 +149,20 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
     : null
   const selectedAbility = selfDefinition?.abilities.find((ability) => ability.id === selectedAbilityId) ?? null
 
-  const needsFieldTarget =
-    selectedAbility &&
-    (selectedAbility.targetType === 'SINGLE_ALLY' ||
-      selectedAbility.targetType === 'SINGLE_ENEMY' ||
-      selectedAbility.targetType === 'SELF')
-  const selectableIds = needsFieldTarget
+  // Every ability, single-target or area, is confirmed by tapping a
+  // highlighted combatant — for an area ability any valid target works
+  // since the server resolves the whole side regardless of which one was
+  // tapped, same as it ignores the target for SELF.
+  const selectableIds = selectedAbility
     ? new Set(
-        selectedAbility!.targetType === 'SELF'
+        selectedAbility.targetType === 'SELF'
           ? [actingAsId]
           : combat.combatants
-              .filter((combatant) => combatant.alive && combatant.enemy === (selectedAbility!.targetType === 'SINGLE_ENEMY'))
+              .filter((combatant) => {
+                const targetsEnemies =
+                  selectedAbility.targetType === 'SINGLE_ENEMY' || selectedAbility.targetType === 'ALL_ENEMIES'
+                return combatant.alive && combatant.enemy === targetsEnemies
+              })
               .map((combatant) => combatant.id),
       )
     : null
@@ -272,6 +275,7 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
             hasActedThisTurn={hasActedThisTurn}
             isSubmitting={isSubmitting}
             onEndTurn={handleEndTurn}
+            onCancel={() => setSelectedAbilityId(null)}
           />
         )}
 
@@ -282,8 +286,6 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
             selectedAbility={selectedAbility}
             isSubmitting={isSubmitting}
             onSelectAbility={setSelectedAbilityId}
-            onCancel={() => setSelectedAbilityId(null)}
-            onConfirm={(abilityId) => void submitAbility(abilityId, null)}
           />
         )}
 

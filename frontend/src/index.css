@@ -992,18 +992,6 @@ p {
   gap: 10px;
 }
 
-.action-prompt {
-  margin: 0;
-  font-weight: 600;
-  text-align: center;
-}
-
-.action-target-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .self-stats-panel {
   display: flex;
   flex-direction: column;
@@ -1190,15 +1178,6 @@ p {
 }
 
 .ability-choice-wrap .ability-choice {
-  flex: 1;
-}
-
-.action-confirm-row {
-  display: flex;
-  gap: 10px;
-}
-
-.action-confirm-row .btn {
   flex: 1;
 }
 

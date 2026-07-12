@@ -1,8 +1,6 @@
 package com.asdru.asdrulet5.combat.web;
 
-import com.asdru.asdrulet5.classdata.web.ClassDefinitionMapper;
-import com.asdru.asdrulet5.classdata.web.dto.EffectDto;
-import com.asdru.asdrulet5.combat.domain.ActiveEffect;
+import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.combat.domain.Combat;
 import com.asdru.asdrulet5.combat.domain.Combatant;
 import com.asdru.asdrulet5.combat.web.dto.ActiveEffectDto;
@@ -38,15 +36,12 @@ public class CombatMapper {
                 combatant.activeEffects().stream().map(CombatMapper::toDto).toList(),
                 combatant.attackName(),
                 combatant.attackDescription(),
-                combatant.attackEffect() != null ? ClassDefinitionMapper.toDto(combatant.attackEffect()) : null
+                combatant.attackEffectSummary()
         );
     }
 
     private ActiveEffectDto toDto(ActiveEffect activeEffect) {
-        EffectDto.Kind kind = switch (activeEffect.kind()) {
-            case DEFENSE -> EffectDto.Kind.BUFF_DEFENSE;
-            case DAMAGE -> EffectDto.Kind.BUFF_DAMAGE;
-        };
-        return new ActiveEffectDto(kind, activeEffect.power(), activeEffect.remainingTurns());
+        return new ActiveEffectDto(
+                activeEffect.name(), activeEffect.description(), activeEffect.icon(), activeEffect.remainingTurns());
     }
 }

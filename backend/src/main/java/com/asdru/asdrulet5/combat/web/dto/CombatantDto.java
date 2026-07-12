@@ -1,6 +1,5 @@
 package com.asdru.asdrulet5.combat.web.dto;
 
-import com.asdru.asdrulet5.classdata.web.dto.EffectDto;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 
 import java.util.List;
@@ -20,6 +19,6 @@ public record CombatantDto(
         List<ActiveEffectDto> activeEffects,
         String attackName,
         String attackDescription,
-        EffectDto attackEffect
+        String attackEffectSummary
 ) {
 }

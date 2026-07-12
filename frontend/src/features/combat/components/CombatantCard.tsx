@@ -1,7 +1,9 @@
 import type { ComponentType } from 'react'
 import { useState } from 'react'
 import { HeartIcon } from '../../../shared/ui/HeartIcon'
+import { PoisonIcon } from '../../../shared/ui/PoisonIcon'
 import { ShieldIcon } from '../../../shared/ui/ShieldIcon'
+import { SparkleIcon } from '../../../shared/ui/SparkleIcon'
 import { SwordIcon } from '../../../shared/ui/SwordIcon'
 import { MemberAvatar } from '../../party/components/MemberAvatar'
 import type { PartyMember } from '../../party/types'
@@ -9,17 +11,20 @@ import type { ActiveEffect, Combatant } from '../types'
 import { ActiveEffectInfo } from './ActiveEffectInfo'
 import { EnemyAttackInfo } from './EnemyAttackInfo'
 
-const ACTIVE_EFFECT_ICON: Record<ActiveEffect['type'], ComponentType<{ className?: string }>> = {
-  BUFF_DEFENSE: ShieldIcon,
-  BUFF_DAMAGE: SwordIcon,
-  DAMAGE: SwordIcon,
-  HEAL: HeartIcon,
-}
-
 export interface FloatingText {
   key: string
   text: string
   kind: 'damage' | 'heal'
+}
+
+// Backend sends a stable icon key per effect (see ActiveEffect.java); unrecognized
+// keys fall back to a generic icon rather than breaking, so new effects never
+// require this map to be updated in lockstep with the backend.
+const EFFECT_ICONS: Record<string, ComponentType<{ className?: string }>> = {
+  shield: ShieldIcon,
+  sword: SwordIcon,
+  heal: HeartIcon,
+  poison: PoisonIcon,
 }
 
 interface Props {
@@ -103,13 +108,13 @@ export function CombatantCard({
       {combatant.activeEffects.length > 0 && (
         <div className="active-effects-row">
           {combatant.activeEffects.map((effect, index) => {
-            const Icon = ACTIVE_EFFECT_ICON[effect.type]
+            const Icon = EFFECT_ICONS[effect.icon] ?? SparkleIcon
             return (
               <button
-                key={`${effect.type}-${index}`}
+                key={`${effect.name}-${index}`}
                 type="button"
                 className="active-effect-badge"
-                aria-label={`View active effect: +${effect.power} ${effect.type.replace('_', ' ').toLowerCase()}, ${effect.remainingTurns} turns left`}
+                aria-label={`View active effect: ${effect.name}, ${effect.remainingTurns} turns left`}
                 onClick={(event) => {
                   event.stopPropagation()
                   setActiveEffectInfo(effect)

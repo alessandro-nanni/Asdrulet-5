@@ -12,5 +12,15 @@ public sealed interface Ability permits BasicAbility, UltimateAbility {
 
     String description();
 
+    /**
+     * Short mechanical summary for display (e.g. "22 damage", "Heals for
+     * 15% of missing HP") — author-written rather than derived, since
+     * {@link #effect()} can now be arbitrary logic that doesn't reduce to a
+     * single power/duration pair.
+     */
+    String effectSummary();
+
     TargetType targetType();
+
+    AbilityEffect effect();
 }

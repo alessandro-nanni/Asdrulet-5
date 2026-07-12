@@ -12,14 +12,14 @@ class ClassDefinitionTest {
 
     private static final Stats STATS = new Stats(100, 10, 10, 100);
 
-    private static final AbilityEffect DAMAGE_EFFECT = new DamageEffect(10);
+    private static final AbilityEffect DAMAGE_EFFECT = AbilityEffect.damage(10);
 
     private static BasicAbility basic(String id) {
-        return new BasicAbility(id, "Basic " + id, "A basic ability.", TargetType.SINGLE_ENEMY, 10, DAMAGE_EFFECT);
+        return new BasicAbility(id, "Basic " + id, "A basic ability.", "10 damage", TargetType.SINGLE_ENEMY, 10, DAMAGE_EFFECT);
     }
 
     private static UltimateAbility ultimate(String id) {
-        return new UltimateAbility(id, "Ultimate " + id, "An ultimate ability.", TargetType.SINGLE_ENEMY, 100, DAMAGE_EFFECT);
+        return new UltimateAbility(id, "Ultimate " + id, "An ultimate ability.", "10 damage", TargetType.SINGLE_ENEMY, 100, DAMAGE_EFFECT);
     }
 
     @Test

@@ -18,16 +18,19 @@ public class MageClassDefinition {
                 List.of(
                         new BasicAbility("mage.firebolt", "Firebolt",
                                 "Launches a bolt of searing flame at an enemy.",
+                                "24 damage",
                                 TargetType.SINGLE_ENEMY, 12,
-                                new DamageEffect(24)),
+                                AbilityEffect.damage(24)),
                         new BasicAbility("mage.frost-lance", "Frost Lance",
                                 "Impales an enemy with ice, slowing them.",
+                                "20 damage",
                                 TargetType.SINGLE_ENEMY, 14,
-                                new DamageEffect(20)),
+                                AbilityEffect.damage(20)),
                         new UltimateAbility("mage.meteor-storm", "Meteor Storm",
                                 "Calls a hail of meteors down on every enemy.",
+                                "30 damage to all enemies",
                                 TargetType.ALL_ENEMIES, 100,
-                                new DamageEffect(30))
+                                AbilityEffect.damage(30))
                 )
         );
     }

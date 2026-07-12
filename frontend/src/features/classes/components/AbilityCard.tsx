@@ -1,4 +1,4 @@
-import type { Ability, Effect } from '../types'
+import type { Ability } from '../types'
 
 const TARGET_LABELS: Record<Ability['targetType'], string> = {
   SELF: 'Self',
@@ -6,19 +6,6 @@ const TARGET_LABELS: Record<Ability['targetType'], string> = {
   ALL_ALLIES: 'All allies',
   SINGLE_ENEMY: 'Single enemy',
   ALL_ENEMIES: 'All enemies',
-}
-
-function effectLabel(effect: Effect): string {
-  switch (effect.type) {
-    case 'DAMAGE':
-      return `${effect.power} damage`
-    case 'HEAL':
-      return `${effect.power} healing`
-    case 'BUFF_DEFENSE':
-      return `+${effect.power} defense for ${effect.durationTurns} turns`
-    case 'BUFF_DAMAGE':
-      return `+${effect.power} damage for ${effect.durationTurns} turns`
-  }
 }
 
 export function AbilityCard({ ability }: { ability: Ability }) {
@@ -35,7 +22,7 @@ export function AbilityCard({ ability }: { ability: Ability }) {
       </div>
       <p className="ability-description">{ability.description}</p>
       <p className="ability-meta">
-        {effectLabel(ability.effect)} · {costLabel} · {TARGET_LABELS[ability.targetType]}
+        {ability.effectSummary} · {costLabel} · {TARGET_LABELS[ability.targetType]}
       </p>
     </div>
   )

@@ -15,36 +15,46 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CombatTest {
 
     private static final BasicAbility STRIKE = new BasicAbility(
-            "test.strike", "Strike", "A basic attack.", TargetType.SINGLE_ENEMY, 30,
-            new DamageEffect(20));
+            "test.strike", "Strike", "A basic attack.", "20 damage", TargetType.SINGLE_ENEMY, 30,
+            AbilityEffect.damage(20));
 
     private static final BasicAbility EXPENSIVE_STRIKE = new BasicAbility(
-            "test.expensive-strike", "Expensive Strike", "A costly attack.", TargetType.SINGLE_ENEMY, 90,
-            new DamageEffect(20));
+            "test.expensive-strike", "Expensive Strike", "A costly attack.", "20 damage", TargetType.SINGLE_ENEMY, 90,
+            AbilityEffect.damage(20));
 
     private static final BasicAbility MEND = new BasicAbility(
-            "test.mend", "Mend", "A basic heal.", TargetType.SINGLE_ALLY, 10,
-            new HealEffect(15));
+            "test.mend", "Mend", "A basic heal.", "15 healing", TargetType.SINGLE_ALLY, 10,
+            AbilityEffect.heal(15));
 
     private static final BasicAbility BRACE = new BasicAbility(
-            "test.brace", "Brace", "Raises defense.", TargetType.SELF, 10,
-            new BuffDefenseEffect(10, 1));
+            "test.brace", "Brace", "Raises defense.", "+10 defense for 1 turn", TargetType.SELF, 10,
+            AbilityEffect.buffDefense("Brace", "shield", 10, 1));
 
     private static final BasicAbility PUMP_UP = new BasicAbility(
-            "test.pump-up", "Pump Up", "Raises damage.", TargetType.SELF, 10,
-            new BuffDamageEffect(15, 2));
+            "test.pump-up", "Pump Up", "Raises damage.", "+15 damage for 2 turns", TargetType.SELF, 10,
+            AbilityEffect.buffDamage("Pump Up", "sword", 15, 2));
 
     private static final UltimateAbility ULTIMATE_STRIKE = new UltimateAbility(
-            "test.ultimate-strike", "Ultimate Strike", "A big attack.", TargetType.SINGLE_ENEMY, 40,
-            new DamageEffect(50));
+            "test.ultimate-strike", "Ultimate Strike", "A big attack.", "50 damage", TargetType.SINGLE_ENEMY, 40,
+            AbilityEffect.damage(50));
+
+    private static final BasicAbility MULTI_STRIKE = new BasicAbility(
+            "test.multi-strike", "Multi Strike", "Hits four times in rapid succession.", "4 hits of 5 damage",
+            TargetType.SINGLE_ENEMY, 10,
+            AbilityEffect.multiHitDamage(4, 5));
+
+    private static final BasicAbility POISON_DART = new BasicAbility(
+            "test.poison-dart", "Poison Dart", "Applies a lingering poison.", "5 poison damage per turn for 2 turns",
+            TargetType.SINGLE_ENEMY, 10,
+            AbilityEffect.damageOverTime("Poisoned", "Takes damage each turn.", "poison", 5, 2));
 
     private static Combatant player(String id, List<Ability> abilities) {
-        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 40, abilities, null, null, null);
+        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 40, abilities, null, null, null, null);
     }
 
     private static Combatant enemy(String id, int maxHealth, int defense, int attackPower) {
         return new Combatant(id, id, true, null, maxHealth, 0, defense, 0, List.of(),
-                "Claw", "A swipe.", new DamageEffect(attackPower));
+                "Claw", "A swipe.", attackPower + " damage", AbilityEffect.damage(attackPower));
     }
 
     private static Combat twoPlayersOneEnemy(Combatant p1, Combatant p2, Combatant enemy) {
@@ -66,7 +76,8 @@ class CombatTest {
 
         Combatant updatedEnemy = findCombatant(combat, "enemy");
         Combatant updatedP1 = findCombatant(combat, "p1");
-        assertThat(updatedEnemy.currentHealth()).isEqualTo(200 - (20 - 6));
+        // Mitigation = 6 / (6 + 25) defense-half-point; 20 * (1 - 6/31) rounds to 16.
+        assertThat(updatedEnemy.currentHealth()).isEqualTo(200 - 16);
         assertThat(updatedP1.currentStamina()).isEqualTo(100 - 30);
     }
 
@@ -79,6 +90,7 @@ class CombatTest {
 
         combat.useAbility("p1", "test.strike", "enemy");
 
+        // Mitigation approaches, but never reaches, 100%; the 1-damage floor still applies.
         assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(199);
     }
 
@@ -113,19 +125,19 @@ class CombatTest {
         Combatant enemy = enemy("enemy", 200, 5, 10);
         Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
 
-        // Each strike deals 15 damage (20 power - 5 defense); charge threshold is 40.
+        // Each strike deals round(20 * 25/30) = 17 damage against 5 defense; charge threshold is 40.
         combat.useAbility("p1", "test.strike", "enemy");
         assertThatThrownBy(() -> combat.useAbility("p1", "test.ultimate-strike", "enemy"))
                 .isInstanceOf(InsufficientResourceException.class);
 
         combat.useAbility("p1", "test.strike", "enemy");
-        assertThat(findCombatant(combat, "p1").ultimateCharge()).isEqualTo(30);
+        assertThat(findCombatant(combat, "p1").ultimateCharge()).isEqualTo(34);
 
         combat.useAbility("p1", "test.strike", "enemy");
         assertThat(findCombatant(combat, "p1").ultimateCharge()).isEqualTo(40);
 
         combat.useAbility("p1", "test.ultimate-strike", "enemy");
-        // The ultimate's own damage (50 - 5 = 45) immediately re-adds charge, capped at threshold.
+        // The ultimate's own damage (round(50 * 25/30) = 42) immediately re-adds charge, capped at threshold.
         assertThat(findCombatant(combat, "p1").ultimateCharge()).isEqualTo(40);
     }
 
@@ -157,7 +169,8 @@ class CombatTest {
         Combatant lowestHealthPlayer = findCombatant(combat, "p1").currentHealth() <= findCombatant(combat, "p2").currentHealth()
                 ? findCombatant(combat, "p1")
                 : findCombatant(combat, "p2");
-        assertThat(lowestHealthPlayer.currentHealth()).isEqualTo(100 - (12 - 5));
+        // round(12 * 25/30) = 10 damage against 5 defense.
+        assertThat(lowestHealthPlayer.currentHealth()).isEqualTo(100 - 10);
     }
 
     @Test
@@ -200,14 +213,16 @@ class CombatTest {
         combat.useAbility("p1", "test.brace", "p1");
         combat.endTurn("p1");
         combat.endTurn("p2");
-        // Enemy attacked p1 (lowest HP tiebreak) while Brace (defense +10, 1 turn) was active: 20 - (5+10) = 5 dmg.
-        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(95);
+        // Enemy attacked p1 (lowest HP tiebreak) while Brace (defense +10, 1 turn) was active:
+        // defense 15, round(20 * 25/40) = 13 dmg.
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 13);
 
         // Brace had 1 turn remaining; it should have expired when p1's turn started again.
         combat.endTurn("p1");
         combat.endTurn("p2");
-        // Second enemy attack with no buff active: 20 - 5 = 15 dmg, on whichever player has lowest HP (p1, at 95).
-        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(95 - 15);
+        // Second enemy attack with no buff active: defense 5, round(20 * 25/30) = 17 dmg,
+        // on whichever player has lowest HP (p1, at 87).
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 13 - 17);
     }
 
     @Test
@@ -220,8 +235,96 @@ class CombatTest {
         combat.useAbility("p1", "test.pump-up", "p1");
         combat.useAbility("p1", "test.strike", "enemy");
 
-        // 20 (strike power) + 15 (buff) - 5 (defense) = 30.
-        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 30);
+        // (20 strike power + 15 buff) against 5 defense: round(35 * 25/30) = 29.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 29);
+    }
+
+    @Test
+    void reapplyingSameNamedBuffRefreshesDurationInsteadOfStacking() {
+        Combatant p1 = player("p1", List.of(PUMP_UP));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.pump-up", "p1");
+        assertThat(findCombatant(combat, "p1").activeEffects()).hasSize(1);
+        assertThat(findCombatant(combat, "p1").bonusDamage()).isEqualTo(15);
+
+        // One full round ticks p1's own effect down from 2 turns to 1.
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+        assertThat(findCombatant(combat, "p1").activeEffects().get(0).remainingTurns()).isEqualTo(1);
+
+        // Reapplying "Pump Up" refreshes the existing effect rather than adding a second one.
+        combat.useAbility("p1", "test.pump-up", "p1");
+        assertThat(findCombatant(combat, "p1").activeEffects()).hasSize(1);
+        assertThat(findCombatant(combat, "p1").activeEffects().get(0).remainingTurns()).isEqualTo(2);
+        assertThat(findCombatant(combat, "p1").bonusDamage()).isEqualTo(15);
+    }
+
+    @Test
+    void distinctlyNamedBuffsOnTheSameStatCoexist() {
+        BasicAbility alphaGuard = new BasicAbility(
+                "test.alpha-guard", "Alpha Guard", "Raises defense.", "+10 defense for 2 turns",
+                TargetType.SELF, 10, AbilityEffect.buffDefense("Alpha Guard", "shield", 10, 2));
+        BasicAbility betaGuard = new BasicAbility(
+                "test.beta-guard", "Beta Guard", "Raises defense further.", "+5 defense for 2 turns",
+                TargetType.SELF, 10, AbilityEffect.buffDefense("Beta Guard", "shield", 5, 2));
+        Combatant p1 = player("p1", List.of(alphaGuard, betaGuard));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.alpha-guard", "p1");
+        combat.useAbility("p1", "test.beta-guard", "p1");
+
+        // Different names, both from base defense 5: 5 + 10 + 5 = 20.
+        assertThat(findCombatant(combat, "p1").activeEffects()).hasSize(2);
+        assertThat(findCombatant(combat, "p1").effectiveDefense()).isEqualTo(20);
+    }
+
+    @Test
+    void multiHitDamageAppliesEachHitIndependentlyAndAccumulatesUltimateCharge() {
+        Combatant p1 = player("p1", List.of(MULTI_STRIKE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 2, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.multi-strike", "enemy");
+
+        // Each hit: round(5 * 25/27) = 5 damage against 2 defense; four hits = 20 total, each contributing to charge.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 20);
+        assertThat(findCombatant(combat, "p1").ultimateCharge()).isEqualTo(20);
+    }
+
+    @Test
+    void damageOverTimeTicksOnHolderTurnStartAndExpiresAfterDuration() {
+        Combatant p1 = player("p1", List.of(POISON_DART));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.poison-dart", "enemy");
+        // Attaching the effect doesn't itself deal damage — onTick hasn't run yet.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200);
+        assertThat(findCombatant(combat, "enemy").activeEffects()).hasSize(1);
+
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+        // Effects tick at the start of their holder's own turn; enemy's turn just started.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(195);
+        assertThat(findCombatant(combat, "enemy").activeEffects()).hasSize(1);
+
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+        // Second and final tick; the effect expires and is removed afterward.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(190);
+        assertThat(findCombatant(combat, "enemy").activeEffects()).isEmpty();
+
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+        // No longer active: no further ticks.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(190);
     }
 
     @Test
@@ -252,8 +355,8 @@ class CombatTest {
     @Test
     void allEnemiesTargetTypeHitsEveryAliveEnemy() {
         BasicAbility cleave = new BasicAbility(
-                "test.cleave", "Cleave", "Hits every enemy.", TargetType.ALL_ENEMIES, 10,
-                new DamageEffect(20));
+                "test.cleave", "Cleave", "Hits every enemy.", "20 damage", TargetType.ALL_ENEMIES, 10,
+                AbilityEffect.damage(20));
         Combatant p1 = player("p1", List.of(cleave));
         Combatant enemyA = enemy("enemyA", 200, 5, 1);
         Combatant enemyB = enemy("enemyB", 200, 5, 1);
@@ -261,7 +364,8 @@ class CombatTest {
 
         combat.useAbility("p1", "test.cleave", null);
 
-        assertThat(findCombatant(combat, "enemyA").currentHealth()).isEqualTo(200 - 15);
-        assertThat(findCombatant(combat, "enemyB").currentHealth()).isEqualTo(200 - 15);
+        // round(20 * 25/30) = 17 damage against 5 defense, applied to each alive enemy.
+        assertThat(findCombatant(combat, "enemyA").currentHealth()).isEqualTo(200 - 17);
+        assertThat(findCombatant(combat, "enemyB").currentHealth()).isEqualTo(200 - 17);
     }
 }

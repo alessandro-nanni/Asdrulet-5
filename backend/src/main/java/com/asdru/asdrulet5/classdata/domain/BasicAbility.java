@@ -8,6 +8,7 @@ public record BasicAbility(
         String id,
         String name,
         String description,
+        String effectSummary,
         TargetType targetType,
         int staminaCost,
         AbilityEffect effect
@@ -16,6 +17,7 @@ public record BasicAbility(
         requireNonBlank(id, "id");
         requireNonBlank(name, "name");
         requireNonBlank(description, "description");
+        requireNonBlank(effectSummary, "effectSummary");
         Objects.requireNonNull(targetType, "targetType");
         Objects.requireNonNull(effect, "effect");
         if (staminaCost < 0) {

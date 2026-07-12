@@ -75,7 +75,7 @@ public class CombatService {
         return new Combatant(
                 member.userId(), member.displayName(), false, member.characterClass(),
                 definition.stats().maxHealth(), definition.stats().maxStamina(), definition.stats().defense(),
-                ultimateChargeThreshold, definition.abilities(), null, null, null);
+                ultimateChargeThreshold, definition.abilities(), null, null, null, null);
     }
 
     private Combatant toEnemyCombatant() {
@@ -83,7 +83,8 @@ public class CombatService {
         return new Combatant(
                 ENEMY_ID, definition.displayName(), true, null,
                 definition.stats().maxHealth(), definition.stats().maxStamina(), definition.stats().defense(),
-                0, List.of(), definition.attackName(), definition.attackDescription(), definition.attackEffect());
+                0, List.of(), definition.attackName(), definition.attackDescription(),
+                definition.attackEffectSummary(), definition.attackEffect());
     }
 
     private Combat getOrThrow(String code) {

@@ -12,6 +12,7 @@ interface Props {
   hasActedThisTurn: boolean
   isSubmitting: boolean
   onEndTurn: () => void
+  onCancel: () => void
 }
 
 export function SelfStatsPanel({
@@ -22,6 +23,7 @@ export function SelfStatsPanel({
   hasActedThisTurn,
   isSubmitting,
   onEndTurn,
+  onCancel,
 }: Props) {
   const staminaPercent = self.maxStamina > 0 ? Math.round((self.currentStamina / self.maxStamina) * 100) : 0
   const chargePercent =
@@ -48,9 +50,14 @@ export function SelfStatsPanel({
           </span>
         </div>
 
-        {isMyTurn && !hasSelectedAbility && (
-          <button type="button" className="self-stat-end-turn-btn" disabled={isSubmitting} onClick={onEndTurn}>
-            {hasActedThisTurn ? 'End' : 'Skip'}
+        {isMyTurn && (
+          <button
+            type="button"
+            className="self-stat-end-turn-btn"
+            disabled={isSubmitting}
+            onClick={hasSelectedAbility ? onCancel : onEndTurn}
+          >
+            {hasSelectedAbility ? 'Cancel' : hasActedThisTurn ? 'End' : 'Skip'}
           </button>
         )}
       </div>

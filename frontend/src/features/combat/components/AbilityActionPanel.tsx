@@ -9,8 +9,6 @@ interface Props {
   selectedAbility: Ability | null
   isSubmitting: boolean
   onSelectAbility: (abilityId: string) => void
-  onCancel: () => void
-  onConfirm: (abilityId: string) => void
 }
 
 function canAfford(self: Combatant, ability: Ability): boolean {
@@ -20,19 +18,7 @@ function canAfford(self: Combatant, ability: Ability): boolean {
   return self.currentStamina >= (ability.staminaCost ?? 0)
 }
 
-function needsConfirmOnly(ability: Ability): boolean {
-  return ability.targetType === 'ALL_ALLIES' || ability.targetType === 'ALL_ENEMIES'
-}
-
-export function AbilityActionPanel({
-  self,
-  abilities,
-  selectedAbility,
-  isSubmitting,
-  onSelectAbility,
-  onCancel,
-  onConfirm,
-}: Props) {
+export function AbilityActionPanel({ self, abilities, selectedAbility, isSubmitting, onSelectAbility }: Props) {
   const [infoAbility, setInfoAbility] = useState<Ability | null>(null)
 
   return (
@@ -71,31 +57,6 @@ export function AbilityActionPanel({
           </div>
         ))}
       </div>
-
-      {selectedAbility && needsConfirmOnly(selectedAbility) && (
-        <div className="action-confirm-row">
-          <button type="button" className="btn btn-secondary" disabled={isSubmitting} onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={isSubmitting}
-            onClick={() => onConfirm(selectedAbility.id)}
-          >
-            Use {selectedAbility.name}
-          </button>
-        </div>
-      )}
-
-      {selectedAbility && !needsConfirmOnly(selectedAbility) && (
-        <div className="action-target-row">
-          <p className="action-prompt">Tap a target for {selectedAbility.name}</p>
-          <button type="button" className="btn btn-secondary btn-block" disabled={isSubmitting} onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
-      )}
 
       {infoAbility && <AbilityInfoOverlay ability={infoAbility} onClose={() => setInfoAbility(null)} />}
     </div>

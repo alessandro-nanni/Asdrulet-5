@@ -20,7 +20,7 @@ public interface EffectTarget {
 
     void applyHeal(int amount);
 
-    void addActiveEffect(BuffKind kind, int power, int durationTurns);
+    void addActiveEffect(ActiveEffect effect);
 
     void addUltimateCharge(int amount);
 }

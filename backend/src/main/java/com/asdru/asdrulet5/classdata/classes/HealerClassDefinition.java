@@ -18,16 +18,19 @@ public class HealerClassDefinition {
                 List.of(
                         new BasicAbility("healer.mending-light", "Mending Light",
                                 "Channels restorative light into a single ally.",
+                                "20 healing",
                                 TargetType.SINGLE_ALLY, 15,
-                                new HealEffect(20)),
+                                AbilityEffect.heal(20)),
                         new BasicAbility("healer.smite", "Smite",
                                 "Calls down a bolt of holy energy on an enemy.",
+                                "18 damage",
                                 TargetType.SINGLE_ENEMY, 10,
-                                new DamageEffect(18)),
+                                AbilityEffect.damage(18)),
                         new UltimateAbility("healer.circle-of-renewal", "Circle of Renewal",
                                 "Floods the whole party with healing light.",
+                                "35 healing to all allies",
                                 TargetType.ALL_ALLIES, 100,
-                                new HealEffect(35))
+                                AbilityEffect.heal(35))
                 )
         );
     }

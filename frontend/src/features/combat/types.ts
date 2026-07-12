@@ -1,11 +1,11 @@
 import type { CharacterClass } from '../party/types'
-import type { Effect, EffectType } from '../classes/types'
 
 export type CombatStatus = 'IN_PROGRESS' | 'PARTY_WON' | 'PARTY_LOST'
 
 export interface ActiveEffect {
-  type: EffectType
-  power: number
+  name: string
+  description: string
+  icon: string
   remainingTurns: number
 }
 
@@ -24,7 +24,7 @@ export interface Combatant {
   activeEffects: ActiveEffect[]
   attackName: string | null
   attackDescription: string | null
-  attackEffect: Effect | null
+  attackEffectSummary: string | null
 }
 
 export interface CombatState {

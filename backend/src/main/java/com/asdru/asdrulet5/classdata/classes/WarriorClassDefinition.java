@@ -18,16 +18,24 @@ public class WarriorClassDefinition {
                 List.of(
                         new BasicAbility("warrior.cleave", "Cleave",
                                 "A wide sweeping strike that cuts through an enemy's guard.",
+                                "22 damage",
                                 TargetType.SINGLE_ENEMY, 15,
-                                new DamageEffect(22)),
+                                AbilityEffect.damage(22)),
                         new BasicAbility("warrior.rally", "Rally",
                                 "A battle cry that steels the warrior's resolve.",
+                                "+8 damage for 2 turns",
                                 TargetType.SELF, 10,
-                                new BuffDamageEffect(8, 2)),
+                                AbilityEffect.buffDamage("Rally", "sword", 8, 2)),
+                        new BasicAbility("warrior.blade-flurry", "Blade Flurry",
+                                "Four rapid slices, each one finding a gap in the enemy's guard.",
+                                "4 hits of 5 damage",
+                                TargetType.SINGLE_ENEMY, 18,
+                                AbilityEffect.multiHitDamage(4, 5)),
                         new UltimateAbility("warrior.reckless-onslaught", "Reckless Onslaught",
                                 "A relentless flurry of blows against a single target.",
+                                "45 damage",
                                 TargetType.SINGLE_ENEMY, 100,
-                                new DamageEffect(45))
+                                AbilityEffect.damage(45))
                 )
         );
     }

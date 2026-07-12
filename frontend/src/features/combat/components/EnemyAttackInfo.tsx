@@ -1,13 +1,5 @@
 import { Portal } from '../../../shared/ui/Portal'
-import type { Effect } from '../../classes/types'
 import type { Combatant } from '../types'
-
-const EFFECT_LABEL: Record<Effect['type'], (effect: Effect) => string> = {
-  DAMAGE: (effect) => `${effect.power} damage`,
-  HEAL: (effect) => `${effect.power} healing`,
-  BUFF_DEFENSE: (effect) => `+${effect.power} defense for ${effect.durationTurns} turns`,
-  BUFF_DAMAGE: (effect) => `+${effect.power} damage for ${effect.durationTurns} turns`,
-}
 
 interface Props {
   combatant: Combatant
@@ -15,7 +7,7 @@ interface Props {
 }
 
 export function EnemyAttackInfo({ combatant, onClose }: Props) {
-  if (!combatant.attackName || !combatant.attackEffect) {
+  if (!combatant.attackName || !combatant.attackEffectSummary) {
     return null
   }
 
@@ -31,7 +23,7 @@ export function EnemyAttackInfo({ combatant, onClose }: Props) {
           </div>
           <p className="enemy-attack-name">{combatant.attackName}</p>
           <p className="ability-description">{combatant.attackDescription}</p>
-          <p className="ability-meta">{EFFECT_LABEL[combatant.attackEffect.type](combatant.attackEffect)}</p>
+          <p className="ability-meta">{combatant.attackEffectSummary}</p>
         </div>
       </div>
     </Portal>

@@ -3,7 +3,6 @@ package com.asdru.asdrulet5.classdata.web;
 import com.asdru.asdrulet5.classdata.domain.*;
 import com.asdru.asdrulet5.classdata.web.dto.AbilityDto;
 import com.asdru.asdrulet5.classdata.web.dto.ClassDefinitionDto;
-import com.asdru.asdrulet5.classdata.web.dto.EffectDto;
 import com.asdru.asdrulet5.classdata.web.dto.StatsDto;
 import lombok.experimental.UtilityClass;
 
@@ -32,21 +31,11 @@ public class ClassDefinitionMapper {
     private AbilityDto toDto(Ability ability) {
         return switch (ability) {
             case BasicAbility basic -> new AbilityDto(
-                    basic.id(), basic.name(), basic.description(), basic.targetType(),
-                    AbilityDto.AbilityKind.BASIC, basic.staminaCost(), null, toDto(basic.effect()));
+                    basic.id(), basic.name(), basic.description(), basic.effectSummary(), basic.targetType(),
+                    AbilityDto.AbilityKind.BASIC, basic.staminaCost(), null);
             case UltimateAbility ultimate -> new AbilityDto(
-                    ultimate.id(), ultimate.name(), ultimate.description(), ultimate.targetType(),
-                    AbilityDto.AbilityKind.ULTIMATE, null, ultimate.chargeThreshold(), toDto(ultimate.effect()));
-        };
-    }
-
-    public EffectDto toDto(AbilityEffect effect) {
-        return switch (effect) {
-            case DamageEffect damage -> new EffectDto(EffectDto.Kind.DAMAGE, damage.power(), 0);
-            case HealEffect heal -> new EffectDto(EffectDto.Kind.HEAL, heal.power(), 0);
-            case BuffDefenseEffect buff ->
-                    new EffectDto(EffectDto.Kind.BUFF_DEFENSE, buff.power(), buff.durationTurns());
-            case BuffDamageEffect buff -> new EffectDto(EffectDto.Kind.BUFF_DAMAGE, buff.power(), buff.durationTurns());
+                    ultimate.id(), ultimate.name(), ultimate.description(), ultimate.effectSummary(), ultimate.targetType(),
+                    AbilityDto.AbilityKind.ULTIMATE, null, ultimate.chargeThreshold());
         };
     }
 }

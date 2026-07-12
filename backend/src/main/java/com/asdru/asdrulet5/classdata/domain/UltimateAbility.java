@@ -11,6 +11,7 @@ public record UltimateAbility(
         String id,
         String name,
         String description,
+        String effectSummary,
         TargetType targetType,
         int chargeThreshold,
         AbilityEffect effect
@@ -19,6 +20,7 @@ public record UltimateAbility(
         Preconditions.requireNonBlank(id, "id");
         Preconditions.requireNonBlank(name, "name");
         Preconditions.requireNonBlank(description, "description");
+        Preconditions.requireNonBlank(effectSummary, "effectSummary");
         Objects.requireNonNull(targetType, "targetType");
         Objects.requireNonNull(effect, "effect");
         if (chargeThreshold < 0) {
