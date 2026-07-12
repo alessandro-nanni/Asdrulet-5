@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
 import { usePartyState } from '../features/party/usePartyState'
 import { PartyMemberList } from '../features/party/components/PartyMemberList'
@@ -28,9 +28,14 @@ export function PartyLobbyPage() {
   if (error) {
     return (
       <div className="page page-center">
-        <p className="alert" role="alert">
-          {error}
-        </p>
+        <div className="card card-hero">
+          <p className="alert" role="alert">
+            {error}
+          </p>
+          <Link to="/" className="btn btn-secondary btn-block">
+            Back to home
+          </Link>
+        </div>
       </div>
     )
   }

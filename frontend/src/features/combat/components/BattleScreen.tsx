@@ -45,20 +45,19 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
 
   // Diff the previous combat snapshot against the new one to figure out who
   // hit/healed whom, since the server only ever pushes full-state snapshots.
-  // The current-turn combatant is the actor when the turn hasn't advanced
-  // (they used an ability); when it *has* advanced, any HP change is the
-  // enemy's automatic attack (v1 has exactly one enemy, so this is unambiguous).
+  // Damage/heals never cross the ally/enemy line except one way: player
+  // abilities only ever damage the enemy or heal/buff allies, and the enemy's
+  // one auto-attack only ever damages an ally — so whichever side got hurt
+  // tells us the actor unambiguously. (We can't infer the actor from whether
+  // currentTurnCombatantId changed: in a 1-ally party the turn sequence is
+  // just [ally, enemy], so ending your turn cycles right back to you and the
+  // id looks unchanged even though the enemy acted in between.)
   useEffect(() => {
     if (!combat) {
       return
     }
     const previous = previousCombatRef.current
     if (previous) {
-      const actorId =
-        previous.currentTurnCombatantId === combat.currentTurnCombatantId
-          ? previous.currentTurnCombatantId
-          : (combat.combatants.find((combatant) => combatant.enemy)?.id ?? null)
-
       const hitTargets: string[] = []
       const healedTargets: string[] = []
       const newFloats: { combatantId: string; entry: FloatingText }[] = []
@@ -85,6 +84,12 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
       }
 
       if (hitTargets.length > 0 || healedTargets.length > 0) {
+        const damagedAllyId = combat.combatants.find(
+          (combatant) => !combatant.enemy && hitTargets.includes(combatant.id),
+        )?.id
+        const actorId = damagedAllyId
+          ? (combat.combatants.find((combatant) => combatant.enemy)?.id ?? null)
+          : previous.currentTurnCombatantId
         if (actorId) {
           setAttackerId(actorId)
           setTimeout(() => setAttackerId((current) => (current === actorId ? null : current)), ATTACK_DURATION_MS)
@@ -198,6 +203,12 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
       } else {
         await endTurnAsFakeMember(code, actingAsId)
       }
+      // Reset explicitly rather than relying only on the
+      // combat?.currentTurnCombatantId effect above: in a 1-ally party the
+      // turn sequence is [ally, enemy], so ending your turn can cycle
+      // straight back to your own id, which looks like no change at all.
+      setHasActedThisTurn(false)
+      setSelectedAbilityId(null)
     } catch {
       setActionError('Could not end turn. Try again.')
     } finally {
@@ -252,7 +263,9 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
           </section>
         )}
 
-        {combat.status === 'IN_PROGRESS' && selfCombatant && <SelfStatsPanel self={selfCombatant} />}
+        {combat.status === 'IN_PROGRESS' && selfCombatant && selfDefinition && (
+          <SelfStatsPanel self={selfCombatant} stats={selfDefinition.stats} />
+        )}
 
         {combat.status === 'IN_PROGRESS' && isMyTurn && selfCombatant && selfDefinition && (
           <AbilityActionPanel

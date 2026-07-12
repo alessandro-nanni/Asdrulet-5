@@ -86,10 +86,10 @@ export function CombatantCard({
       <span className="combatant-name">{combatant.displayName}</span>
       <div className="combatant-bar combatant-bar-health">
         <div className="combatant-bar-fill" style={{ width: `${healthPercent}%` }} />
+        <span className="combatant-bar-overlay-label">
+          {combatant.currentHealth}/{combatant.maxHealth}
+        </span>
       </div>
-      <span className="combatant-bar-label">
-        {combatant.currentHealth}/{combatant.maxHealth}
-      </span>
       {showAttackInfo && <EnemyAttackInfo combatant={combatant} onClose={() => setShowAttackInfo(false)} />}
     </div>
   )
