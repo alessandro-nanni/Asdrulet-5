@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { Ability } from '../../classes/types'
 import type { Combatant } from '../types'
+import { AbilityInfoOverlay } from './AbilityInfoOverlay'
 
 interface Props {
   self: Combatant
@@ -42,31 +44,45 @@ export function AbilityActionPanel({
   onConfirm,
   onEndTurn,
 }: Props) {
+  const [infoAbility, setInfoAbility] = useState<Ability | null>(null)
+
   return (
     <div className="action-panel">
       <div className="ability-choice-list">
         {abilities.map((ability) => (
-          <button
-            key={ability.id}
-            type="button"
-            className={`ability-choice ${ability.type === 'ULTIMATE' ? 'is-ultimate' : ''} ${
-              selectedAbility?.id === ability.id ? 'is-chosen' : ''
-            }`}
-            disabled={
-              isSubmitting ||
-              !canAfford(self, ability) ||
-              (selectedAbility != null && selectedAbility.id !== ability.id)
-            }
-            onClick={() => onSelectAbility(ability.id)}
-          >
-            <span className="ability-choice-icon" aria-hidden="true">
-              {EFFECT_ICONS[ability.effect.type]}
-            </span>
-            <span className="ability-choice-name">{ability.name}</span>
-            <span className="ability-choice-cost">
-              {ability.type === 'ULTIMATE' ? `${self.ultimateCharge}/${self.ultimateChargeThreshold}` : ability.staminaCost}
-            </span>
-          </button>
+          <div key={ability.id} className="ability-choice-wrap">
+            <button
+              type="button"
+              className={`ability-choice ${ability.type === 'ULTIMATE' ? 'is-ultimate' : ''} ${
+                selectedAbility?.id === ability.id ? 'is-chosen' : ''
+              }`}
+              disabled={
+                isSubmitting ||
+                !canAfford(self, ability) ||
+                (selectedAbility != null && selectedAbility.id !== ability.id)
+              }
+              onClick={() => onSelectAbility(ability.id)}
+            >
+              <span className="ability-choice-icon" aria-hidden="true">
+                {EFFECT_ICONS[ability.effect.type]}
+              </span>
+              <span className="ability-choice-name">{ability.name}</span>
+              <span className="ability-choice-cost">
+                {ability.type === 'ULTIMATE' ? `${self.ultimateCharge}/${self.ultimateChargeThreshold}` : ability.staminaCost}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="ability-info-btn"
+              aria-label={`View ${ability.name} details`}
+              onClick={(event) => {
+                event.stopPropagation()
+                setInfoAbility(ability)
+              }}
+            >
+              ?
+            </button>
+          </div>
         ))}
       </div>
 
@@ -100,6 +116,8 @@ export function AbilityActionPanel({
           </button>
         </div>
       )}
+
+      {infoAbility && <AbilityInfoOverlay ability={infoAbility} onClose={() => setInfoAbility(null)} />}
     </div>
   )
 }

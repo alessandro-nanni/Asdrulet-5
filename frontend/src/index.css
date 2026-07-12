@@ -956,23 +956,35 @@ p {
 
 .self-stat-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
 
 .self-stat-tile {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 5px;
+  padding: 4px 6px;
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.2);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.self-stat-tile-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.self-stat-tile-icon-health {
+  color: #35d08e;
 }
 
 .self-stat-tile-value {
   font-weight: 800;
+  color: var(--text);
 }
 
 .ultimate-bar-track {
@@ -1052,11 +1064,6 @@ p {
   cursor: not-allowed;
 }
 
-.ability-choice.is-ultimate {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(255, 183, 3, 0.25);
-}
-
 .ability-choice.is-chosen {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(255, 183, 3, 0.4);
@@ -1077,6 +1084,14 @@ p {
   color: var(--text-muted);
 }
 
+.ability-choice-wrap {
+  position: relative;
+}
+
+.ability-choice-wrap .ability-choice {
+  width: 100%;
+}
+
 .action-confirm-row {
   display: flex;
   gap: 10px;
@@ -1086,7 +1101,8 @@ p {
   flex: 1;
 }
 
-.combatant-info-btn {
+.combatant-info-btn,
+.ability-info-btn {
   appearance: none;
   position: absolute;
   top: 4px;
@@ -1128,4 +1144,18 @@ p {
   padding: 16px;
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(10px);
+}
+
+.ability-info-card {
+  position: relative;
+  padding-top: 44px;
+}
+
+.ability-info-card .ability-info-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  font-size: 0.75rem;
 }
