@@ -414,9 +414,35 @@ p {
   gap: 10px;
 }
 
+.class-card-wrap {
+  position: relative;
+}
+
+.class-info-btn {
+  appearance: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--surface-border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
 .class-card {
   appearance: none;
   cursor: pointer;
+  width: 100%;
   border-radius: var(--radius-md);
   padding: 16px 10px;
   display: flex;
@@ -548,11 +574,6 @@ p {
   border-radius: var(--radius-sm);
   border: 1px solid var(--surface-border);
   padding: 10px 12px;
-}
-
-.ability-card.is-ultimate {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(255, 183, 3, 0.25);
 }
 
 .ability-card-header {
@@ -1221,22 +1242,18 @@ p {
 .enemy-info-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 50;
+  z-index: 1000;
 }
 
 .enemy-info-card {
   width: 100%;
-  max-width: 320px;
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-lg);
-  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(10, 8, 20, 0.94);
+  padding: calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(10px);
 }

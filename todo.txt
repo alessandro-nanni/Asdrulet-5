@@ -1,0 +1,1 @@
+fix the select target expanding the self stats section, put the cancel next to the ability itself and remove the tap target for entirely

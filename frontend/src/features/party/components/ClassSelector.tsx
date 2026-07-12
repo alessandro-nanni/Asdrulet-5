@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { CharacterClass, PartyMember } from '../types'
 import type { ClassDefinition } from '../../classes/types'
-import { ClassDetailsPanel } from '../../classes/components/ClassDetailsPanel'
+import { ClassInfoOverlay } from './ClassInfoOverlay'
 
 const CLASSES: CharacterClass[] = ['HEALER', 'TANK', 'WARRIOR', 'MAGE']
 
@@ -14,7 +14,7 @@ interface Props {
 
 export function ClassSelector({ members, selfUserId, onSelect, definitions }: Props) {
   const self = members.find((member) => member.userId === selfUserId)
-  const [expandedClass, setExpandedClass] = useState<CharacterClass | null>(self?.characterClass ?? null)
+  const [infoClass, setInfoClass] = useState<CharacterClass | null>(null)
 
   const takenBy = new Map<CharacterClass, string>()
   for (const member of members) {
@@ -23,12 +23,7 @@ export function ClassSelector({ members, selfUserId, onSelect, definitions }: Pr
     }
   }
 
-  function handleCardClick(characterClass: CharacterClass) {
-    onSelect(characterClass)
-    setExpandedClass(characterClass)
-  }
-
-  const expandedDefinition = definitions.find((definition) => definition.characterClass === expandedClass) ?? null
+  const infoDefinition = definitions.find((definition) => definition.characterClass === infoClass) ?? null
 
   return (
     <div className="class-selector">
@@ -38,24 +33,36 @@ export function ClassSelector({ members, selfUserId, onSelect, definitions }: Pr
           const isSelected = self?.characterClass === characterClass
 
           return (
-            <button
-              key={characterClass}
-              type="button"
-              className={`class-card class-${characterClass.toLowerCase()} ${isSelected ? 'is-selected' : ''}`}
-              onClick={() => handleCardClick(characterClass)}
-              disabled={Boolean(takenByName)}
-            >
-              <span className="class-name">{characterClass}</span>
-              {takenByName ? (
-                <span className="class-status">Taken by {takenByName}</span>
-              ) : (
-                <span className="class-status">{isSelected ? 'Selected' : 'Available'}</span>
-              )}
-            </button>
+            <div key={characterClass} className="class-card-wrap">
+              <button
+                type="button"
+                className={`class-card class-${characterClass.toLowerCase()} ${isSelected ? 'is-selected' : ''}`}
+                onClick={() => onSelect(characterClass)}
+                disabled={Boolean(takenByName)}
+              >
+                <span className="class-name">{characterClass}</span>
+                {takenByName ? (
+                  <span className="class-status">Taken by {takenByName}</span>
+                ) : (
+                  <span className="class-status">{isSelected ? 'Selected' : 'Available'}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                className="class-info-btn"
+                aria-label={`View ${characterClass} details`}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setInfoClass(characterClass)
+                }}
+              >
+                ?
+              </button>
+            </div>
           )
         })}
       </div>
-      {expandedDefinition && <ClassDetailsPanel definition={expandedDefinition} />}
+      {infoDefinition && <ClassInfoOverlay definition={infoDefinition} onClose={() => setInfoClass(null)} />}
     </div>
   )
 }
