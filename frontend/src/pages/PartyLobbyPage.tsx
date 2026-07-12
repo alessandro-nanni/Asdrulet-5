@@ -80,7 +80,7 @@ export function PartyLobbyPage() {
 
   if (party.status === 'IN_PROGRESS') {
     return (
-      <div className="page">
+      <div className="battle-page">
         {import.meta.env.DEV && party.members.some((member) => member.bot) && (
           <section className="card dev-panel">
             <h2 className="section-title">Playing as (dev)</h2>

@@ -264,7 +264,15 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
         )}
 
         {combat.status === 'IN_PROGRESS' && selfCombatant && selfDefinition && (
-          <SelfStatsPanel self={selfCombatant} stats={selfDefinition.stats} />
+          <SelfStatsPanel
+            self={selfCombatant}
+            stats={selfDefinition.stats}
+            isMyTurn={isMyTurn}
+            hasSelectedAbility={selectedAbility != null}
+            hasActedThisTurn={hasActedThisTurn}
+            isSubmitting={isSubmitting}
+            onEndTurn={handleEndTurn}
+          />
         )}
 
         {combat.status === 'IN_PROGRESS' && isMyTurn && selfCombatant && selfDefinition && (
@@ -272,12 +280,10 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
             self={selfCombatant}
             abilities={selfDefinition.abilities}
             selectedAbility={selectedAbility}
-            hasActedThisTurn={hasActedThisTurn}
             isSubmitting={isSubmitting}
             onSelectAbility={setSelectedAbilityId}
             onCancel={() => setSelectedAbilityId(null)}
             onConfirm={(abilityId) => void submitAbility(abilityId, null)}
-            onEndTurn={handleEndTurn}
           />
         )}
 

@@ -22,11 +22,12 @@ export function EnemyAttackInfo({ combatant, onClose }: Props) {
     <div className="enemy-info-overlay" onClick={onClose}>
       <div className="enemy-info-card" onClick={(event) => event.stopPropagation()}>
         <div className="ability-card-header">
-          <span className="ability-name">{combatant.attackName}</span>
+          <span className="ability-name">{combatant.displayName}</span>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
             ✕
           </button>
         </div>
+        <p className="enemy-attack-name">{combatant.attackName}</p>
         <p className="ability-description">{combatant.attackDescription}</p>
         <p className="ability-meta">{EFFECT_LABEL[combatant.attackEffect.type](combatant.attackEffect)}</p>
       </div>

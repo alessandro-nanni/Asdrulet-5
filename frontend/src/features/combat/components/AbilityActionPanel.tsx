@@ -7,19 +7,10 @@ interface Props {
   self: Combatant
   abilities: Ability[]
   selectedAbility: Ability | null
-  hasActedThisTurn: boolean
   isSubmitting: boolean
   onSelectAbility: (abilityId: string) => void
   onCancel: () => void
   onConfirm: (abilityId: string) => void
-  onEndTurn: () => void
-}
-
-const EFFECT_ICONS: Record<Ability['effect']['type'], string> = {
-  DAMAGE: '⚔️',
-  HEAL: '✨',
-  BUFF_DEFENSE: '🛡️',
-  BUFF_DAMAGE: '💪',
 }
 
 function canAfford(self: Combatant, ability: Ability): boolean {
@@ -37,12 +28,10 @@ export function AbilityActionPanel({
   self,
   abilities,
   selectedAbility,
-  hasActedThisTurn,
   isSubmitting,
   onSelectAbility,
   onCancel,
   onConfirm,
-  onEndTurn,
 }: Props) {
   const [infoAbility, setInfoAbility] = useState<Ability | null>(null)
 
@@ -63,9 +52,6 @@ export function AbilityActionPanel({
               }
               onClick={() => onSelectAbility(ability.id)}
             >
-              <span className="ability-choice-icon" aria-hidden="true">
-                {EFFECT_ICONS[ability.effect.type]}
-              </span>
               <span className="ability-choice-name">{ability.name}</span>
               <span className="ability-choice-cost">
                 {ability.type === 'ULTIMATE' ? `${self.ultimateCharge}/${self.ultimateChargeThreshold}` : ability.staminaCost}
@@ -85,12 +71,6 @@ export function AbilityActionPanel({
           </div>
         ))}
       </div>
-
-      {!selectedAbility && (
-        <button type="button" className="btn btn-secondary btn-block" disabled={isSubmitting} onClick={onEndTurn}>
-          {hasActedThisTurn ? 'End turn' : 'Skip turn'}
-        </button>
-      )}
 
       {selectedAbility && needsConfirmOnly(selectedAbility) && (
         <div className="action-confirm-row">

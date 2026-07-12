@@ -1,8 +1,20 @@
+import type { ComponentType } from 'react'
 import { useState } from 'react'
+import { HeartIcon } from '../../../shared/ui/HeartIcon'
+import { ShieldIcon } from '../../../shared/ui/ShieldIcon'
+import { SwordIcon } from '../../../shared/ui/SwordIcon'
 import { MemberAvatar } from '../../party/components/MemberAvatar'
 import type { PartyMember } from '../../party/types'
-import type { Combatant } from '../types'
+import type { ActiveEffect, Combatant } from '../types'
+import { ActiveEffectInfo } from './ActiveEffectInfo'
 import { EnemyAttackInfo } from './EnemyAttackInfo'
+
+const ACTIVE_EFFECT_ICON: Record<ActiveEffect['type'], ComponentType<{ className?: string }>> = {
+  BUFF_DEFENSE: ShieldIcon,
+  BUFF_DAMAGE: SwordIcon,
+  DAMAGE: SwordIcon,
+  HEAL: HeartIcon,
+}
 
 export interface FloatingText {
   key: string
@@ -34,6 +46,7 @@ export function CombatantCard({
   floatingTexts = [],
 }: Props) {
   const [showAttackInfo, setShowAttackInfo] = useState(false)
+  const [activeEffectInfo, setActiveEffectInfo] = useState<ActiveEffect | null>(null)
   const healthPercent = Math.round((combatant.currentHealth / combatant.maxHealth) * 100)
 
   const classNames = [
@@ -83,12 +96,34 @@ export function CombatantCard({
           👹
         </div>
       )}
-      <span className="combatant-name">{combatant.displayName}</span>
       <div className="combatant-bar combatant-bar-health">
         <div className="combatant-bar-fill" style={{ width: `${healthPercent}%` }} />
         <span className="combatant-bar-overlay-label">{combatant.currentHealth}</span>
       </div>
+      {combatant.activeEffects.length > 0 && (
+        <div className="active-effects-row">
+          {combatant.activeEffects.map((effect, index) => {
+            const Icon = ACTIVE_EFFECT_ICON[effect.type]
+            return (
+              <button
+                key={`${effect.type}-${index}`}
+                type="button"
+                className="active-effect-badge"
+                aria-label={`View active effect: +${effect.power} ${effect.type.replace('_', ' ').toLowerCase()}, ${effect.remainingTurns} turns left`}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setActiveEffectInfo(effect)
+                }}
+              >
+                <Icon className="active-effect-icon" />
+                <span className="active-effect-turns">{effect.remainingTurns}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
       {showAttackInfo && <EnemyAttackInfo combatant={combatant} onClose={() => setShowAttackInfo(false)} />}
+      {activeEffectInfo && <ActiveEffectInfo effect={activeEffectInfo} onClose={() => setActiveEffectInfo(null)} />}
     </div>
   )
 }

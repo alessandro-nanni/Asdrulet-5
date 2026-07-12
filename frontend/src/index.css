@@ -67,6 +67,13 @@ p {
   min-height: 100svh;
 }
 
+.battle-page {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 @media (min-width: 640px) {
   .page {
     max-width: 560px;
@@ -565,6 +572,13 @@ p {
   font-size: 0.85rem;
 }
 
+.enemy-attack-name {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .ability-meta {
   margin: 0;
   font-size: 0.7rem;
@@ -661,6 +675,7 @@ p {
 /* Battle screen */
 
 .battle-screen {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -668,14 +683,19 @@ p {
 
 .battlefield {
   position: relative;
+  flex: 1 1 0%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 8px;
   padding: 20px 14px;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   border: 1px solid var(--surface-border);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: radial-gradient(ellipse 120% 70% at 50% 50%, rgba(255, 255, 255, 0.05), transparent 70%), rgba(0, 0, 0, 0.25);
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255, 92, 92, 0.18), transparent 65%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, rgba(79, 143, 224, 0.18), transparent 65%),
+    rgba(0, 0, 0, 0.25);
   box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
@@ -689,11 +709,13 @@ p {
 }
 
 .battle-controls {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  gap: 8px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
   border: 1px solid var(--surface-border);
   border-top: none;
   background: var(--surface);
@@ -710,10 +732,17 @@ p {
   padding: 10px 8px;
   border-radius: var(--radius-md);
   border: 2px solid transparent;
+  transition: transform 0.2s ease;
 }
 
-.combatant-card.is-current-turn {
-  border-color: rgba(255, 183, 3, 0.45);
+.battlefield-row-enemies .combatant-card.is-current-turn {
+  transform: translateY(18px);
+  z-index: 2;
+}
+
+.battlefield-row-allies .combatant-card.is-current-turn {
+  transform: translateY(-18px);
+  z-index: 2;
 }
 
 .combatant-card.is-defeated {
@@ -854,12 +883,6 @@ p {
   border: 2px solid var(--surface-border);
 }
 
-.combatant-name {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-align: center;
-}
-
 .combatant-bar {
   width: 100%;
   height: 6px;
@@ -904,6 +927,36 @@ p {
   pointer-events: none;
 }
 
+.active-effects-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+}
+
+.active-effect-badge {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.active-effect-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.active-effect-turns {
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
 .battle-result {
   text-align: center;
 }
@@ -933,12 +986,12 @@ p {
 .self-stats-panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .self-stat-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .self-stat-half {
@@ -954,22 +1007,51 @@ p {
   margin-bottom: 2px;
 }
 
-.self-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-
-.self-stat-tile {
+.self-stat-top-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 4px 6px;
-  border-radius: var(--radius-sm);
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.self-stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  border-radius: 999px;
   background: rgba(0, 0, 0, 0.2);
   font-size: 0.8rem;
   color: var(--text-muted);
+  min-width: 0;
+}
+
+.self-stat-pill-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.self-stat-end-turn-btn {
+  appearance: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--accent-contrast);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.self-stat-end-turn-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.self-stat-end-turn-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .self-stat-tile-icon {
@@ -1033,19 +1115,19 @@ p {
 }
 
 .ability-choice-list {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .ability-choice {
   appearance: none;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 10px 6px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
   border-radius: var(--radius-md);
   border: 2px solid var(--surface-border);
   background: rgba(0, 0, 0, 0.2);
@@ -1056,7 +1138,7 @@ p {
 }
 
 .ability-choice:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .ability-choice:disabled {
@@ -1069,27 +1151,25 @@ p {
   box-shadow: 0 0 0 2px rgba(255, 183, 3, 0.4);
 }
 
-.ability-choice-icon {
-  font-size: 1.3rem;
-}
-
 .ability-choice-name {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  text-align: center;
 }
 
 .ability-choice-cost {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .ability-choice-wrap {
-  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
 }
 
 .ability-choice-wrap .ability-choice {
-  width: 100%;
+  flex: 1;
 }
 
 .action-confirm-row {
@@ -1101,8 +1181,7 @@ p {
   flex: 1;
 }
 
-.combatant-info-btn,
-.ability-info-btn {
+.combatant-info-btn {
   appearance: none;
   position: absolute;
   top: 4px;
@@ -1121,6 +1200,22 @@ p {
   justify-content: center;
   cursor: pointer;
   z-index: 3;
+}
+
+.ability-info-btn {
+  appearance: none;
+  flex-shrink: 0;
+  width: 28px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
 .enemy-info-overlay {
