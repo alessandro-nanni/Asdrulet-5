@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { MemberAvatar } from '../../party/components/MemberAvatar'
 import type { PartyMember } from '../../party/types'
 import type { Combatant } from '../types'
+import { EnemyAttackInfo } from './EnemyAttackInfo'
 
 export interface FloatingText {
   key: string
@@ -13,6 +15,7 @@ interface Props {
   member?: PartyMember
   isCurrentTurn: boolean
   selectable?: boolean
+  isInvalidTarget?: boolean
   onSelect?: () => void
   reaction?: 'hit' | 'healed' | null
   isAttacking?: boolean
@@ -24,24 +27,21 @@ export function CombatantCard({
   member,
   isCurrentTurn,
   selectable = false,
+  isInvalidTarget = false,
   onSelect,
   reaction = null,
   isAttacking = false,
   floatingTexts = [],
 }: Props) {
+  const [showAttackInfo, setShowAttackInfo] = useState(false)
   const healthPercent = Math.round((combatant.currentHealth / combatant.maxHealth) * 100)
-  const staminaPercent =
-    combatant.maxStamina > 0 ? Math.round((combatant.currentStamina / combatant.maxStamina) * 100) : 0
-  const chargePercent =
-    combatant.ultimateChargeThreshold > 0
-      ? Math.round((combatant.ultimateCharge / combatant.ultimateChargeThreshold) * 100)
-      : 0
 
   const classNames = [
     'combatant-card',
     isCurrentTurn ? 'is-current-turn' : '',
     combatant.alive ? '' : 'is-defeated',
     selectable ? 'is-selectable' : '',
+    isInvalidTarget ? 'is-invalid-target' : '',
     isAttacking ? 'is-attacking' : '',
     reaction === 'hit' ? 'is-hit' : '',
     reaction === 'healed' ? 'is-healed' : '',
@@ -63,6 +63,19 @@ export function CombatantCard({
           </span>
         ))}
       </div>
+      {combatant.enemy && combatant.attackName && (
+        <button
+          type="button"
+          className="combatant-info-btn"
+          aria-label={`View ${combatant.displayName}'s attack`}
+          onClick={(event) => {
+            event.stopPropagation()
+            setShowAttackInfo(true)
+          }}
+        >
+          ?
+        </button>
+      )}
       {member ? (
         <MemberAvatar member={member} />
       ) : (
@@ -77,16 +90,7 @@ export function CombatantCard({
       <span className="combatant-bar-label">
         {combatant.currentHealth}/{combatant.maxHealth}
       </span>
-      {!combatant.enemy && (
-        <>
-          <div className="combatant-bar combatant-bar-stamina">
-            <div className="combatant-bar-fill" style={{ width: `${staminaPercent}%` }} />
-          </div>
-          <div className="combatant-bar combatant-bar-charge">
-            <div className="combatant-bar-fill" style={{ width: `${chargePercent}%` }} />
-          </div>
-        </>
-      )}
+      {showAttackInfo && <EnemyAttackInfo combatant={combatant} onClose={() => setShowAttackInfo(false)} />}
     </div>
   )
 }

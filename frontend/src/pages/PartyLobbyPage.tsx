@@ -7,18 +7,23 @@ import { ClassSelector } from '../features/party/components/ClassSelector'
 import { TurnOrderEditor } from '../features/party/components/TurnOrderEditor'
 import { QrCodeCard } from '../features/party/components/QrCodeCard'
 import { selectClass, startGame } from '../features/party/api'
-import { selectClassAsFakeMember } from '../features/dev/api'
+import { selectClassAsFakeMember, selectClassAsMember, startGameAsMember } from '../features/dev/api'
+import { getGuestSelfId } from '../features/dev/guestIdentity'
 import { useClassDefinitions } from '../features/classes/useClassDefinitions'
 import { BattleScreen } from '../features/combat/components/BattleScreen'
 import type { CharacterClass } from '../features/party/types'
 
 export function PartyLobbyPage() {
   const { code = '' } = useParams()
+  const normalizedCode = code.toUpperCase()
   const { user } = useAuth()
-  const { party, error } = usePartyState(code.toUpperCase())
+  const { party, error } = usePartyState(normalizedCode)
   const { definitions } = useClassDefinitions()
   const [classError, setClassError] = useState<string | null>(null)
   const [actingAsId, setActingAsId] = useState<string | null>(null)
+
+  const guestSelfId = getGuestSelfId(normalizedCode)
+  const isGuestSession = guestSelfId != null
 
   if (error) {
     return (
@@ -29,7 +34,7 @@ export function PartyLobbyPage() {
       </div>
     )
   }
-  if (!party || !user) {
+  if (!party || (!isGuestSession && !user)) {
     return (
       <div className="page page-center">
         <p className="muted">Loading party...</p>
@@ -37,16 +42,21 @@ export function PartyLobbyPage() {
     )
   }
 
-  const self = party.members.find((member) => member.userId === user.id)
+  const selfId = isGuestSession ? guestSelfId : user!.id
+  const self = party.members.find((member) => member.userId === selfId)
   const isLeader = self?.leader ?? false
-  const effectiveActingAsId = actingAsId ?? user.id
+  const effectiveActingAsId = actingAsId ?? selfId
   const everyoneHasAClass = party.members.every((member) => member.characterClass !== null)
 
   async function handleSelectClass(characterClass: CharacterClass) {
     setClassError(null)
     try {
-      if (effectiveActingAsId === user!.id) {
-        await selectClass(party!.code, characterClass)
+      if (effectiveActingAsId === selfId) {
+        if (isGuestSession) {
+          await selectClassAsMember(party!.code, selfId, characterClass)
+        } else {
+          await selectClass(party!.code, characterClass)
+        }
       } else {
         await selectClassAsFakeMember(party!.code, effectiveActingAsId, characterClass)
       }
@@ -55,14 +65,17 @@ export function PartyLobbyPage() {
     }
   }
 
+  function handleStartGame(order: string[]) {
+    if (isGuestSession) {
+      void startGameAsMember(party!.code, selfId, order)
+    } else {
+      void startGame(party!.code, order)
+    }
+  }
+
   if (party.status === 'IN_PROGRESS') {
     return (
       <div className="page">
-        <header className="lobby-header">
-          <p className="eyebrow">Party code</p>
-          <h1 className="party-code">{party.code}</h1>
-        </header>
-
         {import.meta.env.DEV && party.members.some((member) => member.bot) && (
           <section className="card dev-panel">
             <h2 className="section-title">Playing as (dev)</h2>
@@ -74,7 +87,7 @@ export function PartyLobbyPage() {
               {party.members.map((member) => (
                 <option key={member.userId} value={member.userId}>
                   {member.displayName}
-                  {member.bot ? ' (bot)' : member.userId === user.id ? ' (you)' : ''}
+                  {member.bot ? ' (bot)' : member.userId === selfId ? ' (you)' : ''}
                 </option>
               ))}
             </select>
@@ -85,7 +98,8 @@ export function PartyLobbyPage() {
           code={party.code}
           members={party.members}
           actingAsId={effectiveActingAsId}
-          selfUserId={user.id}
+          selfUserId={selfId}
+          useDevActions={isGuestSession}
         />
       </div>
     )
@@ -116,7 +130,7 @@ export function PartyLobbyPage() {
             {party.members.map((member) => (
               <option key={member.userId} value={member.userId}>
                 {member.displayName}
-                {member.bot ? ' (bot)' : member.userId === user.id ? ' (you)' : ''}
+                {member.bot ? ' (bot)' : member.userId === selfId ? ' (you)' : ''}
               </option>
             ))}
           </select>
@@ -142,12 +156,7 @@ export function PartyLobbyPage() {
         <section className="card">
           <h2 className="section-title">Set turn order</h2>
           {everyoneHasAClass ? (
-            <TurnOrderEditor
-              members={party.members}
-              onSubmit={(order) => {
-                void startGame(party.code, order)
-              }}
-            />
+            <TurnOrderEditor members={party.members} onSubmit={handleStartGame} />
           ) : (
             <p className="muted">Waiting for everyone to choose a class...</p>
           )}

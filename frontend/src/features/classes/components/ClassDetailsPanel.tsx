@@ -13,7 +13,6 @@ export function ClassDetailsPanel({ definition }: { definition: ClassDefinition 
         <StatBar label="Health" value={stats.maxHealth} max={200} characterClass={characterClass} />
         <StatBar label="Damage" value={stats.damage} max={30} characterClass={characterClass} />
         <StatBar label="Defense" value={stats.defense} max={30} characterClass={characterClass} />
-        <StatBar label="Speed" value={stats.speed} max={15} characterClass={characterClass} />
         <StatBar label="Stamina" value={stats.maxStamina} max={150} characterClass={characterClass} />
       </div>
 

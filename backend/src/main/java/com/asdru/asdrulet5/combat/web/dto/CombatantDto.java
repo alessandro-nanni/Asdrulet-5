@@ -1,5 +1,6 @@
 package com.asdru.asdrulet5.combat.web.dto;
 
+import com.asdru.asdrulet5.classdata.web.dto.EffectDto;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 
 import java.util.List;
@@ -16,6 +17,9 @@ public record CombatantDto(
         int ultimateCharge,
         int ultimateChargeThreshold,
         boolean alive,
-        List<ActiveEffectDto> activeEffects
+        List<ActiveEffectDto> activeEffects,
+        String attackName,
+        String attackDescription,
+        EffectDto attackEffect
 ) {
 }

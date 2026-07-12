@@ -4,7 +4,12 @@
     {
       "name": "backend",
       "runtimeExecutable": "backend\\mvnw.cmd",
-      "runtimeArgs": ["-f", "backend/pom.xml", "spring-boot:run"],
+      "runtimeArgs": [
+        "-f",
+        "backend/pom.xml",
+        "spring-boot:run",
+        "-Dspring-boot.run.jvmArguments=-Dapp.dev-tools.enabled=true"
+      ],
       "port": 8080
     },
     {

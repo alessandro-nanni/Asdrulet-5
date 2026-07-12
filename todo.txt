@@ -1,12 +1,13 @@
-Remove the party code text at the top
+Remove the party code text at the top of the screen
 in game screen (common for all players) just show health bar
 more in depth stats should be available in the bottom half of the screen.
 It is currently possible to spam clicks to perform more abilities with just one input. There is a lot of delay when selecting an action and it actually happening.
 When Choosing an ability just add a cancel button, dont change the entitrety of the bottom ui.
-Dont draw two separate islands for the batle field. it should feel almost like a gameboy, where you have the gamescreen on top, and controls (and stats) at the bottom.
+Dont draw two separate islands for the battlefield. it should feel almost like a gameboy, where you have the gamescreen on top, and controls (and stats) at the bottom.
 Remove the line separator, enemies arent moving to attack.
 Add a way to view the possible abilities an enemy can perform
 too many outlines. cant distinguish between card whose turn it is and targets. Maybe just gray out the invalid targets and use a faint outline for the card whose turn it is
 Asdrulet 5 text is still cut out at the bottom
-Self abilities character should still display as all all others, by graying out every invalid target, instead of displaying the custom select message.
+Self abilities character should still display as all others, by graying out every invalid target, instead of displaying the custom select message.
 Remove speed from stats
+make class hats bigger, and not rotated.

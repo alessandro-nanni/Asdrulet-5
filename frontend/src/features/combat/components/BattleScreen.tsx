@@ -4,6 +4,7 @@ import { useClassDefinitions } from '../../classes/useClassDefinitions'
 import { endTurn, endTurnAsFakeMember, useAbility, useAbilityAsFakeMember } from '../api'
 import { CombatantCard, type FloatingText } from './CombatantCard'
 import { AbilityActionPanel } from './AbilityActionPanel'
+import { SelfStatsPanel } from './SelfStatsPanel'
 import type { PartyMember } from '../../party/types'
 import type { CombatState } from '../types'
 
@@ -12,18 +13,20 @@ interface Props {
   members: PartyMember[]
   actingAsId: string
   selfUserId: string
+  useDevActions?: boolean
 }
 
 const REACTION_DURATION_MS = 650
 const ATTACK_DURATION_MS = 500
 const FLOAT_DURATION_MS = 1100
 
-export function BattleScreen({ code, members, actingAsId, selfUserId }: Props) {
+export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActions = false }: Props) {
   const { combat, error } = useCombatState(code)
   const { definitions } = useClassDefinitions()
   const [selectedAbilityId, setSelectedAbilityId] = useState<string | null>(null)
   const [hasActedThisTurn, setHasActedThisTurn] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [attackerId, setAttackerId] = useState<string | null>(null)
   const [reactions, setReactions] = useState<Record<string, 'hit' | 'healed'>>({})
@@ -142,19 +145,28 @@ export function BattleScreen({ code, members, actingAsId, selfUserId }: Props) {
   const selectedAbility = selfDefinition?.abilities.find((ability) => ability.id === selectedAbilityId) ?? null
 
   const needsFieldTarget =
-    selectedAbility && (selectedAbility.targetType === 'SINGLE_ALLY' || selectedAbility.targetType === 'SINGLE_ENEMY')
+    selectedAbility &&
+    (selectedAbility.targetType === 'SINGLE_ALLY' ||
+      selectedAbility.targetType === 'SINGLE_ENEMY' ||
+      selectedAbility.targetType === 'SELF')
   const selectableIds = needsFieldTarget
     ? new Set(
-        combat.combatants
-          .filter((combatant) => combatant.alive && combatant.enemy === (selectedAbility!.targetType === 'SINGLE_ENEMY'))
-          .map((combatant) => combatant.id),
+        selectedAbility!.targetType === 'SELF'
+          ? [actingAsId]
+          : combat.combatants
+              .filter((combatant) => combatant.alive && combatant.enemy === (selectedAbility!.targetType === 'SINGLE_ENEMY'))
+              .map((combatant) => combatant.id),
       )
     : null
 
   async function submitAbility(abilityId: string, targetId: string | null) {
+    if (isSubmitting) {
+      return
+    }
     setActionError(null)
+    setIsSubmitting(true)
     try {
-      if (actingAsId === selfUserId) {
+      if (!useDevActions && actingAsId === selfUserId) {
         await useAbility(code, abilityId, targetId)
       } else {
         await useAbilityAsFakeMember(code, actingAsId, abilityId, targetId)
@@ -163,25 +175,33 @@ export function BattleScreen({ code, members, actingAsId, selfUserId }: Props) {
       setHasActedThisTurn(true)
     } catch {
       setActionError('That action failed. Try again.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   function handleFieldTargetClick(targetId: string) {
-    if (selectedAbility && selectableIds?.has(targetId)) {
+    if (!isSubmitting && selectedAbility && selectableIds?.has(targetId)) {
       void submitAbility(selectedAbility.id, targetId)
     }
   }
 
   async function handleEndTurn() {
+    if (isSubmitting) {
+      return
+    }
     setActionError(null)
+    setIsSubmitting(true)
     try {
-      if (actingAsId === selfUserId) {
+      if (!useDevActions && actingAsId === selfUserId) {
         await endTurn(code)
       } else {
         await endTurnAsFakeMember(code, actingAsId)
       }
     } catch {
       setActionError('Could not end turn. Try again.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -195,6 +215,7 @@ export function BattleScreen({ code, members, actingAsId, selfUserId }: Props) {
               combatant={combatant}
               isCurrentTurn={combat.currentTurnCombatantId === combatant.id}
               selectable={selectableIds?.has(combatant.id) ?? false}
+              isInvalidTarget={selectableIds != null && !selectableIds.has(combatant.id) && combatant.alive}
               onSelect={() => handleFieldTargetClick(combatant.id)}
               isAttacking={attackerId === combatant.id}
               reaction={reactions[combatant.id] ?? null}
@@ -202,8 +223,6 @@ export function BattleScreen({ code, members, actingAsId, selfUserId }: Props) {
             />
           ))}
         </div>
-
-        <div className="battlefield-divider" aria-hidden="true" />
 
         <div className="battlefield-row battlefield-row-allies">
           {allies.map((combatant) => {
@@ -215,6 +234,7 @@ export function BattleScreen({ code, members, actingAsId, selfUserId }: Props) {
                 member={member}
                 isCurrentTurn={combat.currentTurnCombatantId === combatant.id}
                 selectable={selectableIds?.has(combatant.id) ?? false}
+                isInvalidTarget={selectableIds != null && !selectableIds.has(combatant.id) && combatant.alive}
                 onSelect={() => handleFieldTargetClick(combatant.id)}
                 isAttacking={attackerId === combatant.id}
                 reaction={reactions[combatant.id] ?? null}
@@ -225,37 +245,42 @@ export function BattleScreen({ code, members, actingAsId, selfUserId }: Props) {
         </div>
       </div>
 
-      {combat.status !== 'IN_PROGRESS' && (
-        <section className="card battle-result">
-          <h2 className="section-title">{combat.status === 'PARTY_WON' ? 'Victory!' : 'Defeat...'}</h2>
-        </section>
-      )}
+      <div className="battle-controls">
+        {combat.status !== 'IN_PROGRESS' && (
+          <section className="battle-result">
+            <h2 className="section-title">{combat.status === 'PARTY_WON' ? 'Victory!' : 'Defeat...'}</h2>
+          </section>
+        )}
 
-      {combat.status === 'IN_PROGRESS' && isMyTurn && selfCombatant && selfDefinition && (
-        <AbilityActionPanel
-          self={selfCombatant}
-          abilities={selfDefinition.abilities}
-          selectedAbility={selectedAbility}
-          hasActedThisTurn={hasActedThisTurn}
-          onSelectAbility={setSelectedAbilityId}
-          onUndo={() => setSelectedAbilityId(null)}
-          onConfirm={(abilityId) => void submitAbility(abilityId, null)}
-          onEndTurn={handleEndTurn}
-        />
-      )}
+        {combat.status === 'IN_PROGRESS' && selfCombatant && <SelfStatsPanel self={selfCombatant} />}
 
-      {combat.status === 'IN_PROGRESS' && !isMyTurn && (
-        <p className="muted battle-waiting">
-          Waiting for {combat.combatants.find((combatant) => combatant.id === combat.currentTurnCombatantId)?.displayName ?? '...'}
-          ...
-        </p>
-      )}
+        {combat.status === 'IN_PROGRESS' && isMyTurn && selfCombatant && selfDefinition && (
+          <AbilityActionPanel
+            self={selfCombatant}
+            abilities={selfDefinition.abilities}
+            selectedAbility={selectedAbility}
+            hasActedThisTurn={hasActedThisTurn}
+            isSubmitting={isSubmitting}
+            onSelectAbility={setSelectedAbilityId}
+            onCancel={() => setSelectedAbilityId(null)}
+            onConfirm={(abilityId) => void submitAbility(abilityId, null)}
+            onEndTurn={handleEndTurn}
+          />
+        )}
 
-      {actionError && (
-        <p className="alert" role="alert">
-          {actionError}
-        </p>
-      )}
+        {combat.status === 'IN_PROGRESS' && !isMyTurn && (
+          <p className="muted battle-waiting">
+            Waiting for {combat.combatants.find((combatant) => combatant.id === combat.currentTurnCombatantId)?.displayName ?? '...'}
+            ...
+          </p>
+        )}
+
+        {actionError && (
+          <p className="alert" role="alert">
+            {actionError}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

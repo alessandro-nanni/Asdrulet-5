@@ -3,6 +3,7 @@ package com.asdru.asdrulet5.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -55,7 +56,18 @@ public class SecurityConfig {
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/me").permitAll()
-                        .requestMatchers("/api/**", "/ws").authenticated()
+                        // Read-only state and the realtime channel carry no secrets beyond
+                        // what a party code already grants access to, and both need to work
+                        // for the dev-only "Quick game" tool's synthetic, session-less
+                        // players (see PartyDevSessionController / PartyDevController /
+                        // CombatDevController) — those write endpoints are still safe
+                        // because they 404 unless app.dev-tools.enabled is set.
+                        .requestMatchers(HttpMethod.GET, "/api/parties/*", "/api/parties/*/combat", "/api/classes/**")
+                        .permitAll()
+                        .requestMatchers("/ws").permitAll()
+                        .requestMatchers("/api/parties/dev", "/api/parties/dev/**", "/api/parties/*/dev/**",
+                                "/api/parties/*/combat/dev/**").permitAll()
+                        .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(

@@ -1,5 +1,6 @@
 package com.asdru.asdrulet5.combat.web;
 
+import com.asdru.asdrulet5.classdata.web.ClassDefinitionMapper;
 import com.asdru.asdrulet5.classdata.web.dto.EffectDto;
 import com.asdru.asdrulet5.combat.domain.ActiveEffect;
 import com.asdru.asdrulet5.combat.domain.Combat;
@@ -34,7 +35,10 @@ public class CombatMapper {
                 combatant.ultimateCharge(),
                 combatant.ultimateChargeThreshold(),
                 combatant.alive(),
-                combatant.activeEffects().stream().map(CombatMapper::toDto).toList()
+                combatant.activeEffects().stream().map(CombatMapper::toDto).toList(),
+                combatant.attackName(),
+                combatant.attackDescription(),
+                combatant.attackEffect() != null ? ClassDefinitionMapper.toDto(combatant.attackEffect()) : null
         );
     }
 

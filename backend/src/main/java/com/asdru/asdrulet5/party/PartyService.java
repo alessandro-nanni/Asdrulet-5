@@ -45,8 +45,12 @@ public class PartyService {
     }
 
     public PartyStateDto startGame(String code, AuthenticatedUser user, List<String> order) {
+        return startGame(code, user.id(), order);
+    }
+
+    public PartyStateDto startGame(String code, String requesterId, List<String> order) {
         Party party = getOrThrow(code);
-        party.start(user.id(), order);
+        party.start(requesterId, order);
         PartyStateDto dto = broadcast(party);
         combatService.startCombat(party.code(), party.members(), party.turnOrder());
         return dto;
@@ -74,6 +78,18 @@ public class PartyService {
             throw new NotAFakeMemberException(code, fakeMemberId);
         }
         party.selectClass(fakeMemberId, characterClass);
+        return broadcast(party);
+    }
+
+    /**
+     * Like {@link #selectClassAsFakeMember}, but for the session-less leader
+     * of a dev "quick game" party (see PartyDevSessionController) rather than
+     * a bot — that leader is a real (non-bot) member, just without a Google
+     * session behind it, so the bot-only guard above doesn't apply here.
+     */
+    public PartyStateDto selectClassAsMember(String code, String memberId, CharacterClass characterClass) {
+        Party party = getOrThrow(code);
+        party.selectClass(memberId, characterClass);
         return broadcast(party);
     }
 

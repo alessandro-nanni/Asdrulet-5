@@ -50,7 +50,7 @@ public class ClassDefinitionMapper {
         };
     }
 
-    private EffectDto toDto(AbilityEffect effect) {
+    public EffectDto toDto(AbilityEffect effect) {
         return switch (effect) {
             case DamageEffect damage -> new EffectDto(EffectDto.Kind.DAMAGE, damage.power(), 0);
             case HealEffect heal -> new EffectDto(EffectDto.Kind.HEAL, heal.power(), 0);

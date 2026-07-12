@@ -1,5 +1,5 @@
 import type { CharacterClass } from '../party/types'
-import type { EffectType } from '../classes/types'
+import type { Effect, EffectType } from '../classes/types'
 
 export type CombatStatus = 'IN_PROGRESS' | 'PARTY_WON' | 'PARTY_LOST'
 
@@ -22,6 +22,9 @@ export interface Combatant {
   ultimateChargeThreshold: number
   alive: boolean
   activeEffects: ActiveEffect[]
+  attackName: string | null
+  attackDescription: string | null
+  attackEffect: Effect | null
 }
 
 export interface CombatState {

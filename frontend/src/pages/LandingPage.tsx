@@ -31,6 +31,7 @@ export function LandingPage() {
           <p className="subtitle">A turn-based dungeon crawler for you and your friends.</p>
           <LoginButton />
           <InstallAppButton />
+          <QuickGameButton />
         </div>
       </div>
     )
