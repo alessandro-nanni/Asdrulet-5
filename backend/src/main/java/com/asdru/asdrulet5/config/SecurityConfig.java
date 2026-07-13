@@ -63,7 +63,7 @@ public class SecurityConfig {
                         // CombatDevController) — those write endpoints are still safe
                         // because they 404 unless app.dev-tools.enabled is set.
                         .requestMatchers(HttpMethod.GET, "/api/parties/*", "/api/parties/*/combat",
-                                "/api/parties/*/dungeon", "/api/classes/**")
+                                "/api/parties/*/dungeon", "/api/classes/**", "/api/items/**")
                         .permitAll()
                         .requestMatchers("/ws").permitAll()
                         .requestMatchers("/api/parties/dev", "/api/parties/dev/**", "/api/parties/*/dev/**",

@@ -8,6 +8,7 @@ public record PartyMemberDto(
         String avatarUrl,
         CharacterClass characterClass,
         boolean leader,
-        boolean bot
+        boolean bot,
+        LoadoutDto loadout
 ) {
 }

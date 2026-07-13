@@ -1,10 +1,15 @@
 package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
+import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.dungeon.DungeonService;
+import com.asdru.asdrulet5.dungeon.domain.RoomType;
+import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
+import com.asdru.asdrulet5.inventory.exception.UnknownItemDefinitionException;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.PartyStatus;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
+import com.asdru.asdrulet5.party.exception.NotACombatRoomException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
@@ -27,11 +32,16 @@ class PartyServiceTest {
 
     private PartyService partyService;
     private SimpMessagingTemplate messagingTemplate;
+    private DungeonService dungeonService;
+    private CombatService combatService;
 
     @BeforeEach
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
-        partyService = new PartyService(new InMemoryPartyRepository(), messagingTemplate, mock(DungeonService.class));
+        dungeonService = mock(DungeonService.class);
+        combatService = mock(CombatService.class);
+        partyService = new PartyService(new InMemoryPartyRepository(), messagingTemplate, dungeonService,
+                combatService, new ItemDefinitionRegistry());
     }
 
     @Test
@@ -133,5 +143,74 @@ class PartyServiceTest {
 
         assertThatThrownBy(() -> partyService.selectClassAsFakeMember(created.code(), "leader-1", CharacterClass.MAGE))
                 .isInstanceOf(NotAFakeMemberException.class);
+    }
+
+    @Test
+    void enterCombatByNonLeaderThrows() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        partyService.joinParty(created.code(), member, "Player Two");
+        when(dungeonService.currentRoomType(created.code())).thenReturn(RoomType.FIGHT);
+
+        assertThatThrownBy(() -> partyService.enterCombat(created.code(), "player-2"))
+                .isInstanceOf(NotPartyLeaderException.class);
+    }
+
+    @Test
+    void enterCombatInNonCombatRoomThrows() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        when(dungeonService.currentRoomType(created.code())).thenReturn(RoomType.LOOT);
+
+        assertThatThrownBy(() -> partyService.enterCombat(created.code(), "leader-1"))
+                .isInstanceOf(NotACombatRoomException.class);
+        verifyNoInteractions(combatService);
+    }
+
+    @Test
+    void enterCombatByLeaderInFightRoomStartsCombatAndSetsStatus() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        when(dungeonService.currentRoomType(created.code())).thenReturn(RoomType.FIGHT);
+
+        PartyStateDto updated = partyService.enterCombat(created.code(), "leader-1");
+
+        assertThat(updated.status()).isEqualTo(PartyStatus.IN_PROGRESS);
+        verify(combatService, times(1)).startCombat(eq(created.code()), any(), any());
+    }
+
+    @Test
+    void enterCombatInBossRoomIsAllowed() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        when(dungeonService.currentRoomType(created.code())).thenReturn(RoomType.BOSS);
+
+        PartyStateDto updated = partyService.enterCombat(created.code(), "leader-1");
+
+        assertThat(updated.status()).isEqualTo(PartyStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void equipItemFillsTheMatchingSlot() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+
+        PartyStateDto updated = partyService.equipItem(created.code(), "leader-1", "rusted-sword");
+
+        assertThat(updated.members().getFirst().loadout().weaponItemId()).isEqualTo("rusted-sword");
+        assertThat(updated.members().getFirst().loadout().chestplateItemId()).isNull();
+    }
+
+    @Test
+    void equipItemReplacesWhateverWasInThatSlotBefore() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        partyService.equipItem(created.code(), "leader-1", "rusted-sword");
+
+        PartyStateDto updated = partyService.equipItem(created.code(), "leader-1", "flame-edge");
+
+        assertThat(updated.members().getFirst().loadout().weaponItemId()).isEqualTo("flame-edge");
+    }
+
+    @Test
+    void equipUnknownItemThrows() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+
+        assertThatThrownBy(() -> partyService.equipItem(created.code(), "leader-1", "no-such-item"))
+                .isInstanceOf(UnknownItemDefinitionException.class);
     }
 }

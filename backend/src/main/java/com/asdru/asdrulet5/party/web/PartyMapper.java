@@ -1,7 +1,9 @@
 package com.asdru.asdrulet5.party.web;
 
+import com.asdru.asdrulet5.inventory.domain.Loadout;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
+import com.asdru.asdrulet5.party.web.dto.LoadoutDto;
 import com.asdru.asdrulet5.party.web.dto.PartyMemberDto;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
 import lombok.experimental.UtilityClass;
@@ -26,7 +28,12 @@ public class PartyMapper {
                 member.avatarUrl(),
                 member.characterClass(),
                 member.leader(),
-                member.bot()
+                member.bot(),
+                toDto(member.loadout())
         );
+    }
+
+    private LoadoutDto toDto(Loadout loadout) {
+        return new LoadoutDto(loadout.weaponItemId(), loadout.chestplateItemId(), loadout.trinketItemId());
     }
 }

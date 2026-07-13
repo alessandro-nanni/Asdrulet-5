@@ -56,4 +56,9 @@ public class PartyExceptionHandler {
     public ResponseEntity<Map<String, String>> handlePartyFull(PartyFullException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
     }
+
+    @ExceptionHandler(NotACombatRoomException.class)
+    public ResponseEntity<Map<String, String>> handleNotACombatRoom(NotACombatRoomException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
 }

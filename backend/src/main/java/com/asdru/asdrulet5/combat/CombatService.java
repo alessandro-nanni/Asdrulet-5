@@ -10,6 +10,10 @@ import com.asdru.asdrulet5.combat.web.CombatMapper;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.enemydata.EnemyDefinitionRegistry;
 import com.asdru.asdrulet5.enemydata.domain.EnemyDefinition;
+import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
+import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
+import com.asdru.asdrulet5.inventory.domain.ItemPassive;
+import com.asdru.asdrulet5.inventory.domain.Loadout;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -17,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.ToIntFunction;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +32,7 @@ public class CombatService {
     private final CombatRepository combatRepository;
     private final ClassDefinitionRegistry classDefinitionRegistry;
     private final EnemyDefinitionRegistry enemyDefinitionRegistry;
+    private final ItemDefinitionRegistry itemDefinitionRegistry;
     private final SimpMessagingTemplate messagingTemplate;
 
     public CombatStateDto startCombat(String code, List<PartyMember> members, List<String> turnOrder) {
@@ -72,10 +78,31 @@ public class CombatService {
                 .findFirst()
                 .orElseThrow()
                 .chargeThreshold();
+        List<ItemPassive> passives = resolvePassives(member.loadout());
         return new Combatant(
                 member.userId(), member.displayName(), false, member.characterClass(),
-                definition.stats().maxHealth(), definition.stats().maxStamina(), definition.stats().defense(),
-                definition.stats().damage(), ultimateChargeThreshold, definition.abilities(), null, null, null, null);
+                Math.max(1, definition.stats().maxHealth() + sumBonus(passives, ItemPassive::bonusMaxHealth)),
+                Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)),
+                Math.max(0, definition.stats().defense() + sumBonus(passives, ItemPassive::bonusDefense)),
+                Math.max(0, definition.stats().damage() + sumBonus(passives, ItemPassive::bonusDamage)),
+                ultimateChargeThreshold, definition.abilities(), null, null, null, null, passives);
+    }
+
+    private List<ItemPassive> resolvePassives(Loadout loadout) {
+        return loadout.equippedItemIds().stream()
+                .map(itemDefinitionRegistry::get)
+                .map(ItemDefinition::passive)
+                .toList();
+    }
+
+    /**
+     * Summed here rather than clamped per-item, so the floor (applied by the
+     * caller) only kicks in once against the combined total — a trade-off
+     * item's negative bonus could otherwise combine with a low base stat to
+     * go to zero or below.
+     */
+    private int sumBonus(List<ItemPassive> passives, ToIntFunction<ItemPassive> bonus) {
+        return passives.stream().mapToInt(bonus).sum();
     }
 
     private Combatant toEnemyCombatant() {
@@ -84,7 +111,7 @@ public class CombatService {
                 ENEMY_ID, definition.displayName(), true, null,
                 definition.stats().maxHealth(), definition.stats().maxStamina(), definition.stats().defense(),
                 definition.stats().damage(), 0, List.of(), definition.attackName(), definition.attackDescription(),
-                definition.attackEffectSummary(), definition.attackEffect());
+                definition.attackEffectSummary(), definition.attackEffect(), List.of());
     }
 
     private Combat getOrThrow(String code) {

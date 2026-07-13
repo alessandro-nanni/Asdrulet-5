@@ -1,5 +1,6 @@
 package com.asdru.asdrulet5.party.domain;
 
+import com.asdru.asdrulet5.inventory.domain.ItemSlot;
 import com.asdru.asdrulet5.party.exception.*;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PartyTest {
 
     @Test
-    void creatingPartyRegistersLeaderAsFirstMember() {
+    void creatingPartyRegistersLeaderAsFirstMemberWithEmptyLoadout() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
 
         assertThat(party.members()).hasSize(1);
@@ -19,6 +20,7 @@ class PartyTest {
         assertThat(leader.userId()).isEqualTo("leader-1");
         assertThat(leader.leader()).isTrue();
         assertThat(leader.characterClass()).isNull();
+        assertThat(leader.loadout().equippedItemIds()).isEmpty();
     }
 
     @Test
@@ -194,5 +196,36 @@ class PartyTest {
         assertThatThrownBy(() -> party.addFakeMember("Kael"))
                 .isInstanceOf(PartyFullException.class);
         assertThat(party.members()).hasSize(Party.MAX_MEMBERS);
+    }
+
+    @Test
+    void equipItemFillsTheGivenSlotForThatMember() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+
+        party.equipItem("leader-1", ItemSlot.WEAPON, "rusted-sword");
+
+        PartyMember leader = party.members().getFirst();
+        assertThat(leader.loadout().weaponItemId()).isEqualTo("rusted-sword");
+        assertThat(leader.loadout().chestplateItemId()).isNull();
+    }
+
+    @Test
+    void equipItemDoesNotDisturbOtherSlots() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+
+        party.equipItem("leader-1", ItemSlot.WEAPON, "rusted-sword");
+        party.equipItem("leader-1", ItemSlot.TRINKET, "lucky-charm");
+
+        PartyMember leader = party.members().getFirst();
+        assertThat(leader.loadout().weaponItemId()).isEqualTo("rusted-sword");
+        assertThat(leader.loadout().trinketItemId()).isEqualTo("lucky-charm");
+    }
+
+    @Test
+    void equipItemForUnknownMemberThrows() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+
+        assertThatThrownBy(() -> party.equipItem("nobody", ItemSlot.WEAPON, "rusted-sword"))
+                .isInstanceOf(NotPartyMemberException.class);
     }
 }

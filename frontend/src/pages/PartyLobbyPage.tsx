@@ -6,8 +6,8 @@ import { PartyMemberList } from '../features/party/components/PartyMemberList'
 import { ClassSelector } from '../features/party/components/ClassSelector'
 import { TurnOrderEditor } from '../features/party/components/TurnOrderEditor'
 import { QrCodeCard } from '../features/party/components/QrCodeCard'
-import { selectClass, startGame } from '../features/party/api'
-import { selectClassAsFakeMember, selectClassAsMember, startGameAsMember } from '../features/dev/api'
+import { enterCombat, selectClass, startGame } from '../features/party/api'
+import { enterCombatAsMember, selectClassAsFakeMember, selectClassAsMember, startGameAsMember } from '../features/dev/api'
 import { getGuestSelfId } from '../features/dev/guestIdentity'
 import { useClassDefinitions } from '../features/classes/useClassDefinitions'
 import { BattleScreen } from '../features/combat/components/BattleScreen'
@@ -83,10 +83,28 @@ export function PartyLobbyPage() {
     }
   }
 
+  async function handleEnterCombat() {
+    // Apply the response immediately rather than waiting for the broadcast
+    // round-trip back over the WebSocket — it still arrives moments later
+    // but is a no-op then, since it's identical to what we just applied.
+    if (isGuestSession) {
+      applyUpdate(await enterCombatAsMember(party!.code, selfId))
+    } else {
+      applyUpdate(await enterCombat(party!.code))
+    }
+  }
+
   if (party.status === 'DUNGEON') {
     return (
       <div className="battle-page">
-        <DungeonScreen code={party.code} members={party.members} isLeader={isLeader} selfId={selfId} isGuestSession={isGuestSession} />
+        <DungeonScreen
+          code={party.code}
+          members={party.members}
+          isLeader={isLeader}
+          selfId={selfId}
+          isGuestSession={isGuestSession}
+          onEnterCombat={handleEnterCombat}
+        />
       </div>
     )
   }

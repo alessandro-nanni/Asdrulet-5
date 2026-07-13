@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.combat.domain;
 
 import com.asdru.asdrulet5.classdata.domain.*;
 import com.asdru.asdrulet5.combat.exception.*;
+import com.asdru.asdrulet5.inventory.domain.ItemPassive;
 import lombok.Getter;
 import lombok.Synchronized;
 import lombok.experimental.Accessors;
@@ -94,16 +95,42 @@ public class Combat {
 
         List<Combatant> targets = resolveTargets(actor, ability.targetType(), targetId);
         for (Combatant target : targets) {
+            int healthBefore = target.currentHealth();
             effect.apply(actor, target);
+            resolveDamageHooks(actor, target, healthBefore);
         }
         checkWinLoss();
         lastEvents = drainAllEvents();
+    }
+
+    /**
+     * Fires the damage/kill/death passive hooks for one actor-on-target
+     * application, inferred from the target's health delta rather than
+     * threaded through AbilityEffect itself — AbilityEffect operates on the
+     * bare EffectTarget abstraction and has no notion of equipped items, so
+     * this is the narrowest point that both knows "damage happened" and has
+     * the actual Combatants (and their passives) in hand.  A no-op for heals
+     * (health only ever goes up), so this only ever fires for real damage.
+     */
+    private void resolveDamageHooks(Combatant actor, Combatant target, int targetHealthBefore) {
+        int damageDealt = targetHealthBefore - target.currentHealth();
+        if (damageDealt <= 0) {
+            return;
+        }
+        actor.passives().forEach(passive -> passive.onDamageDealt(actor, target, damageDealt));
+        target.passives().forEach(passive -> passive.onDamageTaken(target, actor, damageDealt));
+        if (!target.alive()) {
+            actor.passives().forEach(passive -> passive.onKill(actor, target));
+            target.passives().forEach(passive -> passive.onDeath(target));
+        }
     }
 
     @Synchronized
     public void endTurn(String actorId) {
         requireInProgress();
         requireCurrentTurn(actorId);
+        Combatant actor = requireCombatant(actorId);
+        actor.passives().forEach(passive -> passive.onEndTurn(actor));
         advanceTurn();
         lastEvents = drainAllEvents();
     }
@@ -146,7 +173,9 @@ public class Combat {
         if (target == null) {
             return;
         }
+        int healthBefore = target.currentHealth();
         enemyActor.attackEffect().apply(enemyActor, target);
+        resolveDamageHooks(enemyActor, target, healthBefore);
         checkWinLoss();
     }
 
@@ -158,6 +187,7 @@ public class Combat {
                 continue;
             }
             next.tickActiveEffects();
+            next.passives().forEach(passive -> passive.onStartTurn(next));
             if (!next.enemy()) {
                 next.regenerateStamina(STAMINA_REGEN_PER_TURN);
                 return;

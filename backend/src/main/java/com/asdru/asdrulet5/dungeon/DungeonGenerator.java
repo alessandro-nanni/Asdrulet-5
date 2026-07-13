@@ -91,11 +91,12 @@ public class DungeonGenerator {
         if (layer == layerCount - 1) {
             return RoomType.BOSS;
         }
+        // Weighted toward combat: fights should be the room you run into most.
         int roll = random.nextInt(100);
-        if (roll < 55) {
+        if (roll < 60) {
             return RoomType.FIGHT;
         }
-        if (roll < 80) {
+        if (roll < 82) {
             return RoomType.LOOT;
         }
         return RoomType.MERCHANT;

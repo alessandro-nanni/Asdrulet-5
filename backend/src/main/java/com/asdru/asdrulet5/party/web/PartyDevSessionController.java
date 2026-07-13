@@ -4,6 +4,7 @@ import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.party.PartyService;
 import com.asdru.asdrulet5.party.exception.DevToolsDisabledException;
 import com.asdru.asdrulet5.party.web.dto.CreatePartyRequest;
+import com.asdru.asdrulet5.party.web.dto.EquipItemRequest;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
 import com.asdru.asdrulet5.party.web.dto.SelectClassRequest;
 import com.asdru.asdrulet5.party.web.dto.StartGameRequest;
@@ -56,6 +57,20 @@ public class PartyDevSessionController {
                                    @Valid @RequestBody StartGameRequest request) {
         requireDevToolsEnabled();
         return partyService.startGame(code.toUpperCase(), memberId, request.memberIds());
+    }
+
+    @PostMapping("/{code}/{memberId}/enter-combat")
+    public PartyStateDto enterCombat(@PathVariable String code, @PathVariable String memberId) {
+        requireDevToolsEnabled();
+        return partyService.enterCombat(code.toUpperCase(), memberId);
+    }
+
+    @PostMapping("/{code}/{memberId}/inventory/equip")
+    public PartyStateDto equipItem(@PathVariable String code,
+                                   @PathVariable String memberId,
+                                   @Valid @RequestBody EquipItemRequest request) {
+        requireDevToolsEnabled();
+        return partyService.equipItem(code.toUpperCase(), memberId, request.itemId());
     }
 
     private void requireDevToolsEnabled() {

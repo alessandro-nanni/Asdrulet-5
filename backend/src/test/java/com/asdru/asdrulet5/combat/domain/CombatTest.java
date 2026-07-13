@@ -4,9 +4,11 @@ import com.asdru.asdrulet5.classdata.domain.*;
 import com.asdru.asdrulet5.combat.exception.CombatNotInProgressException;
 import com.asdru.asdrulet5.combat.exception.InsufficientResourceException;
 import com.asdru.asdrulet5.combat.exception.NotYourTurnException;
+import com.asdru.asdrulet5.inventory.domain.ItemPassive;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,12 +51,20 @@ class CombatTest {
             AbilityEffect.damageOverTime("Poisoned", "Takes damage each turn.", "poison", 5, 2));
 
     private static Combatant player(String id, List<Ability> abilities) {
-        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 10, 40, abilities, null, null, null, null);
+        return player(id, abilities, List.of());
+    }
+
+    private static Combatant player(String id, List<Ability> abilities, List<ItemPassive> passives) {
+        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 10, 40, abilities, null, null, null, null, passives);
     }
 
     private static Combatant enemy(String id, int maxHealth, int defense, int attackPower) {
+        return enemy(id, maxHealth, defense, attackPower, List.of());
+    }
+
+    private static Combatant enemy(String id, int maxHealth, int defense, int attackPower, List<ItemPassive> passives) {
         return new Combatant(id, id, true, null, maxHealth, 0, defense, attackPower, 0, List.of(),
-                "Claw", "A swipe.", attackPower + " damage", AbilityEffect.damage(attackPower));
+                "Claw", "A swipe.", attackPower + " damage", AbilityEffect.damage(attackPower), passives);
     }
 
     private static Combat twoPlayersOneEnemy(Combatant p1, Combatant p2, Combatant enemy) {
@@ -411,5 +421,128 @@ class CombatTest {
         // round(20 * 25/30) = 17 damage against 5 defense, applied to each alive enemy.
         assertThat(findCombatant(combat, "enemyA").currentHealth()).isEqualTo(200 - 17);
         assertThat(findCombatant(combat, "enemyB").currentHealth()).isEqualTo(200 - 17);
+    }
+
+    @Test
+    void onDamageDealtHookHealsWearerByTheAmountDealt() {
+        ItemPassive lifesteal = new ItemPassive() {
+            @Override
+            public void onDamageDealt(EffectTarget wearer, EffectTarget target, int amount) {
+                wearer.applyHeal(amount);
+            }
+        };
+        Combatant p1 = player("p1", List.of(STRIKE), List.of(lifesteal));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 50);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        // Enemy's turn auto-resolves onto p1 (lowest health, tied, id tiebreak).
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+        // round(50 * 25/30) = 42 damage against defense 5.
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 42);
+
+        combat.useAbility("p1", "test.strike", "enemy");
+
+        // round(20 * 25/30) = 17 damage dealt to the enemy; lifesteal heals p1 by that same amount.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 17);
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 42 + 17);
+    }
+
+    @Test
+    void onDamageTakenHookReflectsDamageBackAtTheAttacker() {
+        ItemPassive thorns = new ItemPassive() {
+            @Override
+            public void onDamageTaken(EffectTarget wearer, EffectTarget attacker, int amount) {
+                attacker.applyDamage(amount);
+            }
+        };
+        Combatant p1 = player("p1", List.of(STRIKE), List.of(thorns));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 50);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+
+        // round(50 * 25/30) = 42 damage taken by p1, reflected back onto the enemy in full.
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 42);
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 42);
+    }
+
+    @Test
+    void onKillFiresOnTheActorAndOnDeathFiresOnTheVictimForALethalHit() {
+        List<String> log = new ArrayList<>();
+        ItemPassive executioner = new ItemPassive() {
+            @Override
+            public void onKill(EffectTarget wearer, EffectTarget victim) {
+                log.add("kill");
+            }
+        };
+        ItemPassive lastGasp = new ItemPassive() {
+            @Override
+            public void onDeath(EffectTarget wearer) {
+                log.add("death");
+            }
+        };
+        Combatant p1 = player("p1", List.of(STRIKE), List.of(executioner));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 15, 0, 1, List.of(lastGasp));
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.strike", "enemy");
+
+        assertThat(combat.status()).isEqualTo(CombatStatus.PARTY_WON);
+        assertThat(log).containsExactly("kill", "death");
+    }
+
+    @Test
+    void onDamageDealtAndOnKillDoNotFireForNonLethalMisses() {
+        // A heal shouldn't be mistaken for damage dealt (health only ever goes up).
+        List<String> log = new ArrayList<>();
+        ItemPassive tattletale = new ItemPassive() {
+            @Override
+            public void onDamageDealt(EffectTarget wearer, EffectTarget target, int amount) {
+                log.add("dealt");
+            }
+        };
+        Combatant p1 = player("p1", List.of(MEND), List.of(tattletale));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.mend", "p2");
+
+        assertThat(log).isEmpty();
+    }
+
+    @Test
+    void onStartTurnAndOnEndTurnFireForTheActingCombatantOnly() {
+        List<String> log = new ArrayList<>();
+        ItemPassive tracker = new ItemPassive() {
+            @Override
+            public void onStartTurn(EffectTarget wearer) {
+                log.add("start");
+            }
+
+            @Override
+            public void onEndTurn(EffectTarget wearer) {
+                log.add("end");
+            }
+        };
+        Combatant p1 = player("p1", List.of(STRIKE), List.of(tracker));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        // No onStartTurn for p1 at combat creation — the turn engine only fires it via advanceTurn().
+        assertThat(log).isEmpty();
+
+        combat.endTurn("p1");
+        assertThat(log).containsExactly("end");
+
+        combat.endTurn("p2");
+        // Enemy's turn auto-resolves (no tracker on it), then the cursor wraps back to p1.
+        assertThat(log).containsExactly("end", "start");
     }
 }

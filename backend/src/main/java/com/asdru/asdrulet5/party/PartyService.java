@@ -1,11 +1,16 @@
 package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
+import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.dungeon.DungeonService;
+import com.asdru.asdrulet5.dungeon.domain.RoomType;
+import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
+import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.party.dev.FakeNameGenerator;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
+import com.asdru.asdrulet5.party.exception.NotACombatRoomException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
@@ -24,6 +29,8 @@ public class PartyService {
     private final PartyRepository partyRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final DungeonService dungeonService;
+    private final CombatService combatService;
+    private final ItemDefinitionRegistry itemDefinitionRegistry;
 
     public PartyStateDto createParty(AuthenticatedUser leader, String displayName) {
         String code = partyRepository.generateUniqueCode();
@@ -54,6 +61,33 @@ public class PartyService {
         PartyStateDto dto = broadcast(party);
         dungeonService.startDungeon(party.code(), party.leaderId());
         return dto;
+    }
+
+    public PartyStateDto enterCombat(String code, AuthenticatedUser user) {
+        return enterCombat(code, user.id());
+    }
+
+    public PartyStateDto enterCombat(String code, String requesterId) {
+        Party party = getOrThrow(code);
+        RoomType roomType = dungeonService.currentRoomType(code);
+        if (roomType != RoomType.FIGHT && roomType != RoomType.BOSS) {
+            throw new NotACombatRoomException(code, roomType);
+        }
+        party.enterCombat(requesterId);
+        PartyStateDto dto = broadcast(party);
+        combatService.startCombat(party.code(), party.members(), party.turnOrder());
+        return dto;
+    }
+
+    public PartyStateDto equipItem(String code, AuthenticatedUser user, String itemId) {
+        return equipItem(code, user.id(), itemId);
+    }
+
+    public PartyStateDto equipItem(String code, String userId, String itemId) {
+        Party party = getOrThrow(code);
+        ItemDefinition definition = itemDefinitionRegistry.get(itemId);
+        party.equipItem(userId, definition.slot(), itemId);
+        return broadcast(party);
     }
 
     public PartyStateDto getState(String code) {

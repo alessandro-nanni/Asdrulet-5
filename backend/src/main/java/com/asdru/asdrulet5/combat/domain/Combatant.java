@@ -4,6 +4,7 @@ import com.asdru.asdrulet5.classdata.domain.Ability;
 import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.classdata.domain.EffectTarget;
+import com.asdru.asdrulet5.inventory.domain.ItemPassive;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import lombok.Getter;
 import lombok.experimental.Accessors;
@@ -44,6 +45,7 @@ public final class Combatant implements EffectTarget {
     private final String attackDescription;
     private final String attackEffectSummary;
     private final AbilityEffect attackEffect;
+    private final List<ItemPassive> passives;
     private int currentHealth;
     private int currentStamina;
     private int ultimateCharge;
@@ -51,7 +53,7 @@ public final class Combatant implements EffectTarget {
     public Combatant(String id, String displayName, boolean enemy, CharacterClass characterClass,
                      int maxHealth, int maxStamina, int baseDefense, int baseDamage, int ultimateChargeThreshold,
                      List<Ability> abilities, String attackName, String attackDescription,
-                     String attackEffectSummary, AbilityEffect attackEffect) {
+                     String attackEffectSummary, AbilityEffect attackEffect, List<ItemPassive> passives) {
         this.id = id;
         this.displayName = displayName;
         this.enemy = enemy;
@@ -69,6 +71,7 @@ public final class Combatant implements EffectTarget {
         this.attackDescription = attackDescription;
         this.attackEffectSummary = attackEffectSummary;
         this.attackEffect = attackEffect;
+        this.passives = List.copyOf(passives);
     }
 
     public boolean alive() {

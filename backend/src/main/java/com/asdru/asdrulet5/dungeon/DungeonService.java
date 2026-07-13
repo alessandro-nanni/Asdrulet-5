@@ -42,6 +42,10 @@ public class DungeonService {
         return DungeonMapper.toDto(getOrThrow(code));
     }
 
+    public RoomType currentRoomType(String code) {
+        return getOrThrow(code).currentRoomType();
+    }
+
     private Dungeon getOrThrow(String code) {
         return dungeonRepository.findByCode(code).orElseThrow(() -> new DungeonNotFoundException(code));
     }

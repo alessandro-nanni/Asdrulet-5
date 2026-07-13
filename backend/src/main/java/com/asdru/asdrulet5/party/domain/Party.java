@@ -1,5 +1,7 @@
 package com.asdru.asdrulet5.party.domain;
 
+import com.asdru.asdrulet5.inventory.domain.ItemSlot;
+import com.asdru.asdrulet5.inventory.domain.Loadout;
 import com.asdru.asdrulet5.party.exception.*;
 import lombok.Getter;
 import lombok.Synchronized;
@@ -38,7 +40,7 @@ public class Party {
     public Party(String code, String leaderId, String leaderDisplayName, String leaderAvatarUrl) {
         this.code = code;
         this.leaderId = leaderId;
-        members.put(leaderId, new PartyMember(leaderId, leaderDisplayName, leaderAvatarUrl, null, true, false));
+        members.put(leaderId, new PartyMember(leaderId, leaderDisplayName, leaderAvatarUrl, null, true, false, Loadout.empty()));
     }
 
     @Synchronized
@@ -48,7 +50,7 @@ public class Party {
             return existing;
         }
         requireRoom();
-        PartyMember member = new PartyMember(userId, displayName, avatarUrl, null, userId.equals(leaderId), false);
+        PartyMember member = new PartyMember(userId, displayName, avatarUrl, null, userId.equals(leaderId), false, Loadout.empty());
         members.put(userId, member);
         return member;
     }
@@ -62,7 +64,7 @@ public class Party {
     public PartyMember addFakeMember(String displayName) {
         requireRoom();
         String fakeId = "bot-" + code + "-" + fakeMemberSequence.incrementAndGet();
-        PartyMember member = new PartyMember(fakeId, displayName, null, null, false, true);
+        PartyMember member = new PartyMember(fakeId, displayName, null, null, false, true, Loadout.empty());
         members.put(fakeId, member);
         return member;
     }
@@ -102,6 +104,23 @@ public class Party {
         }
         this.turnOrder = List.copyOf(order);
         this.status = PartyStatus.DUNGEON;
+    }
+
+    @Synchronized
+    public void equipItem(String userId, ItemSlot slot, String itemId) {
+        PartyMember member = members.get(userId);
+        if (member == null) {
+            throw new NotPartyMemberException(code, userId);
+        }
+        members.put(userId, member.withLoadout(member.loadout().withItem(slot, itemId)));
+    }
+
+    @Synchronized
+    public void enterCombat(String requesterId) {
+        if (!leaderId.equals(requesterId)) {
+            throw new NotPartyLeaderException(code, requesterId);
+        }
+        this.status = PartyStatus.IN_PROGRESS;
     }
 
     @Synchronized

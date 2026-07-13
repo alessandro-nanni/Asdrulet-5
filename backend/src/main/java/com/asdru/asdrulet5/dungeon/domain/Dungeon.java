@@ -59,12 +59,21 @@ public class Dungeon {
     }
 
     @Synchronized
+    public RoomType currentRoomType() {
+        return nodesById.get(currentNodeId).roomType();
+    }
+
+    @Synchronized
     public void moveTo(String requesterId, String targetNodeId) {
         if (!leaderId.equals(requesterId)) {
             throw new NotPartyLeaderException(code, requesterId);
         }
         DungeonNode current = nodesById.get(currentNodeId);
-        if (!current.nextNodeIds().contains(targetNodeId)) {
+        // The graph's edges are already forward-only (generated layer by
+        // layer, never back toward a previous one), but this check makes
+        // that guarantee explicit and independent of the graph shape — a
+        // previously-visited node is never a valid destination, full stop.
+        if (visitedNodeIds.contains(targetNodeId) || !current.nextNodeIds().contains(targetNodeId)) {
             throw new InvalidNodeTransitionException(code, currentNodeId, targetNodeId);
         }
         this.currentNodeId = targetNodeId;

@@ -6,6 +6,9 @@ import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatantDto;
 import com.asdru.asdrulet5.enemydata.EnemyDefinitionRegistry;
+import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
+import com.asdru.asdrulet5.inventory.domain.ItemSlot;
+import com.asdru.asdrulet5.inventory.domain.Loadout;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,14 +29,18 @@ class CombatServiceTest {
     private SimpMessagingTemplate messagingTemplate;
 
     private static PartyMember member(String id, CharacterClass characterClass) {
-        return new PartyMember(id, id, null, characterClass, false, false);
+        return member(id, characterClass, Loadout.empty());
+    }
+
+    private static PartyMember member(String id, CharacterClass characterClass, Loadout loadout) {
+        return new PartyMember(id, id, null, characterClass, false, false, loadout);
     }
 
     @BeforeEach
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
         combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(),
-                new EnemyDefinitionRegistry(), messagingTemplate);
+                new EnemyDefinitionRegistry(), new ItemDefinitionRegistry(), messagingTemplate);
     }
 
     @Test
@@ -69,6 +76,22 @@ class CombatServiceTest {
                 .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
         assertThat(enemyHealthAfter).isLessThan(enemyHealthBefore);
         verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/party/ABC123/combat"), any(CombatStateDto.class));
+    }
+
+    @Test
+    void startCombatAppliesEquippedItemPassiveBonusesToStats() {
+        // Warrior base stats: 120 health, 18 damage, 10 defense (see WarriorClassDefinition).
+        Loadout loadout = Loadout.empty()
+                .withItem(ItemSlot.WEAPON, "flame-edge")      // +7 damage
+                .withItem(ItemSlot.CHESTPLATE, "plate-armor"); // +20 health, +6 defense
+        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR, loadout));
+
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
+
+        CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(warrior.maxHealth()).isEqualTo(140);
+        assertThat(warrior.damage()).isEqualTo(25);
+        assertThat(warrior.defense()).isEqualTo(16);
     }
 
     @Test

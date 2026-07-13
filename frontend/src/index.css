@@ -782,8 +782,8 @@ p {
 .dungeon-party-marker {
   position: absolute;
   transition:
-    left 0.6s ease,
-    top 0.6s ease;
+    left 0.35s ease,
+    top 0.35s ease;
   pointer-events: none;
 }
 
@@ -795,6 +795,24 @@ p {
 
 .dungeon-waiting {
   text-align: center;
+}
+
+.dungeon-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  border: 1px solid var(--surface-border);
+  border-bottom: none;
+  border-left: none;
+  border-right: none;
+  background: var(--surface);
+}
+
+.dungeon-room-label {
+  font-weight: 700;
+  font-size: 1.05rem;
 }
 
 /* Battle screen */

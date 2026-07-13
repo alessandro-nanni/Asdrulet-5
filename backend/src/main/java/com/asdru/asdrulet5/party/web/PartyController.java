@@ -49,4 +49,16 @@ public class PartyController {
                                    @Valid @RequestBody StartGameRequest request) {
         return partyService.startGame(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.memberIds());
     }
+
+    @PostMapping("/{code}/enter-combat")
+    public PartyStateDto enterCombat(@PathVariable String code, @AuthenticationPrincipal OidcUser principal) {
+        return partyService.enterCombat(code.toUpperCase(), AuthenticatedUserMapper.from(principal));
+    }
+
+    @PostMapping("/{code}/inventory/equip")
+    public PartyStateDto equipItem(@PathVariable String code,
+                                   @AuthenticationPrincipal OidcUser principal,
+                                   @Valid @RequestBody EquipItemRequest request) {
+        return partyService.equipItem(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.itemId());
+    }
 }

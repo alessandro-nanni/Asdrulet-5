@@ -16,14 +16,15 @@ interface Props {
 }
 
 // Fixed, non-normalized spacing: every node is exactly LAYER_GAP apart from
-// its neighboring layer and ROW_GAP apart from its neighbors within a layer,
+// its neighboring layer (vertically, since the graph flows top-to-bottom)
+// and ROW_GAP apart from its neighbors within a layer (horizontally),
 // regardless of how many nodes any given layer has. That fixed minimum
 // (well above NODE_RADIUS*2) is what guarantees nodes never overlap.
-const NODE_RADIUS = 34
-const MARGIN = 70
-const LAYER_GAP = 190
-const ROW_GAP = 140
-const ICON_SIZE = NODE_RADIUS * 1.3
+const NODE_RADIUS = 42
+const MARGIN = 80
+const LAYER_GAP = 200
+const ROW_GAP = 170
+const ICON_SIZE = NODE_RADIUS * 1.4
 const DRAG_CLICK_THRESHOLD = 6
 
 const ROOM_ICONS: Record<RoomType, string> = {
@@ -68,17 +69,19 @@ function layout(nodes: DungeonNode[]): { points: Map<string, Point>; width: numb
   }
   const maxCountInAnyLayer = Math.max(...countByLayer.values())
 
-  const width = MARGIN * 2 + (layerCount - 1) * LAYER_GAP
-  const height = MARGIN * 2 + (maxCountInAnyLayer - 1) * ROW_GAP
+  // Graph flows top-to-bottom: layer -> y (grows with depth), indexInLayer
+  // -> x (each layer's row is centered horizontally within the widest row).
+  const width = MARGIN * 2 + (maxCountInAnyLayer - 1) * ROW_GAP
+  const height = MARGIN * 2 + (layerCount - 1) * LAYER_GAP
 
   const points = new Map<string, Point>()
   for (const node of nodes) {
     const countInLayer = countByLayer.get(node.layer) ?? 1
-    const columnHeight = (countInLayer - 1) * ROW_GAP
-    const startY = (height - columnHeight) / 2
+    const rowWidth = (countInLayer - 1) * ROW_GAP
+    const startX = (width - rowWidth) / 2
     points.set(node.id, {
-      x: MARGIN + node.layer * LAYER_GAP,
-      y: startY + node.indexInLayer * ROW_GAP,
+      x: startX + node.indexInLayer * ROW_GAP,
+      y: MARGIN + node.layer * LAYER_GAP,
     })
   }
   return { points, width, height }
@@ -182,7 +185,10 @@ export function DungeonMap({ dungeon, members, isLeader, onSelectNode }: Props) 
             if (!point) return null
             const isCurrent = node.id === dungeon.currentNodeId
             const isVisited = visitedSet.has(node.id)
-            const isAvailable = isLeader && availableSet.has(node.id)
+            // Belt-and-suspenders alongside the backend's own guard: never
+            // treat an already-visited node as a valid destination, even if
+            // it somehow ended up in availableNodeIds.
+            const isAvailable = isLeader && availableSet.has(node.id) && !isVisited
             const classNames = [
               'dungeon-node',
               `dungeon-node-${node.roomType.toLowerCase()}`,
@@ -203,14 +209,17 @@ export function DungeonMap({ dungeon, members, isLeader, onSelectNode }: Props) 
                 aria-label={isAvailable ? `Move to ${node.roomType.toLowerCase()} room` : undefined}
               >
                 <circle className="dungeon-node-ring" cx="0" cy="0" r={NODE_RADIUS} />
-                <image
-                  className="dungeon-node-icon"
-                  href={ROOM_ICONS[node.roomType]}
-                  x={-ICON_SIZE / 2}
-                  y={-ICON_SIZE / 2}
-                  width={ICON_SIZE}
-                  height={ICON_SIZE}
-                />
+                {/* Hidden on the current node — the party marker sits on top of it there, so the icon would just be clutter underneath. */}
+                {!isCurrent && (
+                  <image
+                    className="dungeon-node-icon"
+                    href={ROOM_ICONS[node.roomType]}
+                    x={-ICON_SIZE / 2}
+                    y={-ICON_SIZE / 2}
+                    width={ICON_SIZE}
+                    height={ICON_SIZE}
+                  />
+                )}
               </g>
             )
           })}
