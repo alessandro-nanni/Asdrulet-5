@@ -1,5 +1,6 @@
 import type { ComponentType, CSSProperties } from 'react'
 import { useState } from 'react'
+import goblinPortrait from '../../../assets/enemies/goblin.png'
 import { HeartIcon } from '../../../shared/ui/HeartIcon'
 import { PoisonIcon } from '../../../shared/ui/PoisonIcon'
 import { ShieldIcon } from '../../../shared/ui/ShieldIcon'
@@ -112,7 +113,7 @@ export function CombatantCard({
         <MemberAvatar member={member} />
       ) : (
         <div className="enemy-portrait" aria-hidden="true">
-          👹
+          <img src={goblinPortrait} alt="" className="enemy-portrait-img" />
         </div>
       )}
       <div className="combatant-bar combatant-bar-health">
