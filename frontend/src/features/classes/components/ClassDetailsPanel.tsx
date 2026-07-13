@@ -10,10 +10,10 @@ export function ClassDetailsPanel({ definition }: { definition: ClassDefinition 
       <p className="class-flavor">{definition.flavorText}</p>
 
       <div className="stat-bar-list">
-        <StatBar label="Health" value={stats.maxHealth} max={200} characterClass={characterClass} />
-        <StatBar label="Damage" value={stats.damage} max={30} characterClass={characterClass} />
-        <StatBar label="Defense" value={stats.defense} max={30} characterClass={characterClass} />
-        <StatBar label="Stamina" value={stats.maxStamina} max={150} characterClass={characterClass} />
+        <StatBar label="Health" value={stats.maxHealth} max={200} theme={characterClass.toLowerCase()} />
+        <StatBar label="Damage" value={stats.damage} max={30} theme={characterClass.toLowerCase()} />
+        <StatBar label="Defense" value={stats.defense} max={30} theme={characterClass.toLowerCase()} />
+        <StatBar label="Stamina" value={stats.maxStamina} max={150} theme={characterClass.toLowerCase()} />
       </div>
 
       <div className="ability-list">

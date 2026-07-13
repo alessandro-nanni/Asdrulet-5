@@ -35,6 +35,7 @@ public final class Combatant implements EffectTarget {
     private final int maxHealth;
     private final int maxStamina;
     private final int baseDefense;
+    private final int baseDamage;
     private final int ultimateChargeThreshold;
     private final List<ActiveEffect> activeEffects = new ArrayList<>();
     private final List<CombatEvent> events = new ArrayList<>();
@@ -48,7 +49,7 @@ public final class Combatant implements EffectTarget {
     private int ultimateCharge;
 
     public Combatant(String id, String displayName, boolean enemy, CharacterClass characterClass,
-                     int maxHealth, int maxStamina, int baseDefense, int ultimateChargeThreshold,
+                     int maxHealth, int maxStamina, int baseDefense, int baseDamage, int ultimateChargeThreshold,
                      List<Ability> abilities, String attackName, String attackDescription,
                      String attackEffectSummary, AbilityEffect attackEffect) {
         this.id = id;
@@ -60,6 +61,7 @@ public final class Combatant implements EffectTarget {
         this.maxStamina = maxStamina;
         this.currentStamina = maxStamina;
         this.baseDefense = baseDefense;
+        this.baseDamage = baseDamage;
         this.ultimateCharge = 0;
         this.ultimateChargeThreshold = ultimateChargeThreshold;
         this.abilities = List.copyOf(abilities);

@@ -1,17 +1,16 @@
-import type { CharacterClass } from '../../party/types'
-
 interface Props {
   label: string
   value: number
   max: number
-  characterClass: CharacterClass
+  /** Lowercase theme key, e.g. 'warrior' or 'enemy' — see the `.stat-bar.class-*` rules in index.css. */
+  theme: string
 }
 
-export function StatBar({ label, value, max, characterClass }: Props) {
+export function StatBar({ label, value, max, theme }: Props) {
   const fillPercent = Math.min(100, Math.round((value / max) * 100))
 
   return (
-    <div className={`stat-bar class-${characterClass.toLowerCase()}`}>
+    <div className={`stat-bar class-${theme}`}>
       <div className="stat-bar-label">
         <span>{label}</span>
         <span>{value}</span>

@@ -23,7 +23,7 @@ const FLOAT_SPREAD_PX = 22
 const FLOAT_STAGGER_MS = 90
 
 export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActions = false }: Props) {
-  const { combat, error } = useCombatState(code)
+  const { combat, error, applyUpdate } = useCombatState(code)
   const { definitions } = useClassDefinitions()
   const [selectedAbilityId, setSelectedAbilityId] = useState<string | null>(null)
   const [hasActedThisTurn, setHasActedThisTurn] = useState(false)
@@ -105,9 +105,10 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
 
       // One floating-text popup per individual event (not one per net health
       // delta), so a multi-hit ability shows a popup per hit instead of a
-      // single combined number. Events on the same target are fanned out
-      // horizontally and staggered slightly in time so they read as
-      // separate hits rather than one illegible stack.
+      // single combined number. Events on the same target get a random
+      // horizontal offset and a staggered start so repeated attacks (e.g.
+      // Blade Flurry's 4 hits) don't land in the same fixed pattern every
+      // time or render as one illegible stack.
       const eventsByTarget = new Map<string, typeof combat.recentEvents>()
       for (const event of combat.recentEvents) {
         const list = eventsByTarget.get(event.targetId) ?? []
@@ -122,8 +123,8 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
             key: `f${floatingKeyRef.current++}`,
             text: kind === 'heal' ? `+${event.amount}` : `-${event.amount}`,
             kind,
-            offsetX: (index - (events.length - 1) / 2) * FLOAT_SPREAD_PX,
-            delayMs: index * FLOAT_STAGGER_MS,
+            offsetX: (Math.random() - 0.5) * 2 * FLOAT_SPREAD_PX,
+            delayMs: index * FLOAT_STAGGER_MS + Math.random() * FLOAT_STAGGER_MS * 0.6,
           }
           setFloatingByCombatant((current) => ({
             ...current,
@@ -189,10 +190,14 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
     setActionError(null)
     setIsSubmitting(true)
     try {
+      // Apply the response immediately rather than waiting for the
+      // broadcast round-trip back over the WebSocket — it still arrives
+      // moments later but is a no-op then, since it's identical to what we
+      // just applied.
       if (!useDevActions && actingAsId === selfUserId) {
-        await useAbility(code, abilityId, targetId)
+        applyUpdate(await useAbility(code, abilityId, targetId))
       } else {
-        await useAbilityAsFakeMember(code, actingAsId, abilityId, targetId)
+        applyUpdate(await useAbilityAsFakeMember(code, actingAsId, abilityId, targetId))
       }
       setSelectedAbilityId(null)
       setHasActedThisTurn(true)
@@ -216,10 +221,14 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
     setActionError(null)
     setIsSubmitting(true)
     try {
+      // Apply the response immediately rather than waiting for the
+      // broadcast round-trip back over the WebSocket — it still arrives
+      // moments later but is a no-op then, since it's identical to what we
+      // just applied.
       if (!useDevActions && actingAsId === selfUserId) {
-        await endTurn(code)
+        applyUpdate(await endTurn(code))
       } else {
-        await endTurnAsFakeMember(code, actingAsId)
+        applyUpdate(await endTurnAsFakeMember(code, actingAsId))
       }
       // Reset explicitly rather than relying only on the
       // combat?.currentTurnCombatantId effect above: in a 1-ally party the

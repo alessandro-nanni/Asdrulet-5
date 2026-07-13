@@ -9,7 +9,7 @@ import { MemberAvatar } from '../../party/components/MemberAvatar'
 import type { PartyMember } from '../../party/types'
 import type { ActiveEffect, Combatant } from '../types'
 import { ActiveEffectInfo } from './ActiveEffectInfo'
-import { EnemyAttackInfo } from './EnemyAttackInfo'
+import { EnemyInfoOverlay } from './EnemyInfoOverlay'
 
 export interface FloatingText {
   key: string
@@ -54,7 +54,7 @@ export function CombatantCard({
   isAttacking = false,
   floatingTexts = [],
 }: Props) {
-  const [showAttackInfo, setShowAttackInfo] = useState(false)
+  const [showEnemyInfo, setShowEnemyInfo] = useState(false)
   const [activeEffectInfo, setActiveEffectInfo] = useState<ActiveEffect | null>(null)
   const healthPercent = Math.round((combatant.currentHealth / combatant.maxHealth) * 100)
 
@@ -99,10 +99,10 @@ export function CombatantCard({
         <button
           type="button"
           className="combatant-info-btn"
-          aria-label={`View ${combatant.displayName}'s attack`}
+          aria-label={`View ${combatant.displayName}'s info`}
           onClick={(event) => {
             event.stopPropagation()
-            setShowAttackInfo(true)
+            setShowEnemyInfo(true)
           }}
         >
           ?
@@ -141,7 +141,7 @@ export function CombatantCard({
           })}
         </div>
       )}
-      {showAttackInfo && <EnemyAttackInfo combatant={combatant} onClose={() => setShowAttackInfo(false)} />}
+      {showEnemyInfo && <EnemyInfoOverlay combatant={combatant} onClose={() => setShowEnemyInfo(false)} />}
       {activeEffectInfo && <ActiveEffectInfo effect={activeEffectInfo} onClose={() => setActiveEffectInfo(null)} />}
     </div>
   )

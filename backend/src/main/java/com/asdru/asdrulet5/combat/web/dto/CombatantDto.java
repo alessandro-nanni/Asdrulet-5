@@ -13,6 +13,8 @@ public record CombatantDto(
         int currentHealth,
         int maxStamina,
         int currentStamina,
+        int defense,
+        int damage,
         int ultimateCharge,
         int ultimateChargeThreshold,
         boolean alive,

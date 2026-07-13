@@ -14,6 +14,7 @@
   --class-tank: #4f8fe0;
   --class-warrior: #ff5c5c;
   --class-mage: #a06bff;
+  --enemy: #7cb342;
 
   font: 16px/145% system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: dark;
@@ -563,6 +564,9 @@ p {
 .stat-bar.class-mage .stat-bar-fill {
   background: var(--class-mage);
 }
+.stat-bar.class-enemy .stat-bar-fill {
+  background: var(--enemy);
+}
 
 .ability-list {
   display: flex;
@@ -591,13 +595,6 @@ p {
   margin: 4px 0;
   color: var(--text-muted);
   font-size: 0.85rem;
-}
-
-.enemy-attack-name {
-  margin: 2px 0 0;
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--text-muted);
 }
 
 .ability-meta {
@@ -745,6 +742,7 @@ p {
 
 .combatant-card {
   --engage-offset: 0px;
+  --attack-lunge: 0px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -772,6 +770,19 @@ p {
 
 .battlefield-row-allies .combatant-card.is-engaged {
   --engage-offset: -18px;
+}
+
+/* Direction each row's attack-flash lunges toward the opposing row — layered
+   on top of --engage-offset (not replacing it), so a player mid-turn keeps
+   holding their forward stance while still visibly darting further in for
+   each hit, and the enemy — which never engages — gets a visible strike
+   motion instead of just a scale/brightness pulse in place. */
+.battlefield-row-enemies .combatant-card {
+  --attack-lunge: 16px;
+}
+
+.battlefield-row-allies .combatant-card {
+  --attack-lunge: -16px;
 }
 
 .combatant-card.is-defeated {
@@ -824,7 +835,7 @@ p {
     filter: brightness(1);
   }
   40% {
-    transform: translateY(var(--engage-offset)) scale(1.06);
+    transform: translateY(calc(var(--engage-offset) + var(--attack-lunge))) scale(1.06);
     filter: brightness(1.35);
   }
 }

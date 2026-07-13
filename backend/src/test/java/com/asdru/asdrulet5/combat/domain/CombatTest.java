@@ -49,11 +49,11 @@ class CombatTest {
             AbilityEffect.damageOverTime("Poisoned", "Takes damage each turn.", "poison", 5, 2));
 
     private static Combatant player(String id, List<Ability> abilities) {
-        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 40, abilities, null, null, null, null);
+        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 10, 40, abilities, null, null, null, null);
     }
 
     private static Combatant enemy(String id, int maxHealth, int defense, int attackPower) {
-        return new Combatant(id, id, true, null, maxHealth, 0, defense, 0, List.of(),
+        return new Combatant(id, id, true, null, maxHealth, 0, defense, attackPower, 0, List.of(),
                 "Claw", "A swipe.", attackPower + " damage", AbilityEffect.damage(attackPower));
     }
 

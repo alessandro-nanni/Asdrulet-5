@@ -17,7 +17,7 @@ export function PartyLobbyPage() {
   const { code = '' } = useParams()
   const normalizedCode = code.toUpperCase()
   const { user } = useAuth()
-  const { party, error } = usePartyState(normalizedCode)
+  const { party, error, applyUpdate } = usePartyState(normalizedCode)
   const { definitions } = useClassDefinitions()
   const [classError, setClassError] = useState<string | null>(null)
   const [actingAsId, setActingAsId] = useState<string | null>(null)
@@ -56,25 +56,29 @@ export function PartyLobbyPage() {
   async function handleSelectClass(characterClass: CharacterClass) {
     setClassError(null)
     try {
+      // Apply the response immediately rather than waiting for the
+      // broadcast round-trip back over the WebSocket — the broadcast still
+      // arrives moments later (carrying updates from other players too) but
+      // is a no-op here since it's identical to what we just applied.
       if (effectiveActingAsId === selfId) {
         if (isGuestSession) {
-          await selectClassAsMember(party!.code, selfId, characterClass)
+          applyUpdate(await selectClassAsMember(party!.code, selfId, characterClass))
         } else {
-          await selectClass(party!.code, characterClass)
+          applyUpdate(await selectClass(party!.code, characterClass))
         }
       } else {
-        await selectClassAsFakeMember(party!.code, effectiveActingAsId, characterClass)
+        applyUpdate(await selectClassAsFakeMember(party!.code, effectiveActingAsId, characterClass))
       }
     } catch {
       setClassError('That class was just taken. Pick another one.')
     }
   }
 
-  function handleStartGame(order: string[]) {
+  async function handleStartGame(order: string[]) {
     if (isGuestSession) {
-      void startGameAsMember(party!.code, selfId, order)
+      applyUpdate(await startGameAsMember(party!.code, selfId, order))
     } else {
-      void startGame(party!.code, order)
+      applyUpdate(await startGame(party!.code, order))
     }
   }
 
