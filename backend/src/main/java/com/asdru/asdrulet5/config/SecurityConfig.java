@@ -62,11 +62,12 @@ public class SecurityConfig {
                         // players (see PartyDevSessionController / PartyDevController /
                         // CombatDevController) — those write endpoints are still safe
                         // because they 404 unless app.dev-tools.enabled is set.
-                        .requestMatchers(HttpMethod.GET, "/api/parties/*", "/api/parties/*/combat", "/api/classes/**")
+                        .requestMatchers(HttpMethod.GET, "/api/parties/*", "/api/parties/*/combat",
+                                "/api/parties/*/dungeon", "/api/classes/**")
                         .permitAll()
                         .requestMatchers("/ws").permitAll()
                         .requestMatchers("/api/parties/dev", "/api/parties/dev/**", "/api/parties/*/dev/**",
-                                "/api/parties/*/combat/dev/**").permitAll()
+                                "/api/parties/*/combat/dev/**", "/api/parties/*/dungeon/dev/**").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )

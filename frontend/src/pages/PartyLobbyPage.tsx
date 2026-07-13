@@ -11,6 +11,7 @@ import { selectClassAsFakeMember, selectClassAsMember, startGameAsMember } from 
 import { getGuestSelfId } from '../features/dev/guestIdentity'
 import { useClassDefinitions } from '../features/classes/useClassDefinitions'
 import { BattleScreen } from '../features/combat/components/BattleScreen'
+import { DungeonScreen } from '../features/dungeon/components/DungeonScreen'
 import type { CharacterClass } from '../features/party/types'
 
 export function PartyLobbyPage() {
@@ -80,6 +81,14 @@ export function PartyLobbyPage() {
     } else {
       applyUpdate(await startGame(party!.code, order))
     }
+  }
+
+  if (party.status === 'DUNGEON') {
+    return (
+      <div className="battle-page">
+        <DungeonScreen code={party.code} members={party.members} isLeader={isLeader} selfId={selfId} isGuestSession={isGuestSession} />
+      </div>
+    )
   }
 
   if (party.status === 'IN_PROGRESS') {

@@ -101,7 +101,7 @@ public class Party {
             throw new MissingClassSelectionException(code);
         }
         this.turnOrder = List.copyOf(order);
-        this.status = PartyStatus.IN_PROGRESS;
+        this.status = PartyStatus.DUNGEON;
     }
 
     @Synchronized

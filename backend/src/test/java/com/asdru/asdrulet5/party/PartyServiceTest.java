@@ -1,7 +1,7 @@
 package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
-import com.asdru.asdrulet5.combat.CombatService;
+import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.PartyStatus;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
@@ -31,7 +31,7 @@ class PartyServiceTest {
     @BeforeEach
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
-        partyService = new PartyService(new InMemoryPartyRepository(), messagingTemplate, mock(CombatService.class));
+        partyService = new PartyService(new InMemoryPartyRepository(), messagingTemplate, mock(DungeonService.class));
     }
 
     @Test
@@ -101,7 +101,7 @@ class PartyServiceTest {
         PartyStateDto updated = partyService.startGame(created.code(), leader, List.of("player-2", "leader-1"));
 
         assertThat(updated.turnOrder()).containsExactly("player-2", "leader-1");
-        assertThat(updated.status()).isEqualTo(PartyStatus.IN_PROGRESS);
+        assertThat(updated.status()).isEqualTo(PartyStatus.DUNGEON);
     }
 
     @Test

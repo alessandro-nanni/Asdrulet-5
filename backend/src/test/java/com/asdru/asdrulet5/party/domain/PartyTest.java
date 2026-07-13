@@ -129,7 +129,7 @@ class PartyTest {
         party.start("leader-1", List.of("player-2", "leader-1"));
 
         assertThat(party.turnOrder()).containsExactly("player-2", "leader-1");
-        assertThat(party.status()).isEqualTo(PartyStatus.IN_PROGRESS);
+        assertThat(party.status()).isEqualTo(PartyStatus.DUNGEON);
     }
 
     @Test

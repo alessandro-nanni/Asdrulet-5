@@ -1,6 +1,6 @@
 export type CharacterClass = 'HEALER' | 'TANK' | 'WARRIOR' | 'MAGE'
 
-export type PartyStatus = 'LOBBY' | 'IN_PROGRESS'
+export type PartyStatus = 'LOBBY' | 'DUNGEON' | 'IN_PROGRESS'
 
 export interface PartyMember {
   userId: string
