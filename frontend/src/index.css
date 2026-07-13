@@ -693,15 +693,21 @@ p {
 /* Dungeon map */
 
 .dungeon-screen {
-  flex: 1;
+  /* Explicit height (not just flex: 1) so this box has a definite size of
+     its own: #root/.battle-page only set min-height, which lets them grow
+     past the viewport to fit tall generated dungeons, and without a
+     definite bound here .dungeon-map's flex: 1 has nothing to shrink
+     against — it renders at the SVG's full intrinsic height instead of
+     scrolling internally, letting edges spill out past the footer. */
+  /* flex: 1 1 auto (not the flex: 1 shorthand, which sets flex-basis: 0%
+     and would override the explicit height below) so this element's own
+     height is what actually gets used as its flex-basis. */
+  height: 100svh;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 20px 16px;
-}
-
-.dungeon-title {
-  text-align: center;
 }
 
 .dungeon-map {
@@ -730,13 +736,21 @@ p {
 }
 
 .dungeon-edge {
+  fill: none;
   stroke: var(--surface-border);
   stroke-width: 3;
+}
+
+.dungeon-edge-taken {
+  stroke: var(--text-muted);
+  stroke-width: 4;
+  opacity: 0.7;
 }
 
 .dungeon-edge-active {
   stroke: var(--accent);
   stroke-width: 4;
+  opacity: 1;
 }
 
 .dungeon-node-ring {
@@ -798,9 +812,12 @@ p {
 }
 
 .dungeon-controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
   border: 1px solid var(--surface-border);
@@ -810,9 +827,19 @@ p {
   background: var(--surface);
 }
 
+.dungeon-room-info {
+  text-align: center;
+}
+
 .dungeon-room-label {
   font-weight: 700;
   font-size: 1.05rem;
+}
+
+.dungeon-room-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 4px;
 }
 
 /* Battle screen */

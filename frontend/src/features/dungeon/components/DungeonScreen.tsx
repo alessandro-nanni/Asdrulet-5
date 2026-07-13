@@ -24,6 +24,14 @@ const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   BOSS: 'Boss Room',
 }
 
+const ROOM_TYPE_DESCRIPTIONS: Record<RoomType, string> = {
+  START: 'Your journey begins here. Choose a path to move deeper into the dungeon.',
+  FIGHT: 'You sense danger nearby. Enemies are waiting inside.',
+  LOOT: 'Something valuable glints in the dark, worth a closer look.',
+  MERCHANT: 'A traveling merchant has set up shop here.',
+  BOSS: 'A powerful presence looms ahead. This is the final battle.',
+}
+
 // The full graph (including each node's nextNodeIds) is already in `dungeon`,
 // so the post-move state is fully predictable client-side. Applying it right
 // away — instead of waiting on the request round-trip — is what makes the
@@ -68,7 +76,6 @@ export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession,
 
   return (
     <div className="dungeon-screen">
-      <h2 className="section-title dungeon-title">Choose your path</h2>
       <DungeonMap
         dungeon={dungeon}
         members={members}
@@ -78,11 +85,22 @@ export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession,
       {!isLeader && <p className="muted dungeon-waiting">Waiting for the leader to choose a path...</p>}
 
       <div className="dungeon-controls">
-        <p className="dungeon-room-label">{currentRoom ? ROOM_TYPE_LABELS[currentRoom.roomType] : ''}</p>
-        {/* Loot/merchant rooms have no content yet — Enter only does
-            something for combat rooms, so it's hidden everywhere else. */}
-        {isLeader && isCombatRoom && (
-          <button type="button" className="btn btn-primary btn-block" onClick={onEnterCombat}>
+        <div className="dungeon-room-info">
+          <p className="dungeon-room-label">{currentRoom ? ROOM_TYPE_LABELS[currentRoom.roomType] : ''}</p>
+          <p className="dungeon-room-description">
+            {currentRoom ? ROOM_TYPE_DESCRIPTIONS[currentRoom.roomType] : ''}
+          </p>
+        </div>
+        {/* Loot/merchant rooms have no content yet, so Enter is disabled
+            there — but the button always stays put so the footer layout
+            doesn't jump around as you move between room types. */}
+        {isLeader && (
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            onClick={onEnterCombat}
+            disabled={!isCombatRoom}
+          >
             Enter
           </button>
         )}

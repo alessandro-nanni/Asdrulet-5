@@ -14,20 +14,23 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Builds a small procedurally-generated dungeon: a layered directed acyclic
- * graph with a single START node, a single BOSS node, and 3-4 branching
- * middle layers in between. Every node in a layer is guaranteed at least one
+ * Builds a procedurally-generated dungeon: a layered directed acyclic graph
+ * with a single START node, a single BOSS node, and several branching middle
+ * layers in between. Every node in a layer is guaranteed at least one
  * incoming edge from the previous layer, so the whole graph is reachable from
- * START.
+ * START. Occasional "skip" edges jump two layers ahead to add shortcuts and
+ * make the branching feel less uniform, but the graph always still funnels
+ * into the single terminal BOSS node.
  */
 @Component
 public class DungeonGenerator {
 
-    private static final int MIN_MIDDLE_LAYERS = 3;
-    private static final int MAX_MIDDLE_LAYERS = 4;
+    private static final int MIN_MIDDLE_LAYERS = 4;
+    private static final int MAX_MIDDLE_LAYERS = 6;
     private static final int MIN_NODES_PER_LAYER = 2;
-    private static final int MAX_NODES_PER_LAYER = 3;
-    private static final int MAX_FORWARD_EDGES = 2;
+    private static final int MAX_NODES_PER_LAYER = 4;
+    private static final int MAX_FORWARD_EDGES = 3;
+    private static final double SKIP_EDGE_CHANCE = 0.25;
 
     private final SecureRandom random = new SecureRandom();
 
@@ -62,6 +65,20 @@ public class DungeonGenerator {
                 boolean hasIncoming = current.stream().anyMatch(fromId -> forwardEdges.get(fromId).contains(targetId));
                 if (!hasIncoming) {
                     String fromId = current.get(random.nextInt(current.size()));
+                    forwardEdges.get(fromId).add(targetId);
+                }
+            }
+        }
+
+        // Extra shortcut edges two layers ahead: purely additive branching on
+        // top of the guaranteed-reachable layer-by-layer skeleton above, so
+        // they can never strand a node or break the single-BOSS invariant.
+        for (int layer = 0; layer < layerCount - 2; layer++) {
+            List<String> current = idsByLayer.get(layer);
+            List<String> skipTarget = idsByLayer.get(layer + 2);
+            for (String fromId : current) {
+                if (random.nextDouble() < SKIP_EDGE_CHANCE) {
+                    String targetId = skipTarget.get(random.nextInt(skipTarget.size()));
                     forwardEdges.get(fromId).add(targetId);
                 }
             }

@@ -27,6 +27,15 @@ const ROW_GAP = 170
 const ICON_SIZE = NODE_RADIUS * 1.4
 const DRAG_CLICK_THRESHOLD = 6
 
+// Vertical zig-zag applied within a layer's row (alternating up/down by
+// index) so same-layer nodes aren't all pinned to one dead-straight
+// horizontal line. Straight rows are what made many edges run at nearly
+// identical angles between rows, overlapping each other visually even with
+// the bow on edgePath — breaking the row itself gives every node's edges a
+// distinct enough angle to stay readable. Kept well under LAYER_GAP/2 so
+// staggered nodes never drift close to the neighboring layer's row.
+const ROW_STAGGER = 50
+
 const ROOM_ICONS: Record<RoomType, string> = {
   START: roomStart,
   FIGHT: roomFight,
@@ -61,29 +70,125 @@ interface Point {
   y: number
 }
 
-function layout(nodes: DungeonNode[]): { points: Map<string, Point>; width: number; height: number } {
-  const layerCount = Math.max(...nodes.map((node) => node.layer)) + 1
-  const countByLayer = new Map<number, number>()
-  for (const node of nodes) {
-    countByLayer.set(node.layer, (countByLayer.get(node.layer) ?? 0) + 1)
+// A deterministic (not random — must stay stable across re-renders) offset
+// derived from the edge's own id string, used to fan out edges that would
+// otherwise run at nearly the same angle through the same stretch of the
+// map. Range is roughly [-1, 1].
+function edgeHash(key: string): number {
+  let h = 0
+  for (let i = 0; i < key.length; i++) {
+    h = (h * 31 + key.charCodeAt(i)) | 0
   }
-  const maxCountInAnyLayer = Math.max(...countByLayer.values())
+  return ((h % 1000) + 1000) % 1000 / 500 - 1
+}
 
-  // Graph flows top-to-bottom: layer -> y (grows with depth), indexInLayer
-  // -> x (each layer's row is centered horizontally within the widest row).
+// Edges are drawn as curves rather than straight lines: a straight line
+// between every source/target pair means any two edges heading in roughly
+// the same direction overlap for most of their length, which is what made
+// the map look tangled once nodes had 2-3 outgoing edges each plus the
+// occasional two-layer skip edge. Bowing each edge out by a per-edge,
+// layer-distance-scaled amount (skip edges — which otherwise cut straight
+// through an entire row of unrelated nodes — bow out much further than
+// adjacent-layer ones) spreads overlapping edges apart into distinct,
+// readable paths. The endpoints are still pulled back by NODE_RADIUS first
+// so the curve starts/ends right at the node's circle, same as before.
+function edgePath(from: Point, to: Point, radius: number, layerDiff: number, key: string): string {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const dist = Math.hypot(dx, dy) || 1
+  const ux = dx / dist
+  const uy = dy / dist
+  const x1 = from.x + ux * radius
+  const y1 = from.y + uy * radius
+  const x2 = to.x - ux * radius
+  const y2 = to.y - uy * radius
+
+  const bowRange = layerDiff > 1 ? 70 : 24
+  const bow = edgeHash(key) * bowRange
+  const px = -uy
+  const py = ux
+  const midX = (x1 + x2) / 2 + px * bow
+  const midY = (y1 + y2) / 2 + py * bow
+
+  return `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`
+}
+
+// Sugiyama-style barycenter sweep: a node's indexInLayer only reflects the
+// order the generator happened to create it in, which has no relation to
+// which node in the previous layer actually connects to it — that mismatch,
+// not just crossing edges themselves, is what made the map hard to read (a
+// node's edges would zig across the whole row to reach parents/children
+// positioned far from it). Repeatedly reordering each layer by the average
+// x-position of its already-placed neighbors in the adjacent layer (first a
+// downward pass using parents, then upward using children, alternating)
+// pulls connected nodes toward each other column-wise, which is the standard
+// heuristic for minimizing edge crossings in a layered graph.
+const BARYCENTER_SWEEPS = 4
+
+function layout(nodes: DungeonNode[]): { points: Map<string, Point>; width: number; height: number } {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]))
+  const layerCount = Math.max(...nodes.map((node) => node.layer)) + 1
+
+  const parentsById = new Map<string, string[]>()
+  for (const node of nodes) {
+    for (const targetId of node.nextNodeIds) {
+      const parents = parentsById.get(targetId) ?? []
+      parents.push(node.id)
+      parentsById.set(targetId, parents)
+    }
+  }
+
+  const order: string[][] = Array.from({ length: layerCount }, () => [])
+  for (const node of nodes) {
+    order[node.layer].push(node.id)
+  }
+  for (const layerIds of order) {
+    layerIds.sort((a, b) => nodesById.get(a)!.indexInLayer - nodesById.get(b)!.indexInLayer)
+  }
+
+  for (let sweep = 0; sweep < BARYCENTER_SWEEPS; sweep++) {
+    const downward = sweep % 2 === 0
+    const layerRange = downward
+      ? Array.from({ length: layerCount - 1 }, (_, i) => i + 1)
+      : Array.from({ length: layerCount - 1 }, (_, i) => layerCount - 2 - i)
+
+    for (const layer of layerRange) {
+      const neighborLayer = downward ? layer - 1 : layer + 1
+      const neighborPos = new Map(order[neighborLayer].map((id, idx) => [id, idx]))
+      const scored = order[layer].map((id, idx) => {
+        const neighborIds = downward ? (parentsById.get(id) ?? []) : nodesById.get(id)!.nextNodeIds
+        const relevant = neighborIds.filter((nid) => nodesById.get(nid)?.layer === neighborLayer)
+        const score =
+          relevant.length > 0
+            ? relevant.reduce((sum, nid) => sum + (neighborPos.get(nid) ?? 0), 0) / relevant.length
+            : idx
+        return { id, score, idx }
+      })
+      scored.sort((a, b) => a.score - b.score || a.idx - b.idx)
+      order[layer] = scored.map((item) => item.id)
+    }
+  }
+
+  const maxCountInAnyLayer = Math.max(...order.map((layerIds) => layerIds.length))
+
+  // Graph flows top-to-bottom: layer -> y (grows with depth), position within
+  // the barycenter-refined order -> x (each layer's row is centered
+  // horizontally within the widest row).
   const width = MARGIN * 2 + (maxCountInAnyLayer - 1) * ROW_GAP
   const height = MARGIN * 2 + (layerCount - 1) * LAYER_GAP
 
   const points = new Map<string, Point>()
-  for (const node of nodes) {
-    const countInLayer = countByLayer.get(node.layer) ?? 1
-    const rowWidth = (countInLayer - 1) * ROW_GAP
+  order.forEach((layerIds, layer) => {
+    const rowWidth = (layerIds.length - 1) * ROW_GAP
     const startX = (width - rowWidth) / 2
-    points.set(node.id, {
-      x: startX + node.indexInLayer * ROW_GAP,
-      y: MARGIN + node.layer * LAYER_GAP,
+    layerIds.forEach((id, idx) => {
+      const stagger = layerIds.length > 1 ? (idx % 2 === 0 ? -ROW_STAGGER : ROW_STAGGER) : 0
+      points.set(id, {
+        x: startX + idx * ROW_GAP,
+        y: MARGIN + layer * LAYER_GAP + stagger,
+      })
     })
-  }
+  })
   return { points, width, height }
 }
 
@@ -96,7 +201,17 @@ export function DungeonMap({ dungeon, members, isLeader, onSelectNode }: Props) 
 
   const availableSet = new Set(dungeon.availableNodeIds)
   const visitedSet = new Set(dungeon.visitedNodeIds)
+  const nodesById = new Map(dungeon.nodes.map((node) => [node.id, node]))
   const currentPoint = points.get(dungeon.currentNodeId)
+
+  // visitedNodeIds is recorded in the order the party actually walked it (the
+  // graph is forward-only and revisiting is blocked), so consecutive pairs
+  // are exactly the edges that were taken — everything else is either the
+  // current node's still-open options or a path never chosen.
+  const takenEdgeKeys = new Set<string>()
+  for (let i = 0; i < dungeon.visitedNodeIds.length - 1; i++) {
+    takenEdgeKeys.add(`${dungeon.visitedNodeIds[i]}-${dungeon.visitedNodeIds[i + 1]}`)
+  }
   const formation = FORMATIONS[Math.min(members.length, 4)] ?? FORMATIONS[1]
 
   // Keep the party centered in view whenever it moves to a new node — this is
@@ -167,14 +282,14 @@ export function DungeonMap({ dungeon, members, isLeader, onSelectNode }: Props) 
               const to = points.get(targetId)
               if (!to) return null
               const active = node.id === dungeon.currentNodeId
+              const edgeKey = `${node.id}-${targetId}`
+              const taken = takenEdgeKeys.has(edgeKey)
+              const layerDiff = (nodesById.get(targetId)?.layer ?? node.layer + 1) - node.layer
               return (
-                <line
-                  key={`${node.id}-${targetId}`}
-                  className={`dungeon-edge${active ? ' dungeon-edge-active' : ''}`}
-                  x1={from.x}
-                  y1={from.y}
-                  x2={to.x}
-                  y2={to.y}
+                <path
+                  key={edgeKey}
+                  className={`dungeon-edge${taken ? ' dungeon-edge-taken' : ''}${active ? ' dungeon-edge-active' : ''}`}
+                  d={edgePath(from, to, NODE_RADIUS, layerDiff, edgeKey)}
                 />
               )
             })
