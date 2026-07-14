@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,26 +29,40 @@ import static org.mockito.Mockito.*;
 
 class PartyServiceTest {
 
-    private final AuthenticatedUser leader = new AuthenticatedUser("leader-1", "Google Name", "leader.png");
-    private final AuthenticatedUser member = new AuthenticatedUser("player-2", "Google Name Two", "player2.png");
+    private final AuthenticatedUser leader = new AuthenticatedUser("leader-1", "Leader", "leader.png");
+    private final AuthenticatedUser member = new AuthenticatedUser("player-2", "Player Two", "player2.png");
 
     private PartyService partyService;
     private SimpMessagingTemplate messagingTemplate;
     private DungeonService dungeonService;
     private CombatService combatService;
+    private ScheduledExecutorService victoryReturnScheduler;
+    private RoomEntryDelay roomEntryDelay;
 
     @BeforeEach
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
         dungeonService = mock(DungeonService.class);
         combatService = mock(CombatService.class);
+        victoryReturnScheduler = mock(ScheduledExecutorService.class);
+        // Runs the scheduled task immediately rather than actually waiting —
+        // keeps tests fast/deterministic while still letting us assert on
+        // the delay/unit the real code schedules with.
+        doAnswer(invocation -> {
+            Runnable task = invocation.getArgument(0);
+            task.run();
+            return null;
+        }).when(victoryReturnScheduler).schedule(any(Runnable.class), anyLong(), any(TimeUnit.class));
+        // A real RoomEntryDelay would block each enterRoom call for real —
+        // pointless in a unit test, so use one configured to sleep 0ms.
+        roomEntryDelay = new RoomEntryDelay(0);
         partyService = new PartyService(new InMemoryPartyRepository(), messagingTemplate, dungeonService,
-                combatService, new ItemDefinitionRegistry());
+                combatService, new ItemDefinitionRegistry(), victoryReturnScheduler, roomEntryDelay);
     }
 
     @Test
     void createPartyReturnsCodeWithLeaderAsOnlyMember() {
-        PartyStateDto dto = partyService.createParty(leader, "Leader");
+        PartyStateDto dto = partyService.createParty(leader);
 
         assertThat(dto.code()).isNotBlank();
         assertThat(dto.leaderId()).isEqualTo("leader-1");
@@ -56,9 +72,9 @@ class PartyServiceTest {
 
     @Test
     void joinPartyAddsMemberWithChosenDisplayNameAndBroadcastsState() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
 
-        PartyStateDto joined = partyService.joinParty(created.code(), member, "Player Two");
+        PartyStateDto joined = partyService.joinParty(created.code(), member);
 
         assertThat(joined.members()).hasSize(2);
         assertThat(joined.members().get(1).displayName()).isEqualTo("Player Two");
@@ -68,47 +84,47 @@ class PartyServiceTest {
 
     @Test
     void joinUnknownPartyThrows() {
-        assertThatThrownBy(() -> partyService.joinParty("NOPE99", member, "Player Two"))
+        assertThatThrownBy(() -> partyService.joinParty("NOPE99", member))
                 .isInstanceOf(PartyNotFoundException.class);
     }
 
     @Test
     void selectClassPersistsChoice() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
 
-        PartyStateDto updated = partyService.selectClass(created.code(), leader, CharacterClass.HEALER);
+        PartyStateDto updated = partyService.selectClass(created.code(), "leader-1", CharacterClass.HEALER);
 
         assertThat(updated.members().getFirst().characterClass()).isEqualTo(CharacterClass.HEALER);
     }
 
     @Test
     void selectClassAlreadyTakenByAnotherMemberThrows() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
-        partyService.joinParty(created.code(), member, "Player Two");
-        partyService.selectClass(created.code(), leader, CharacterClass.MAGE);
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.MAGE);
 
-        assertThatThrownBy(() -> partyService.selectClass(created.code(), member, CharacterClass.MAGE))
+        assertThatThrownBy(() -> partyService.selectClass(created.code(), "player-2", CharacterClass.MAGE))
                 .isInstanceOf(ClassAlreadyTakenException.class);
     }
 
     @Test
     void onlyLeaderCanStartGame() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
-        partyService.joinParty(created.code(), member, "Player Two");
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
 
-        assertThatThrownBy(() -> partyService.startGame(created.code(), member, List.of("leader-1", "player-2")))
+        assertThatThrownBy(() -> partyService.startGame(created.code(), "player-2", List.of("leader-1", "player-2")))
                 .isInstanceOf(NotPartyLeaderException.class);
     }
 
     @Test
     void leaderStartsGameSuccessfully() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
-        partyService.joinParty(created.code(), member, "Player Two");
-        partyService.selectClass(created.code(), leader, CharacterClass.WARRIOR);
-        partyService.selectClass(created.code(), member, CharacterClass.HEALER);
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         assertThat(created.status()).isEqualTo(PartyStatus.LOBBY);
 
-        PartyStateDto updated = partyService.startGame(created.code(), leader, List.of("player-2", "leader-1"));
+        PartyStateDto updated = partyService.startGame(created.code(), "leader-1", List.of("player-2", "leader-1"));
 
         assertThat(updated.turnOrder()).containsExactly("player-2", "leader-1");
         assertThat(updated.status()).isEqualTo(PartyStatus.DUNGEON);
@@ -116,7 +132,7 @@ class PartyServiceTest {
 
     @Test
     void addFakeMembersAddsBotsFlaggedAsSuch() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
 
         PartyStateDto updated = partyService.addFakeMembers(created.code(), 3);
 
@@ -127,7 +143,7 @@ class PartyServiceTest {
 
     @Test
     void selectClassAsFakeMemberUpdatesTheBot() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
         PartyStateDto withBots = partyService.addFakeMembers(created.code(), 1);
         String botId = withBots.members().stream().filter(PartyMemberDto::bot).findFirst().orElseThrow().userId();
 
@@ -139,7 +155,7 @@ class PartyServiceTest {
 
     @Test
     void selectClassAsFakeMemberRejectsRealMemberTarget() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
 
         assertThatThrownBy(() -> partyService.selectClassAsFakeMember(created.code(), "leader-1", CharacterClass.MAGE))
                 .isInstanceOf(NotAFakeMemberException.class);
@@ -147,8 +163,8 @@ class PartyServiceTest {
 
     @Test
     void enterRoomByNonLeaderThrows() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
-        partyService.joinParty(created.code(), member, "Player Two");
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
         when(dungeonService.enterNode(created.code(), "player-2")).thenReturn(RoomType.FIGHT);
 
         assertThatThrownBy(() -> partyService.enterRoom(created.code(), "player-2"))
@@ -157,7 +173,7 @@ class PartyServiceTest {
 
     @Test
     void enterRoomInLootRoomAutoClearsWithoutStartingCombat() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
         when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.LOOT);
 
         PartyStateDto updated = partyService.enterRoom(created.code(), "leader-1");
@@ -169,7 +185,7 @@ class PartyServiceTest {
 
     @Test
     void enterRoomByLeaderInFightRoomStartsCombatAndSetsStatus() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
         when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.FIGHT);
 
         PartyStateDto updated = partyService.enterRoom(created.code(), "leader-1");
@@ -180,7 +196,7 @@ class PartyServiceTest {
 
     @Test
     void enterRoomInBossRoomIsAllowed() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
         when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.BOSS);
 
         PartyStateDto updated = partyService.enterRoom(created.code(), "leader-1");
@@ -190,19 +206,20 @@ class PartyServiceTest {
 
     @Test
     void combatVictoryEventReturnsPartyToDungeonAndClearsTheNode() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
         when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.FIGHT);
         partyService.enterRoom(created.code(), "leader-1");
 
         partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
 
+        verify(victoryReturnScheduler).schedule(any(Runnable.class), eq(3L), eq(TimeUnit.SECONDS));
         verify(dungeonService, times(1)).clearEnteredNode(created.code());
         assertThat(partyService.getState(created.code()).status()).isEqualTo(PartyStatus.DUNGEON);
     }
 
     @Test
     void equipItemFillsTheMatchingSlot() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
 
         PartyStateDto updated = partyService.equipItem(created.code(), "leader-1", "rusted-sword");
 
@@ -212,7 +229,7 @@ class PartyServiceTest {
 
     @Test
     void equipItemReplacesWhateverWasInThatSlotBefore() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
         partyService.equipItem(created.code(), "leader-1", "rusted-sword");
 
         PartyStateDto updated = partyService.equipItem(created.code(), "leader-1", "flame-edge");
@@ -222,7 +239,7 @@ class PartyServiceTest {
 
     @Test
     void equipUnknownItemThrows() {
-        PartyStateDto created = partyService.createParty(leader, "Leader");
+        PartyStateDto created = partyService.createParty(leader);
 
         assertThatThrownBy(() -> partyService.equipItem(created.code(), "leader-1", "no-such-item"))
                 .isInstanceOf(UnknownItemDefinitionException.class);

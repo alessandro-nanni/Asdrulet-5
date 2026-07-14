@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { selectNode } from '../api'
-import { selectNodeAsMember } from '../../dev/api'
 import { useDungeonState } from '../useDungeonState'
 import { DungeonMap } from './DungeonMap'
 import type { PartyMember } from '../../party/types'
@@ -11,7 +10,6 @@ interface Props {
   members: PartyMember[]
   isLeader: boolean
   selfId: string
-  isGuestSession: boolean
   onEnterRoom: () => Promise<void>
 }
 
@@ -31,16 +29,6 @@ const ROOM_TYPE_DESCRIPTIONS: Record<RoomType, string> = {
   BOSS: 'A powerful presence looms ahead. This is the final battle.',
 }
 
-// The swirl animation (see .dungeon-party-marker.is-entering in index.css)
-// plays for this long regardless of how fast the network round-trip is —
-// without a floor, a fast local response would cut it off after a barely
-// visible flash.
-const MIN_SWIRL_MS = 650
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 // The full graph (including each node's nextNodeIds) is already in `dungeon`,
 // so browsing to a next-room option only ever changes currentNodeId — home,
 // availableNodeIds and clearedNodeIds are untouched until something is
@@ -52,7 +40,7 @@ function optimisticSelect(dungeon: DungeonState, nodeId: string): DungeonState {
   return { ...dungeon, currentNodeId: nodeId }
 }
 
-export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession, onEnterRoom }: Props) {
+export function DungeonScreen({ code, members, isLeader, selfId, onEnterRoom }: Props) {
   const { dungeon, error, applyUpdate } = useDungeonState(code)
   const [isEntering, setIsEntering] = useState(false)
 
@@ -70,17 +58,16 @@ export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession,
   async function handleSelectNode(nodeId: string) {
     if (nodeId === dungeon!.currentNodeId) return
     applyUpdate(optimisticSelect(dungeon!, nodeId))
-    if (isGuestSession) {
-      applyUpdate(await selectNodeAsMember(code, selfId, nodeId))
-    } else {
-      applyUpdate(await selectNode(code, nodeId))
-    }
+    applyUpdate(await selectNode(code, selfId, nodeId))
   }
 
   async function handleEnter() {
     setIsEntering(true)
     try {
-      await Promise.all([onEnterRoom(), delay(MIN_SWIRL_MS)])
+      // onEnterRoom (see PartyLobbyPage) already holds its own response back
+      // until the swirl's minimum duration has elapsed, so a plain await
+      // here is enough — no need for this component to also race a timer.
+      await onEnterRoom()
     } finally {
       setIsEntering(false)
     }

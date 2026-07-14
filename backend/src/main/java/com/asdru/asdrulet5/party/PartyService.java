@@ -22,38 +22,41 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class PartyService {
+
+    /**
+     * How long a won fight stays on screen before the party is pulled back
+     * to the dungeon map. Without this gap, the party-status broadcast
+     * (DUNGEON) can reach the frontend so close behind the combat action's
+     * own HTTP response (PARTY_WON) that the dungeon screen swaps back in
+     * before the player ever sees the victory banner.
+     */
+    private static final long VICTORY_DISPLAY_DELAY_SECONDS = 3;
 
     private final PartyRepository partyRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final DungeonService dungeonService;
     private final CombatService combatService;
     private final ItemDefinitionRegistry itemDefinitionRegistry;
+    private final ScheduledExecutorService victoryReturnScheduler;
+    private final RoomEntryDelay roomEntryDelay;
 
-    public PartyStateDto createParty(AuthenticatedUser leader, String displayName) {
+    public PartyStateDto createParty(AuthenticatedUser leader) {
         String code = partyRepository.generateUniqueCode();
-        Party party = new Party(code, leader.id(), displayName, leader.avatarUrl());
+        Party party = new Party(code, leader.id(), leader.displayName(), leader.avatarUrl());
         partyRepository.save(party);
         return PartyMapper.toDto(party);
     }
 
-    public PartyStateDto joinParty(String code, AuthenticatedUser user, String displayName) {
+    public PartyStateDto joinParty(String code, AuthenticatedUser user) {
         Party party = getOrThrow(code);
-        party.addMember(user.id(), displayName, user.avatarUrl());
+        party.addMember(user.id(), user.displayName(), user.avatarUrl());
         return broadcast(party);
-    }
-
-    public PartyStateDto selectClass(String code, AuthenticatedUser user, CharacterClass characterClass) {
-        Party party = getOrThrow(code);
-        party.selectClass(user.id(), characterClass);
-        return broadcast(party);
-    }
-
-    public PartyStateDto startGame(String code, AuthenticatedUser user, List<String> order) {
-        return startGame(code, user.id(), order);
     }
 
     public PartyStateDto startGame(String code, String requesterId, List<String> order) {
@@ -64,20 +67,23 @@ public class PartyService {
         return dto;
     }
 
-    public PartyStateDto enterRoom(String code, AuthenticatedUser user) {
-        return enterRoom(code, user.id());
-    }
-
     /**
      * Commits to whatever next room is currently selected on the dungeon
      * map. Fight/boss rooms drop the party into combat (status flips to
      * IN_PROGRESS, mirroring the old enterCombat flow); anything else has no
      * gameplay of its own yet, so it's cleared immediately, unlocking the
      * next set of choices right away.
+     *
+     * <p>roomEntryDelay.sleep() holds the transition (and therefore the
+     * broadcast announcing it) back briefly so the frontend's room-entry
+     * swirl animation has time to actually play before the screen changes —
+     * see {@link RoomEntryDelay}'s own comment for why this can't just be a
+     * client-side delay.
      */
     public PartyStateDto enterRoom(String code, String requesterId) {
         Party party = getOrThrow(code);
         RoomType enteredRoomType = dungeonService.enterNode(code, requesterId);
+        roomEntryDelay.sleep();
         if (enteredRoomType == RoomType.FIGHT || enteredRoomType == RoomType.BOSS) {
             party.enterCombat(requesterId);
             PartyStateDto dto = broadcast(party);
@@ -90,19 +96,23 @@ public class PartyService {
 
     /**
      * Fired by CombatService the instant a Combat's status flips to
-     * PARTY_WON — flips the party back out of combat and resolves the
-     * dungeon node the fight was fought in, so the party can keep moving.
+     * PARTY_WON. The actual return-to-dungeon transition is scheduled a few
+     * seconds out rather than applied immediately, so the victory banner
+     * has time to actually be seen — see VICTORY_DISPLAY_DELAY_SECONDS.
      */
     @EventListener
     public void onCombatVictory(CombatVictoryEvent event) {
-        Party party = getOrThrow(event.partyCode());
-        dungeonService.clearEnteredNode(event.partyCode());
-        party.returnToDungeon();
-        broadcast(party);
+        victoryReturnScheduler.schedule(
+                () -> returnToDungeonAfterVictory(event.partyCode()),
+                VICTORY_DISPLAY_DELAY_SECONDS,
+                TimeUnit.SECONDS);
     }
 
-    public PartyStateDto equipItem(String code, AuthenticatedUser user, String itemId) {
-        return equipItem(code, user.id(), itemId);
+    private void returnToDungeonAfterVictory(String code) {
+        Party party = getOrThrow(code);
+        dungeonService.clearEnteredNode(code);
+        party.returnToDungeon();
+        broadcast(party);
     }
 
     public PartyStateDto equipItem(String code, String userId, String itemId) {
@@ -138,12 +148,11 @@ public class PartyService {
     }
 
     /**
-     * Like {@link #selectClassAsFakeMember}, but for the session-less leader
-     * of a dev "quick game" party (see PartyDevSessionController) rather than
-     * a bot — that leader is a real (non-bot) member, just without a Google
-     * session behind it, so the bot-only guard above doesn't apply here.
+     * Like {@link #selectClassAsFakeMember}, but for any real (non-bot)
+     * member — no bot-ownership guard, since a real member can only ever act
+     * as themselves (the id they present is their own).
      */
-    public PartyStateDto selectClassAsMember(String code, String memberId, CharacterClass characterClass) {
+    public PartyStateDto selectClass(String code, String memberId, CharacterClass characterClass) {
         Party party = getOrThrow(code);
         party.selectClass(memberId, characterClass);
         return broadcast(party);

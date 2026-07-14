@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useUsername } from '../identity/useUsername'
-import { addFakeMembers, createDevParty } from './api'
-import { setGuestSelfId } from './guestIdentity'
+import { useLocalIdentity } from '../identity/useLocalIdentity'
+import { createParty } from '../party/api'
+import { addFakeMembers } from './api'
 
 const MAX_PARTY_SIZE = 4
 const PARTY_SIZES = Array.from({ length: MAX_PARTY_SIZE }, (_, index) => index + 1)
 
 export function QuickGameButton() {
   const navigate = useNavigate()
-  const [username] = useUsername()
+  const { identity } = useLocalIdentity()
   const [partySize, setPartySize] = useState(MAX_PARTY_SIZE)
   const [error, setError] = useState<string | null>(null)
 
@@ -20,15 +20,14 @@ export function QuickGameButton() {
   async function handleQuickGame() {
     setError(null)
     try {
-      const party = await createDevParty(username.trim() || 'Dev')
-      setGuestSelfId(party.code, party.leaderId)
+      const party = await createParty(identity.id, identity.displayName.trim() || 'Dev', identity.avatarUrl)
       const extraMembers = partySize - 1
       if (extraMembers > 0) {
         await addFakeMembers(party.code, extraMembers)
       }
       navigate(`/party/${party.code}`)
     } catch {
-      setError('Quick game is unavailable (dev tools disabled on the server).')
+      setError('Quick game is unavailable (bot fill needs dev tools enabled on the server).')
     }
   }
 

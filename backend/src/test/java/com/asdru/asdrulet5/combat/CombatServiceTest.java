@@ -47,7 +47,7 @@ class CombatServiceTest {
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(),
+        combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(false),
                 new EnemyDefinitionRegistry(), new ItemDefinitionRegistry(), messagingTemplate, eventPublisher);
     }
 
@@ -126,7 +126,7 @@ class CombatServiceTest {
         Combat combat = new Combat("VICT123", List.of(p1, weakEnemy), List.of("p1", "enemy-1"));
         CombatRepository repository = new InMemoryCombatRepository();
         repository.save(combat);
-        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(),
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
                 new EnemyDefinitionRegistry(), new ItemDefinitionRegistry(), messagingTemplate, eventPublisher);
 
         CombatStateDto updated = service.useAbility("VICT123", "p1", "test.strike", "enemy-1");

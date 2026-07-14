@@ -1,6 +1,0 @@
-fix the edge coloring on the first and last room of the minimap.
-Enable a bit of horizontal panning on the minimap.
-Fix the delay when clicking the minimap navigation node.
-Implement an actual enter functionality, and the next rooms cant be entered until the current one is cleared.
-The flow is: starting node doesnt have enter button, and all next room are automatically available, if any of the next rooms are selected it posssible to go to the original room or any of the sibling rooms until enter is presesd on one of them. When enter is pressed, the room is marked as entered and the edge is drawn to signal the path taken. Only if/when the room has been cleared, will the cycle repeat at that node. A fight room is cleared when all monsters are defeated, (just to give an idea, the rest will be implemented in the future)
-Display a swirl animation for the characters getting sucked in the node after pressing the enter room node.

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCombatState } from '../useCombatState'
 import { useClassDefinitions } from '../../classes/useClassDefinitions'
-import { endTurn, endTurnAsFakeMember, useAbility, useAbilityAsFakeMember } from '../api'
+import { endTurn, useAbility } from '../api'
 import { CombatantCard, type FloatingText } from './CombatantCard'
 import { AbilityActionPanel } from './AbilityActionPanel'
 import { SelfStatsPanel } from './SelfStatsPanel'
@@ -12,8 +12,6 @@ interface Props {
   code: string
   members: PartyMember[]
   actingAsId: string
-  selfUserId: string
-  useDevActions?: boolean
 }
 
 const REACTION_DURATION_MS = 650
@@ -22,7 +20,7 @@ const FLOAT_DURATION_MS = 1100
 const FLOAT_SPREAD_PX = 22
 const FLOAT_STAGGER_MS = 90
 
-export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActions = false }: Props) {
+export function BattleScreen({ code, members, actingAsId }: Props) {
   const { combat, error, applyUpdate } = useCombatState(code)
   const { definitions } = useClassDefinitions()
   const [selectedAbilityId, setSelectedAbilityId] = useState<string | null>(null)
@@ -194,11 +192,7 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
       // broadcast round-trip back over the WebSocket — it still arrives
       // moments later but is a no-op then, since it's identical to what we
       // just applied.
-      if (!useDevActions && actingAsId === selfUserId) {
-        applyUpdate(await useAbility(code, abilityId, targetId))
-      } else {
-        applyUpdate(await useAbilityAsFakeMember(code, actingAsId, abilityId, targetId))
-      }
+      applyUpdate(await useAbility(code, actingAsId, abilityId, targetId))
       setSelectedAbilityId(null)
       setHasActedThisTurn(true)
     } catch {
@@ -225,11 +219,7 @@ export function BattleScreen({ code, members, actingAsId, selfUserId, useDevActi
       // broadcast round-trip back over the WebSocket — it still arrives
       // moments later but is a no-op then, since it's identical to what we
       // just applied.
-      if (!useDevActions && actingAsId === selfUserId) {
-        applyUpdate(await endTurn(code))
-      } else {
-        applyUpdate(await endTurnAsFakeMember(code, actingAsId))
-      }
+      applyUpdate(await endTurn(code, actingAsId))
       // Reset explicitly rather than relying only on the
       // combat?.currentTurnCombatantId effect above: in a 1-ally party the
       // turn sequence is [ally, enemy], so ending your turn can cycle

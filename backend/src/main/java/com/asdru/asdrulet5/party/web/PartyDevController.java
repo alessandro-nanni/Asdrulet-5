@@ -11,10 +11,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Dev-only tooling to test multi-member party flows from a single logged-in
- * session, without needing separate devices/logins for every player. Gated
- * behind app.dev-tools.enabled (default false); never enable this in a
- * public deployment.
+ * Dev-only tooling to test multi-member party flows from a single browser,
+ * without needing separate devices for every player. Gated behind
+ * app.dev-tools.enabled (default false); never enable this in a public
+ * deployment.
  */
 @RestController
 @RequestMapping("/api/parties/{code}/dev")

@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ClassDefinitionControllerTest {
 
-    private final ClassDefinitionController controller = new ClassDefinitionController(new ClassDefinitionRegistry());
+    private final ClassDefinitionController controller = new ClassDefinitionController(new ClassDefinitionRegistry(false));
 
     @Test
     void getAllClassesReturnsFourDefinitions() {

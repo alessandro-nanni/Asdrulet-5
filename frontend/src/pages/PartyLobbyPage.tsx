@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useAuth } from '../features/auth/AuthContext'
+import { useLocalIdentity } from '../features/identity/useLocalIdentity'
 import { usePartyState } from '../features/party/usePartyState'
 import { PartyMemberList } from '../features/party/components/PartyMemberList'
 import { ClassSelector } from '../features/party/components/ClassSelector'
 import { TurnOrderEditor } from '../features/party/components/TurnOrderEditor'
 import { QrCodeCard } from '../features/party/components/QrCodeCard'
 import { enterRoom, selectClass, startGame } from '../features/party/api'
-import { enterRoomAsMember, selectClassAsFakeMember, selectClassAsMember, startGameAsMember } from '../features/dev/api'
-import { getGuestSelfId } from '../features/dev/guestIdentity'
+import { selectClassAsFakeMember } from '../features/dev/api'
 import { useClassDefinitions } from '../features/classes/useClassDefinitions'
 import { BattleScreen } from '../features/combat/components/BattleScreen'
 import { DungeonScreen } from '../features/dungeon/components/DungeonScreen'
@@ -17,14 +16,12 @@ import type { CharacterClass } from '../features/party/types'
 export function PartyLobbyPage() {
   const { code = '' } = useParams()
   const normalizedCode = code.toUpperCase()
-  const { user } = useAuth()
+  const { identity } = useLocalIdentity()
+  const selfId = identity.id
   const { party, error, applyUpdate } = usePartyState(normalizedCode)
   const { definitions } = useClassDefinitions()
   const [classError, setClassError] = useState<string | null>(null)
   const [actingAsId, setActingAsId] = useState<string | null>(null)
-
-  const guestSelfId = getGuestSelfId(normalizedCode)
-  const isGuestSession = guestSelfId != null
 
   if (error) {
     return (
@@ -40,7 +37,7 @@ export function PartyLobbyPage() {
       </div>
     )
   }
-  if (!party || (!isGuestSession && !user)) {
+  if (!party) {
     return (
       <div className="page page-center">
         <p className="muted">Loading party...</p>
@@ -48,7 +45,6 @@ export function PartyLobbyPage() {
     )
   }
 
-  const selfId = isGuestSession ? guestSelfId : user!.id
   const self = party.members.find((member) => member.userId === selfId)
   const isLeader = self?.leader ?? false
   const effectiveActingAsId = actingAsId ?? selfId
@@ -62,11 +58,7 @@ export function PartyLobbyPage() {
       // arrives moments later (carrying updates from other players too) but
       // is a no-op here since it's identical to what we just applied.
       if (effectiveActingAsId === selfId) {
-        if (isGuestSession) {
-          applyUpdate(await selectClassAsMember(party!.code, selfId, characterClass))
-        } else {
-          applyUpdate(await selectClass(party!.code, characterClass))
-        }
+        applyUpdate(await selectClass(party!.code, selfId, characterClass))
       } else {
         applyUpdate(await selectClassAsFakeMember(party!.code, effectiveActingAsId, characterClass))
       }
@@ -76,22 +68,15 @@ export function PartyLobbyPage() {
   }
 
   async function handleStartGame(order: string[]) {
-    if (isGuestSession) {
-      applyUpdate(await startGameAsMember(party!.code, selfId, order))
-    } else {
-      applyUpdate(await startGame(party!.code, order))
-    }
+    applyUpdate(await startGame(party!.code, selfId, order))
   }
 
   async function handleEnterRoom() {
-    // Apply the response immediately rather than waiting for the broadcast
-    // round-trip back over the WebSocket — it still arrives moments later
-    // but is a no-op then, since it's identical to what we just applied.
-    if (isGuestSession) {
-      applyUpdate(await enterRoomAsMember(party!.code, selfId))
-    } else {
-      applyUpdate(await enterRoom(party!.code))
-    }
+    // The server itself holds this response (and the broadcast it triggers)
+    // back briefly so the entry swirl animation has time to play — see
+    // RoomEntryDelay on the backend for why that has to happen server-side
+    // rather than as a delay here.
+    applyUpdate(await enterRoom(party!.code, selfId))
   }
 
   if (party.status === 'DUNGEON') {
@@ -102,7 +87,6 @@ export function PartyLobbyPage() {
           members={party.members}
           isLeader={isLeader}
           selfId={selfId}
-          isGuestSession={isGuestSession}
           onEnterRoom={handleEnterRoom}
         />
       </div>
@@ -130,13 +114,7 @@ export function PartyLobbyPage() {
           </section>
         )}
 
-        <BattleScreen
-          code={party.code}
-          members={party.members}
-          actingAsId={effectiveActingAsId}
-          selfUserId={selfId}
-          useDevActions={isGuestSession}
-        />
+        <BattleScreen code={party.code} members={party.members} actingAsId={effectiveActingAsId} />
       </div>
     )
   }

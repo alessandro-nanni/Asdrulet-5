@@ -1,13 +1,10 @@
 package com.asdru.asdrulet5.dungeon.web;
 
-import com.asdru.asdrulet5.auth.web.AuthenticatedUserMapper;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.web.dto.DungeonStateDto;
 import com.asdru.asdrulet5.dungeon.web.dto.SelectNodeRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,11 +19,10 @@ public class DungeonController {
         return dungeonService.getState(code.toUpperCase());
     }
 
-    @PostMapping("/select")
+    @PostMapping("/{memberId}/select")
     public DungeonStateDto select(@PathVariable String code,
-                                  @AuthenticationPrincipal OidcUser principal,
+                                  @PathVariable String memberId,
                                   @Valid @RequestBody SelectNodeRequest request) {
-        String actorId = AuthenticatedUserMapper.from(principal).id();
-        return dungeonService.select(code.toUpperCase(), actorId, request.nodeId());
+        return dungeonService.select(code.toUpperCase(), memberId, request.nodeId());
     }
 }

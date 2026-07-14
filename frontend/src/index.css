@@ -297,6 +297,55 @@ p {
   font-size: 0.9rem;
 }
 
+/* Avatar picker */
+
+.avatar-picker {
+  align-items: center;
+  text-align: center;
+}
+
+.avatar-picker-button {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 2px dashed var(--surface-border);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-picker-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.avatar-picker-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-picker-placeholder {
+  font-size: 2rem;
+  color: var(--text-muted);
+}
+
+.avatar-picker-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Party members */
 
 .member-list {

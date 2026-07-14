@@ -1,5 +1,6 @@
 package com.asdru.asdrulet5.classdata;
 
+import com.asdru.asdrulet5.classdata.domain.Ability;
 import com.asdru.asdrulet5.classdata.domain.BasicAbility;
 import com.asdru.asdrulet5.classdata.domain.ClassDefinition;
 import com.asdru.asdrulet5.classdata.domain.UltimateAbility;
@@ -14,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ClassDefinitionRegistryTest {
 
-    private final ClassDefinitionRegistry registry = new ClassDefinitionRegistry();
+    private final ClassDefinitionRegistry registry = new ClassDefinitionRegistry(false);
 
     @Test
     void allReturnsExactlyOneDefinitionPerCharacterClass() {
@@ -41,5 +42,19 @@ class ClassDefinitionRegistryTest {
         ClassDefinition definition = registry.get(characterClass);
 
         assertThat(definition.stats().maxHealth()).isPositive();
+    }
+
+    @Test
+    void warriorHasNoDebugAbilityWhenDevToolsDisabled() {
+        ClassDefinition warrior = registry.get(CharacterClass.WARRIOR);
+
+        assertThat(warrior.abilities()).extracting(Ability::id).doesNotContain("warrior.debug-nuke");
+    }
+
+    @Test
+    void warriorHasDebugAbilityWhenDevToolsEnabled() {
+        ClassDefinition warrior = new ClassDefinitionRegistry(true).get(CharacterClass.WARRIOR);
+
+        assertThat(warrior.abilities()).extracting(Ability::id).contains("warrior.debug-nuke");
     }
 }

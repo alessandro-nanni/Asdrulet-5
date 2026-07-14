@@ -1,15 +1,20 @@
 package com.asdru.asdrulet5.party.web;
 
-import com.asdru.asdrulet5.auth.web.AuthenticatedUserMapper;
+import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.party.PartyService;
 import com.asdru.asdrulet5.party.web.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * There's no login: {@code id} in every request is a string the client
+ * generated once (see the frontend's local identity store) and just keeps
+ * presenting — same trust model the old dev-only "quick game" tooling used,
+ * now the only one. Party/Dungeon/Combat enforce who's allowed to do what
+ * (e.g. only the leader can start the game) purely by comparing these ids.
+ */
 @RestController
 @RequestMapping("/api/parties")
 @RequiredArgsConstructor
@@ -18,9 +23,9 @@ public class PartyController {
     private final PartyService partyService;
 
     @PostMapping
-    public ResponseEntity<PartyStateDto> createParty(@AuthenticationPrincipal OidcUser principal,
-                                                     @Valid @RequestBody CreatePartyRequest request) {
-        PartyStateDto dto = partyService.createParty(AuthenticatedUserMapper.from(principal), request.displayName());
+    public ResponseEntity<PartyStateDto> createParty(@Valid @RequestBody CreatePartyRequest request) {
+        AuthenticatedUser leader = new AuthenticatedUser(request.id(), request.displayName(), request.avatarUrl());
+        PartyStateDto dto = partyService.createParty(leader);
         return ResponseEntity.status(201).body(dto);
     }
 
@@ -29,36 +34,37 @@ public class PartyController {
         return partyService.getState(code.toUpperCase());
     }
 
-    @PostMapping("/{code}/join")
+    @PostMapping("/{code}/{memberId}/join")
     public PartyStateDto joinParty(@PathVariable String code,
-                                   @AuthenticationPrincipal OidcUser principal,
+                                   @PathVariable String memberId,
                                    @Valid @RequestBody JoinPartyRequest request) {
-        return partyService.joinParty(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.displayName());
+        AuthenticatedUser user = new AuthenticatedUser(memberId, request.displayName(), request.avatarUrl());
+        return partyService.joinParty(code.toUpperCase(), user);
     }
 
-    @PostMapping("/{code}/class")
+    @PostMapping("/{code}/{memberId}/class")
     public PartyStateDto selectClass(@PathVariable String code,
-                                     @AuthenticationPrincipal OidcUser principal,
+                                     @PathVariable String memberId,
                                      @Valid @RequestBody SelectClassRequest request) {
-        return partyService.selectClass(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.characterClass());
+        return partyService.selectClass(code.toUpperCase(), memberId, request.characterClass());
     }
 
-    @PostMapping("/{code}/start")
+    @PostMapping("/{code}/{memberId}/start")
     public PartyStateDto startGame(@PathVariable String code,
-                                   @AuthenticationPrincipal OidcUser principal,
+                                   @PathVariable String memberId,
                                    @Valid @RequestBody StartGameRequest request) {
-        return partyService.startGame(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.memberIds());
+        return partyService.startGame(code.toUpperCase(), memberId, request.memberIds());
     }
 
-    @PostMapping("/{code}/enter-room")
-    public PartyStateDto enterRoom(@PathVariable String code, @AuthenticationPrincipal OidcUser principal) {
-        return partyService.enterRoom(code.toUpperCase(), AuthenticatedUserMapper.from(principal));
+    @PostMapping("/{code}/{memberId}/enter-room")
+    public PartyStateDto enterRoom(@PathVariable String code, @PathVariable String memberId) {
+        return partyService.enterRoom(code.toUpperCase(), memberId);
     }
 
-    @PostMapping("/{code}/inventory/equip")
+    @PostMapping("/{code}/{memberId}/inventory/equip")
     public PartyStateDto equipItem(@PathVariable String code,
-                                   @AuthenticationPrincipal OidcUser principal,
+                                   @PathVariable String memberId,
                                    @Valid @RequestBody EquipItemRequest request) {
-        return partyService.equipItem(code.toUpperCase(), AuthenticatedUserMapper.from(principal), request.itemId());
+        return partyService.equipItem(code.toUpperCase(), memberId, request.itemId());
     }
 }
