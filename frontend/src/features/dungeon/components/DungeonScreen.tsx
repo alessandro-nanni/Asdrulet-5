@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { selectNode } from '../api'
 import { useDungeonState } from '../useDungeonState'
 import { DungeonMap } from './DungeonMap'
-import type { PartyMember } from '../../party/types'
+import { InventoryScreen } from '../../inventory/components/InventoryScreen'
+import backpackIcon from '../../../assets/ui/backpack.png'
+import type { PartyMember, PartyState } from '../../party/types'
 import type { DungeonState, RoomType } from '../types'
 
 interface Props {
@@ -10,7 +12,9 @@ interface Props {
   members: PartyMember[]
   isLeader: boolean
   selfId: string
+  storage: (string | null)[]
   onEnterRoom: () => Promise<void>
+  onApplyUpdate: (state: PartyState) => void
 }
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
@@ -40,9 +44,11 @@ function optimisticSelect(dungeon: DungeonState, nodeId: string): DungeonState {
   return { ...dungeon, currentNodeId: nodeId }
 }
 
-export function DungeonScreen({ code, members, isLeader, selfId, onEnterRoom }: Props) {
+export function DungeonScreen({ code, members, isLeader, selfId, storage, onEnterRoom, onApplyUpdate }: Props) {
   const { dungeon, error, applyUpdate } = useDungeonState(code)
   const [isEntering, setIsEntering] = useState(false)
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false)
+  const self = members.find((member) => member.userId === selfId)
 
   if (error) {
     return (
@@ -85,6 +91,14 @@ export function DungeonScreen({ code, members, isLeader, selfId, onEnterRoom }: 
         isEntering={isEntering}
         onSelectNode={isLeader ? handleSelectNode : undefined}
       />
+      <button
+        type="button"
+        className="icon-btn dungeon-inventory-btn"
+        onClick={() => setIsInventoryOpen(true)}
+        aria-label="Open inventory"
+      >
+        <img src={backpackIcon} alt="" className="dungeon-inventory-icon" />
+      </button>
       {!isLeader && <p className="muted dungeon-waiting">Waiting for the leader to choose a path...</p>}
 
       <div className="dungeon-controls">
@@ -108,6 +122,16 @@ export function DungeonScreen({ code, members, isLeader, selfId, onEnterRoom }: 
           </button>
         )}
       </div>
+
+      {isInventoryOpen && self && (
+        <InventoryScreen
+          code={code}
+          member={self}
+          storage={storage}
+          onApplyUpdate={onApplyUpdate}
+          onClose={() => setIsInventoryOpen(false)}
+        />
+      )}
     </div>
   )
 }

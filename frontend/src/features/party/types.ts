@@ -2,6 +2,12 @@ export type CharacterClass = 'HEALER' | 'TANK' | 'WARRIOR' | 'MAGE'
 
 export type PartyStatus = 'LOBBY' | 'DUNGEON' | 'IN_PROGRESS'
 
+export interface Loadout {
+  weaponItemId: string | null
+  chestplateItemId: string | null
+  trinketItemId: string | null
+}
+
 export interface PartyMember {
   userId: string
   displayName: string
@@ -9,6 +15,7 @@ export interface PartyMember {
   characterClass: CharacterClass | null
   leader: boolean
   bot: boolean
+  loadout: Loadout
 }
 
 export interface PartyState {
@@ -17,4 +24,6 @@ export interface PartyState {
   members: PartyMember[]
   turnOrder: string[]
   status: PartyStatus
+  // 12 cells (3 columns x 4 rows), each either an item id or null.
+  storage: (string | null)[]
 }

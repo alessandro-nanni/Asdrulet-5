@@ -87,7 +87,9 @@ export function PartyLobbyPage() {
           members={party.members}
           isLeader={isLeader}
           selfId={selfId}
+          storage={party.storage}
           onEnterRoom={handleEnterRoom}
+          onApplyUpdate={applyUpdate}
         />
       </div>
     )

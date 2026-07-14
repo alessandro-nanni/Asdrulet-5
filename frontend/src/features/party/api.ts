@@ -29,3 +29,7 @@ export function startGame(code: string, memberId: string, memberIds: string[]): 
 export function enterRoom(code: string, memberId: string): Promise<PartyState> {
   return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/enter-room`)
 }
+
+export function equipFromStorage(code: string, memberId: string, storageIndex: number): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/inventory/equip-from-storage`, { storageIndex })
+}

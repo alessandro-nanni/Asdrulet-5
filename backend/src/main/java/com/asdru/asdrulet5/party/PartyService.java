@@ -49,6 +49,10 @@ public class PartyService {
     public PartyStateDto createParty(AuthenticatedUser leader) {
         String code = partyRepository.generateUniqueCode();
         Party party = new Party(code, leader.id(), leader.displayName(), leader.avatarUrl());
+        // Seeds the shared storage grid with the full item catalog — there's
+        // no loot-drop mechanic yet, so this is how a fresh party actually
+        // gets anything to equip.
+        party.seedStorage(itemDefinitionRegistry.all().stream().map(ItemDefinition::id).toList());
         partyRepository.save(party);
         return PartyMapper.toDto(party);
     }
@@ -119,6 +123,12 @@ public class PartyService {
         Party party = getOrThrow(code);
         ItemDefinition definition = itemDefinitionRegistry.get(itemId);
         party.equipItem(userId, definition.slot(), itemId);
+        return broadcast(party);
+    }
+
+    public PartyStateDto equipFromStorage(String code, String userId, int storageIndex) {
+        Party party = getOrThrow(code);
+        party.equipFromStorage(userId, storageIndex, itemId -> itemDefinitionRegistry.get(itemId).slot());
         return broadcast(party);
     }
 

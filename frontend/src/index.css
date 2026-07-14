@@ -751,6 +751,7 @@ p {
   /* flex: 1 1 auto (not the flex: 1 shorthand, which sets flex-basis: 0%
      and would override the explicit height below) so this element's own
      height is what actually gets used as its flex-basis. */
+  position: relative;
   height: 100svh;
   flex: 1 1 auto;
   display: flex;
@@ -810,6 +811,22 @@ p {
 
 .dungeon-node-icon {
   pointer-events: none;
+}
+
+.dungeon-inventory-btn {
+  position: absolute;
+  top: calc(28px + env(safe-area-inset-top));
+  right: 28px;
+  width: 44px;
+  height: 44px;
+  background: rgba(10, 8, 20, 0.7);
+  z-index: 4;
+}
+
+.dungeon-inventory-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
 }
 
 .dungeon-node.is-visited .dungeon-node-ring {
@@ -1508,4 +1525,188 @@ p {
   width: 28px;
   height: 28px;
   font-size: 0.75rem;
+}
+
+/* Inventory */
+
+.inventory-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: rgba(10, 8, 20, 0.97);
+  padding: calc(20px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+
+.inventory-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inventory-detail-panel {
+  flex-shrink: 0;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inventory-equipped-note {
+  text-align: center;
+}
+
+.inventory-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.inventory-detail-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.inventory-stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.inventory-stat-list li {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.inventory-stat-list li.is-positive {
+  color: var(--class-healer);
+}
+
+.inventory-stat-list li.is-negative {
+  color: var(--class-warrior);
+}
+
+.inventory-storage-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.inventory-storage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.inventory-cell {
+  appearance: none;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  padding: 8px;
+}
+
+.inventory-cell.is-empty {
+  border-style: dashed;
+  cursor: default;
+}
+
+.inventory-cell.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255, 183, 3, 0.3);
+}
+
+.inventory-cell:disabled {
+  cursor: not-allowed;
+}
+
+.inventory-cell-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.inventory-equipped-row {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.inventory-equipped-cell {
+  flex-direction: column;
+  gap: 4px;
+  aspect-ratio: auto;
+  height: 92px;
+}
+
+.inventory-slot-caption {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Equipped items panel (battle screen) */
+
+.equipped-items-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.equipped-items-label {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.equipped-items-list {
+  display: flex;
+  gap: 8px;
+}
+
+.equipped-item-btn {
+  appearance: none;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.equipped-item-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }

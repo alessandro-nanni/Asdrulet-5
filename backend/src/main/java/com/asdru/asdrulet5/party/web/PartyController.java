@@ -67,4 +67,11 @@ public class PartyController {
                                    @Valid @RequestBody EquipItemRequest request) {
         return partyService.equipItem(code.toUpperCase(), memberId, request.itemId());
     }
+
+    @PostMapping("/{code}/{memberId}/inventory/equip-from-storage")
+    public PartyStateDto equipFromStorage(@PathVariable String code,
+                                          @PathVariable String memberId,
+                                          @Valid @RequestBody EquipFromStorageRequest request) {
+        return partyService.equipFromStorage(code.toUpperCase(), memberId, request.storageIndex());
+    }
 }

@@ -6,8 +6,10 @@ import com.asdru.asdrulet5.combat.CombatVictoryEvent;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
+import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.exception.UnknownItemDefinitionException;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
+import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyStatus;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
@@ -243,5 +245,50 @@ class PartyServiceTest {
 
         assertThatThrownBy(() -> partyService.equipItem(created.code(), "leader-1", "no-such-item"))
                 .isInstanceOf(UnknownItemDefinitionException.class);
+    }
+
+    @Test
+    void createPartySeedsSharedStorageWithFullCatalog() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThat(created.storage()).hasSize(Party.STORAGE_SIZE);
+        assertThat(created.storage()).filteredOn(java.util.Objects::nonNull)
+                .containsExactlyInAnyOrderElementsOf(
+                        new ItemDefinitionRegistry().all().stream().map(ItemDefinition::id).toList());
+    }
+
+    @Test
+    void equipFromStorageEquipsItemAndSwapsPreviousBackIntoTheSameCell() {
+        PartyStateDto created = partyService.createParty(leader);
+        int swordIndex = created.storage().indexOf("rusted-sword");
+        int flameIndex = created.storage().indexOf("flame-edge");
+
+        PartyStateDto afterFirstEquip = partyService.equipFromStorage(created.code(), "leader-1", swordIndex);
+        assertThat(afterFirstEquip.members().getFirst().loadout().weaponItemId()).isEqualTo("rusted-sword");
+        assertThat(afterFirstEquip.storage().get(swordIndex)).isNull();
+
+        PartyStateDto afterSecondEquip = partyService.equipFromStorage(created.code(), "leader-1", flameIndex);
+
+        assertThat(afterSecondEquip.members().getFirst().loadout().weaponItemId()).isEqualTo("flame-edge");
+        // The previously-equipped rusted sword goes back into the cell the
+        // new item just vacated, so nothing is lost or duplicated.
+        assertThat(afterSecondEquip.storage().get(flameIndex)).isEqualTo("rusted-sword");
+    }
+
+    @Test
+    void equipFromEmptyStorageCellThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        int emptyIndex = created.storage().indexOf(null);
+
+        assertThatThrownBy(() -> partyService.equipFromStorage(created.code(), "leader-1", emptyIndex))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.EmptyStorageSlotException.class);
+    }
+
+    @Test
+    void equipFromOutOfRangeStorageIndexThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.equipFromStorage(created.code(), "leader-1", Party.STORAGE_SIZE))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.InvalidStorageIndexException.class);
     }
 }

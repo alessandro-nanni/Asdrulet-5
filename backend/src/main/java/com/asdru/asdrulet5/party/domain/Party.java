@@ -7,11 +7,14 @@ import lombok.Getter;
 import lombok.Synchronized;
 import lombok.experimental.Accessors;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 public class Party {
 
@@ -20,6 +23,9 @@ public class Party {
      * exist — the two happen to match today but must not be coupled.
      */
     public static final int MAX_MEMBERS = 4;
+
+    /** Shared party storage grid: 3 columns x 4 rows, rendered by the frontend. */
+    public static final int STORAGE_SIZE = 12;
 
     @Getter
     @Accessors(fluent = true)
@@ -31,6 +37,7 @@ public class Party {
 
     private final Map<String, PartyMember> members = new LinkedHashMap<>();
     private final AtomicInteger fakeMemberSequence = new AtomicInteger();
+    private final List<String> storage = new ArrayList<>(Collections.nCopies(STORAGE_SIZE, null));
     private List<String> turnOrder = List.of();
 
     @Getter
@@ -112,6 +119,53 @@ public class Party {
         if (member == null) {
             throw new NotPartyMemberException(code, userId);
         }
+        members.put(userId, member.withLoadout(member.loadout().withItem(slot, itemId)));
+    }
+
+    /**
+     * Fills the shared storage grid — called once, right after creation, with
+     * whatever the catalog currently holds. Any cells beyond the given list
+     * (or beyond STORAGE_SIZE) are simply left empty.
+     */
+    @Synchronized
+    public void seedStorage(List<String> itemIds) {
+        for (int i = 0; i < itemIds.size() && i < STORAGE_SIZE; i++) {
+            storage.set(i, itemIds.get(i));
+        }
+    }
+
+    @Synchronized
+    public List<String> storage() {
+        // Not List.copyOf: cells are legitimately null (empty), and
+        // List.copyOf/List.of both reject null elements.
+        return Collections.unmodifiableList(new ArrayList<>(storage));
+    }
+
+    /**
+     * Equips whatever item sits in the given shared-storage cell, swapping
+     * whatever the member already had in that item's slot back into the same
+     * cell — so the grid never loses or duplicates an item. slotResolver
+     * looks up the item's slot (via ItemDefinitionRegistry, kept out of this
+     * class the same way PartyService already resolves it for equipItem)
+     * inside this synchronized method, so the read of the storage cell and
+     * the swap happen atomically.
+     */
+    @Synchronized
+    public void equipFromStorage(String userId, int storageIndex, Function<String, ItemSlot> slotResolver) {
+        PartyMember member = members.get(userId);
+        if (member == null) {
+            throw new NotPartyMemberException(code, userId);
+        }
+        if (storageIndex < 0 || storageIndex >= STORAGE_SIZE) {
+            throw new InvalidStorageIndexException(code, storageIndex);
+        }
+        String itemId = storage.get(storageIndex);
+        if (itemId == null) {
+            throw new EmptyStorageSlotException(code, storageIndex);
+        }
+        ItemSlot slot = slotResolver.apply(itemId);
+        String previousItemId = member.loadout().itemIdFor(slot);
+        storage.set(storageIndex, previousItemId);
         members.put(userId, member.withLoadout(member.loadout().withItem(slot, itemId)));
     }
 

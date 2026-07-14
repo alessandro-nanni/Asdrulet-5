@@ -9,6 +9,7 @@ public record PartyStateDto(
         String leaderId,
         List<PartyMemberDto> members,
         List<String> turnOrder,
-        PartyStatus status
+        PartyStatus status,
+        List<String> storage
 ) {
 }

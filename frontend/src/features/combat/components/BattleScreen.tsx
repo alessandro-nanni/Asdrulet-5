@@ -5,6 +5,7 @@ import { endTurn, useAbility } from '../api'
 import { CombatantCard, type FloatingText } from './CombatantCard'
 import { AbilityActionPanel } from './AbilityActionPanel'
 import { SelfStatsPanel } from './SelfStatsPanel'
+import { EquippedItemsPanel } from './EquippedItemsPanel'
 import type { PartyMember } from '../../party/types'
 import type { CombatState } from '../types'
 
@@ -158,6 +159,7 @@ export function BattleScreen({ code, members, actingAsId }: Props) {
   const allies = combat.combatants.filter((combatant) => !combatant.enemy)
   const isMyTurn = combat.currentTurnCombatantId === actingAsId
   const selfCombatant = combat.combatants.find((combatant) => combatant.id === actingAsId) ?? null
+  const selfMember = members.find((member) => member.userId === actingAsId) ?? null
   const selfDefinition = selfCombatant?.characterClass
     ? (definitions.find((definition) => definition.characterClass === selfCombatant.characterClass) ?? null)
     : null
@@ -294,6 +296,8 @@ export function BattleScreen({ code, members, actingAsId }: Props) {
             onCancel={() => setSelectedAbilityId(null)}
           />
         )}
+
+        {combat.status === 'IN_PROGRESS' && selfMember && <EquippedItemsPanel loadout={selfMember.loadout} />}
 
         {combat.status === 'IN_PROGRESS' && isMyTurn && selfCombatant && selfDefinition && (
           <AbilityActionPanel
