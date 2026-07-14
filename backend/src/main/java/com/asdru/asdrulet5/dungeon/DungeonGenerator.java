@@ -110,11 +110,14 @@ public class DungeonGenerator {
         }
         // Weighted toward combat: fights should be the room you run into most.
         int roll = random.nextInt(100);
-        if (roll < 60) {
+        if (roll < 55) {
             return RoomType.FIGHT;
         }
-        if (roll < 82) {
+        if (roll < 73) {
             return RoomType.LOOT;
+        }
+        if (roll < 88) {
+            return RoomType.MYSTERY;
         }
         return RoomType.MERCHANT;
     }

@@ -5,6 +5,7 @@ import roomStart from '../../../assets/dungeon/room-start.png'
 import roomFight from '../../../assets/dungeon/room-fight.png'
 import roomLoot from '../../../assets/dungeon/room-loot.png'
 import roomMerchant from '../../../assets/dungeon/room-merchant.png'
+import roomMystery from '../../../assets/dungeon/room-mystery.png'
 import roomBoss from '../../../assets/dungeon/room-boss.png'
 import type { DungeonNode, DungeonState, RoomType } from '../types'
 
@@ -48,6 +49,7 @@ const ROOM_ICONS: Record<RoomType, string> = {
   FIGHT: roomFight,
   LOOT: roomLoot,
   MERCHANT: roomMerchant,
+  MYSTERY: roomMystery,
   BOSS: roomBoss,
 }
 

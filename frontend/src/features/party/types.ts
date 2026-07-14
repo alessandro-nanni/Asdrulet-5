@@ -2,10 +2,22 @@ export type CharacterClass = 'HEALER' | 'TANK' | 'WARRIOR' | 'MAGE'
 
 export type PartyStatus = 'LOBBY' | 'DUNGEON' | 'IN_PROGRESS'
 
+export type WheelEffect = 'FULL_HEAL' | 'HALVE_HEALTH' | 'GIVE_ITEM' | 'CLEAR_EFFECTS' | 'POISON'
+
 export interface Loadout {
   weaponItemId: string | null
   chestplateItemId: string | null
   trinketItemId: string | null
+}
+
+// Same shape as combat's ActiveEffect (features/combat/types.ts) — kept as a
+// separate type rather than imported from there, mirroring how the backend
+// maps its own party.web.dto.PendingEffectDto instead of reusing combat's.
+export interface PendingEffect {
+  name: string
+  description: string
+  icon: string
+  remainingTurns: number
 }
 
 export interface PartyMember {
@@ -16,6 +28,11 @@ export interface PartyMember {
   leader: boolean
   bot: boolean
   loadout: Loadout
+  // null means "at full health" — see the backend PartyMember's own doc.
+  currentHealth: number | null
+  // Carried into the member's next fight as real ActiveEffects (e.g. a
+  // MYSTERY wheel's poison) — see the backend PartyMember's own doc.
+  pendingEffects: PendingEffect[]
 }
 
 export interface PartyState {
@@ -26,4 +43,7 @@ export interface PartyState {
   status: PartyStatus
   // 12 cells (3 columns x 4 rows), each either an item id or null.
   storage: (string | null)[]
+  // Keyed by userId — only ever holds entries for the MYSTERY room currently
+  // entered, reset the moment a new room is entered.
+  wheelResults: Record<string, WheelEffect>
 }

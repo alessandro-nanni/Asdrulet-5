@@ -33,3 +33,11 @@ export function enterRoom(code: string, memberId: string): Promise<PartyState> {
 export function equipFromStorage(code: string, memberId: string, storageIndex: number): Promise<PartyState> {
   return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/inventory/equip-from-storage`, { storageIndex })
 }
+
+export function spinWheel(code: string, memberId: string): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/wheel/spin`)
+}
+
+export function acknowledgeWheelResult(code: string, memberId: string): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/wheel/acknowledge`)
+}

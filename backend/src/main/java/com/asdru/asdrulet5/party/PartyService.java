@@ -1,18 +1,26 @@
 package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
+import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
 import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.combat.CombatVictoryEvent;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
 import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
+import com.asdru.asdrulet5.inventory.domain.ItemSlot;
 import com.asdru.asdrulet5.party.dev.FakeNameGenerator;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
+import com.asdru.asdrulet5.party.domain.WheelContext;
+import com.asdru.asdrulet5.party.domain.WheelEffect;
+import com.asdru.asdrulet5.party.exception.AlreadySpunWheelException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
+import com.asdru.asdrulet5.party.exception.NotInMysteryRoomException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
+import com.asdru.asdrulet5.party.exception.NotYetSpunWheelException;
+import com.asdru.asdrulet5.party.exception.NotYourWheelTurnException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
 import com.asdru.asdrulet5.party.web.PartyMapper;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
@@ -21,7 +29,10 @@ import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -43,16 +54,14 @@ public class PartyService {
     private final DungeonService dungeonService;
     private final CombatService combatService;
     private final ItemDefinitionRegistry itemDefinitionRegistry;
+    private final ClassDefinitionRegistry classDefinitionRegistry;
     private final ScheduledExecutorService victoryReturnScheduler;
     private final RoomEntryDelay roomEntryDelay;
+    private final SecureRandom random = new SecureRandom();
 
     public PartyStateDto createParty(AuthenticatedUser leader) {
         String code = partyRepository.generateUniqueCode();
         Party party = new Party(code, leader.id(), leader.displayName(), leader.avatarUrl());
-        // Seeds the shared storage grid with the full item catalog — there's
-        // no loot-drop mechanic yet, so this is how a fresh party actually
-        // gets anything to equip.
-        party.seedStorage(itemDefinitionRegistry.all().stream().map(ItemDefinition::id).toList());
         partyRepository.save(party);
         return PartyMapper.toDto(party);
     }
@@ -89,13 +98,140 @@ public class PartyService {
         RoomType enteredRoomType = dungeonService.enterNode(code, requesterId);
         roomEntryDelay.sleep();
         if (enteredRoomType == RoomType.FIGHT || enteredRoomType == RoomType.BOSS) {
+            // Snapshot before entering combat: this is what carries each
+            // member's pending effects (e.g. a MYSTERY wheel's poison) into
+            // the fresh Combatant CombatService is about to build. The
+            // party's own copy is cleared right after taking the snapshot,
+            // so a pending effect a wheel handed out is consumed exactly
+            // once even though the fight itself doesn't write anything back
+            // onto PartyMember when it ends.
+            List<PartyMember> membersForCombat = party.members();
             party.enterCombat(requesterId);
+            membersForCombat.stream()
+                    .filter(member -> !member.pendingEffects().isEmpty())
+                    .forEach(member -> party.clearPendingEffects(member.userId()));
             PartyStateDto dto = broadcast(party);
-            combatService.startCombat(party.code(), party.members(), party.turnOrder());
+            combatService.startCombat(party.code(), membersForCombat, party.turnOrder());
             return dto;
+        }
+        if (enteredRoomType == RoomType.MYSTERY) {
+            // Stays entered — unlike LOOT/MERCHANT there's real gameplay
+            // here, so the room only clears once every member has spun (see
+            // spinWheel). resetWheelSpins() means a MYSTERY room visited a
+            // second time (a fresh dungeon run, or in principle a re-roll)
+            // starts with a clean slate rather than reusing stale spins.
+            party.resetWheelSpins();
+            return broadcast(party);
         }
         dungeonService.clearEnteredNode(code);
         return PartyMapper.toDto(party);
+    }
+
+    /**
+     * One party member spinning the wheel in the MYSTERY room the party
+     * currently has entered. There's one shared wheel for the whole party:
+     * the effect is drawn from whichever {@link WheelEffect}s nobody has
+     * landed on yet this room visit (see Party.remainingWheelEffects), so
+     * results never repeat across members, and only whoever is next in the
+     * party's own turnOrder (set at game start) is allowed to spin — see
+     * Party.isMembersWheelTurn. The rolled effect applies to the spinning
+     * member alone, polymorphically (each effect knows its own behavior —
+     * see {@link WheelEffect#applyTo}, nothing here switches on which one
+     * was rolled). Never touches the room's clear state directly — see
+     * {@link #acknowledgeWheelResult} for that, so a member's screen is
+     * never swapped out from under them mid-spin.
+     */
+    public PartyStateDto spinWheel(String code, String userId) {
+        Party party = getOrThrow(code);
+        PartyMember member = party.members().stream()
+                .filter(candidate -> candidate.userId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new NotPartyMemberException(code, userId));
+        if (dungeonService.enteredRoomType(code) != RoomType.MYSTERY) {
+            throw new NotInMysteryRoomException(code);
+        }
+        if (party.hasSpunWheel(userId)) {
+            throw new AlreadySpunWheelException(code, userId);
+        }
+        if (!party.isMembersWheelTurn(userId)) {
+            throw new NotYourWheelTurnException(code, userId);
+        }
+
+        List<WheelEffect> remaining = party.remainingWheelEffects();
+        WheelEffect effect = remaining.get(random.nextInt(remaining.size()));
+        effect.applyTo(member, wheelContextFor(party));
+        party.recordWheelSpin(userId, effect);
+        return broadcast(party);
+    }
+
+    /**
+     * Called once a member's own client has finished locally announcing
+     * their spin result (see MysteryWheelScreen's spin-then-announce
+     * timing on the frontend). The room only actually clears once every
+     * member has both spun and acknowledged — driven by the clients
+     * themselves rather than a fixed backend delay, so there's no timer to
+     * tune against however long the frontend's own animation happens to
+     * take.
+     */
+    public PartyStateDto acknowledgeWheelResult(String code, String userId) {
+        Party party = getOrThrow(code);
+        boolean isMember = party.members().stream().anyMatch(candidate -> candidate.userId().equals(userId));
+        if (!isMember) {
+            throw new NotPartyMemberException(code, userId);
+        }
+        if (!party.hasSpunWheel(userId)) {
+            throw new NotYetSpunWheelException(code, userId);
+        }
+        party.recordWheelAcknowledgement(userId);
+        if (party.allMembersHaveAcknowledgedWheel()) {
+            dungeonService.clearEnteredNode(code);
+        }
+        return broadcast(party);
+    }
+
+    private WheelContext wheelContextFor(Party party) {
+        return new WheelContext() {
+            @Override
+            public Party party() {
+                return party;
+            }
+
+            @Override
+            public int effectiveMaxHealth(PartyMember member) {
+                int base = classDefinitionRegistry.get(member.characterClass()).stats().maxHealth();
+                int bonus = member.loadout().equippedItemIds().stream()
+                        .map(itemDefinitionRegistry::get)
+                        .mapToInt(definition -> definition.passive().bonusMaxHealth())
+                        .sum();
+                return Math.max(1, base + bonus);
+            }
+
+            @Override
+            public void giveRandomItemTo(PartyMember member) {
+                String itemId = pickRandomUnplacedItemId(party);
+                ItemSlot slot = itemDefinitionRegistry.get(itemId).slot();
+                party.giveAndEquipItem(member.userId(), slot, itemId);
+            }
+        };
+    }
+
+    /**
+     * Favors an item that isn't already in play (in the shared storage or
+     * equipped by anyone) so a spin feels like discovering something new
+     * rather than handing back a duplicate — falling back to the full
+     * catalog only once every item is already somewhere in the party.
+     */
+    private String pickRandomUnplacedItemId(Party party) {
+        Set<String> inPlay = new HashSet<>(party.storage());
+        party.members().forEach(member -> inPlay.addAll(member.loadout().equippedItemIds()));
+        List<String> candidates = itemDefinitionRegistry.all().stream()
+                .map(ItemDefinition::id)
+                .filter(id -> !inPlay.contains(id))
+                .toList();
+        if (candidates.isEmpty()) {
+            candidates = itemDefinitionRegistry.all().stream().map(ItemDefinition::id).toList();
+        }
+        return candidates.get(random.nextInt(candidates.size()));
     }
 
     /**

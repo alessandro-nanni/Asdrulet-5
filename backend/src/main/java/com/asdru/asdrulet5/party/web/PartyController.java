@@ -74,4 +74,14 @@ public class PartyController {
                                           @Valid @RequestBody EquipFromStorageRequest request) {
         return partyService.equipFromStorage(code.toUpperCase(), memberId, request.storageIndex());
     }
+
+    @PostMapping("/{code}/{memberId}/wheel/spin")
+    public PartyStateDto spinWheel(@PathVariable String code, @PathVariable String memberId) {
+        return partyService.spinWheel(code.toUpperCase(), memberId);
+    }
+
+    @PostMapping("/{code}/{memberId}/wheel/acknowledge")
+    public PartyStateDto acknowledgeWheelResult(@PathVariable String code, @PathVariable String memberId) {
+        return partyService.acknowledgeWheelResult(code.toUpperCase(), memberId);
+    }
 }

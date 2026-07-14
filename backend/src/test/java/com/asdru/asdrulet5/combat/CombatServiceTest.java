@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.combat;
 
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
 import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
+import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.classdata.domain.BasicAbility;
 import com.asdru.asdrulet5.classdata.domain.TargetType;
 import com.asdru.asdrulet5.combat.domain.Combat;
@@ -40,7 +41,17 @@ class CombatServiceTest {
     }
 
     private static PartyMember member(String id, CharacterClass characterClass, Loadout loadout) {
-        return new PartyMember(id, id, null, characterClass, false, false, loadout);
+        return new PartyMember(id, id, null, characterClass, false, false, loadout, null, List.of());
+    }
+
+    private static PartyMember memberWithHealth(String id, CharacterClass characterClass, Integer currentHealth) {
+        return new PartyMember(id, id, null, characterClass, false, false, Loadout.empty(), currentHealth, List.of());
+    }
+
+    private static PartyMember memberWithPoison(String id, CharacterClass characterClass, int power, int turns) {
+        ActiveEffect poison = ActiveEffect.damageOverTime("Poison", "A lingering venom saps your health each turn.",
+                "poison", power, turns);
+        return new PartyMember(id, id, null, characterClass, false, false, Loadout.empty(), null, List.of(poison));
     }
 
     @BeforeEach
@@ -100,6 +111,41 @@ class CombatServiceTest {
         assertThat(warrior.maxHealth()).isEqualTo(140);
         assertThat(warrior.damage()).isEqualTo(25);
         assertThat(warrior.defense()).isEqualTo(16);
+    }
+
+    @Test
+    void startCombatHonorsAMemberSCarriedOverCurrentHealth() {
+        // A MYSTERY wheel's "halve current health" persists on the member
+        // until the next fight actually starts — see PartyMember's own doc.
+        List<PartyMember> members = List.of(memberWithHealth("p1", CharacterClass.WARRIOR, 30));
+
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
+
+        CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(warrior.maxHealth()).isEqualTo(120);
+        assertThat(warrior.currentHealth()).isEqualTo(30);
+    }
+
+    @Test
+    void startCombatWithNoCarriedOverHealthStartsAtMax() {
+        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR));
+
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
+
+        CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(warrior.currentHealth()).isEqualTo(warrior.maxHealth());
+    }
+
+    @Test
+    void startCombatSeedsAPendingPoisonAsAnActiveEffect() {
+        List<PartyMember> members = List.of(memberWithPoison("p1", CharacterClass.WARRIOR, 6, 4));
+
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
+
+        CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(warrior.activeEffects()).hasSize(1);
+        assertThat(warrior.activeEffects().getFirst().name()).isEqualTo("Poison");
+        assertThat(warrior.activeEffects().getFirst().remainingTurns()).isEqualTo(4);
     }
 
     @Test

@@ -22,6 +22,7 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -758,6 +759,57 @@ p {
   flex-direction: column;
   gap: 12px;
   padding: 20px 16px;
+}
+
+.dungeon-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.dungeon-topbar-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dungeon-topbar-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dungeon-topbar-health {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dungeon-topbar-health-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: #ff5c5c;
+}
+
+.dungeon-topbar-health-bar {
+  flex: 1;
+}
+
+.dungeon-topbar-health-value {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
 .dungeon-map {
@@ -1709,4 +1761,112 @@ p {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* Mystery wheel */
+
+.wheel-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  background: rgba(10, 8, 20, 0.97);
+  padding: calc(28px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  text-align: center;
+}
+
+.wheel-shell {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  margin: 8px 0;
+}
+
+.wheel-pointer {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 18px solid var(--accent);
+  z-index: 2;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+}
+
+/* An <svg> now, not a div — crisp vector pie slices instead of a CSS
+   conic-gradient, which is what used to leave a faint mismatched seam at
+   the rounded edge where the gradient's underlying square met the
+   border-radius clip. Individual slices can also now be dimmed to "empty"
+   independently once claimed, which a single gradient background couldn't
+   do at all. */
+.wheel-dial {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 4px solid var(--surface-border);
+  box-shadow: var(--shadow-card);
+  background: var(--surface);
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.12, 0.66, 0.2, 1);
+}
+
+.wheel-segment-text {
+  font-size: 10px;
+  font-weight: 800;
+  fill: rgba(0, 0, 0, 0.82);
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 2px;
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.12, 0.66, 0.2, 1);
+}
+
+.wheel-result {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  max-width: 320px;
+}
+
+.wheel-result-title {
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.wheel-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wheel-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+}
+
+.wheel-member-row.is-current-turn {
+  border-color: var(--accent);
 }

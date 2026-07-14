@@ -1,19 +1,21 @@
 package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
+import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
 import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.combat.CombatVictoryEvent;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
-import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.exception.UnknownItemDefinitionException;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyStatus;
+import com.asdru.asdrulet5.party.domain.WheelEffect;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
+import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
 import com.asdru.asdrulet5.party.web.dto.PartyMemberDto;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
@@ -26,6 +28,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -35,6 +38,7 @@ class PartyServiceTest {
     private final AuthenticatedUser member = new AuthenticatedUser("player-2", "Player Two", "player2.png");
 
     private PartyService partyService;
+    private PartyRepository partyRepository;
     private SimpMessagingTemplate messagingTemplate;
     private DungeonService dungeonService;
     private CombatService combatService;
@@ -43,6 +47,7 @@ class PartyServiceTest {
 
     @BeforeEach
     void setUp() {
+        partyRepository = new InMemoryPartyRepository();
         messagingTemplate = mock(SimpMessagingTemplate.class);
         dungeonService = mock(DungeonService.class);
         combatService = mock(CombatService.class);
@@ -58,8 +63,9 @@ class PartyServiceTest {
         // A real RoomEntryDelay would block each enterRoom call for real —
         // pointless in a unit test, so use one configured to sleep 0ms.
         roomEntryDelay = new RoomEntryDelay(0);
-        partyService = new PartyService(new InMemoryPartyRepository(), messagingTemplate, dungeonService,
-                combatService, new ItemDefinitionRegistry(), victoryReturnScheduler, roomEntryDelay);
+        partyService = new PartyService(partyRepository, messagingTemplate, dungeonService,
+                combatService, new ItemDefinitionRegistry(), new ClassDefinitionRegistry(false),
+                victoryReturnScheduler, roomEntryDelay);
     }
 
     @Test
@@ -248,20 +254,20 @@ class PartyServiceTest {
     }
 
     @Test
-    void createPartySeedsSharedStorageWithFullCatalog() {
+    void createPartyStartsWithEmptyStorage() {
         PartyStateDto created = partyService.createParty(leader);
 
         assertThat(created.storage()).hasSize(Party.STORAGE_SIZE);
-        assertThat(created.storage()).filteredOn(java.util.Objects::nonNull)
-                .containsExactlyInAnyOrderElementsOf(
-                        new ItemDefinitionRegistry().all().stream().map(ItemDefinition::id).toList());
+        assertThat(created.storage()).allMatch(java.util.Objects::isNull);
     }
 
     @Test
     void equipFromStorageEquipsItemAndSwapsPreviousBackIntoTheSameCell() {
         PartyStateDto created = partyService.createParty(leader);
-        int swordIndex = created.storage().indexOf("rusted-sword");
-        int flameIndex = created.storage().indexOf("flame-edge");
+        Party party = partyRepository.findByCode(created.code()).orElseThrow();
+        party.seedStorage(List.of("rusted-sword", "flame-edge"));
+        int swordIndex = 0;
+        int flameIndex = 1;
 
         PartyStateDto afterFirstEquip = partyService.equipFromStorage(created.code(), "leader-1", swordIndex);
         assertThat(afterFirstEquip.members().getFirst().loadout().weaponItemId()).isEqualTo("rusted-sword");
@@ -290,5 +296,232 @@ class PartyServiceTest {
 
         assertThatThrownBy(() -> partyService.equipFromStorage(created.code(), "leader-1", Party.STORAGE_SIZE))
                 .isInstanceOf(com.asdru.asdrulet5.party.exception.InvalidStorageIndexException.class);
+    }
+
+    @Test
+    void enterRoomInMysteryRoomDoesNotAutoClear() {
+        PartyStateDto created = partyService.createParty(leader);
+        when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.MYSTERY);
+
+        partyService.enterRoom(created.code(), "leader-1");
+
+        verify(dungeonService, never()).clearEnteredNode(created.code());
+        verifyNoInteractions(combatService);
+    }
+
+    @Test
+    void spinWheelWhenNoRoomIsEnteredThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.spinWheel(created.code(), "leader-1"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.NotInMysteryRoomException.class);
+    }
+
+    @Test
+    void spinWheelByUnknownMemberThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.spinWheel(created.code(), "nobody"))
+                .isInstanceOf(NotPartyMemberException.class);
+    }
+
+    @Test
+    void spinWheelTwiceInTheSameRoomThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+
+        partyService.spinWheel(created.code(), "leader-1");
+
+        assertThatThrownBy(() -> partyService.spinWheel(created.code(), "leader-1"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.AlreadySpunWheelException.class);
+    }
+
+    @Test
+    void spinWheelOutOfTurnOrderThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+
+        assertThatThrownBy(() -> partyService.spinWheel(created.code(), "player-2"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.NotYourWheelTurnException.class);
+    }
+
+    @Test
+    void spinWheelInTurnOrderSucceedsForEachMemberInSequence() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        // Deliberately not join order, to prove this is genuinely turnOrder-driven.
+        partyService.startGame(created.code(), "leader-1", List.of("player-2", "leader-1"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+
+        assertThatThrownBy(() -> partyService.spinWheel(created.code(), "leader-1"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.NotYourWheelTurnException.class);
+
+        assertThatCode(() -> partyService.spinWheel(created.code(), "player-2")).doesNotThrowAnyException();
+        assertThatCode(() -> partyService.spinWheel(created.code(), "leader-1")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void spinWheelNeverRepeatsAnEffectAcrossDifferentMembers() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        AuthenticatedUser member3 = new AuthenticatedUser("player-3", "Player Three", "p3.png");
+        AuthenticatedUser member4 = new AuthenticatedUser("player-4", "Player Four", "p4.png");
+        partyService.joinParty(created.code(), member3);
+        partyService.joinParty(created.code(), member4);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        partyService.selectClass(created.code(), "player-3", CharacterClass.TANK);
+        partyService.selectClass(created.code(), "player-4", CharacterClass.MAGE);
+        List<String> order = List.of("leader-1", "player-2", "player-3", "player-4");
+        partyService.startGame(created.code(), "leader-1", order);
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+
+        for (String userId : order) {
+            partyService.spinWheel(created.code(), userId);
+        }
+
+        PartyStateDto finalState = partyService.getState(created.code());
+        assertThat(finalState.wheelResults()).hasSize(4);
+        assertThat(finalState.wheelResults().values().stream().toList()).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void spinWheelNeverClearsTheRoomByItself() {
+        // Clearing is driven entirely by acknowledgeWheelResult now (see
+        // below) — spinning alone, even by every member, must never clear
+        // the room on its own.
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+
+        partyService.spinWheel(created.code(), "leader-1");
+        partyService.spinWheel(created.code(), "player-2");
+
+        verify(dungeonService, never()).clearEnteredNode(created.code());
+    }
+
+    @Test
+    void acknowledgeBeforeSpinningThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.acknowledgeWheelResult(created.code(), "leader-1"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.NotYetSpunWheelException.class);
+    }
+
+    @Test
+    void acknowledgeByUnknownMemberThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.acknowledgeWheelResult(created.code(), "nobody"))
+                .isInstanceOf(NotPartyMemberException.class);
+    }
+
+    @Test
+    void acknowledgeClearsTheRoomOnlyOnceEveryMemberHasAcknowledged() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+        partyService.spinWheel(created.code(), "leader-1");
+        partyService.spinWheel(created.code(), "player-2");
+
+        partyService.acknowledgeWheelResult(created.code(), "leader-1");
+        verify(dungeonService, never()).clearEnteredNode(created.code());
+
+        partyService.acknowledgeWheelResult(created.code(), "player-2");
+        verify(dungeonService, times(1)).clearEnteredNode(created.code());
+    }
+
+    @Test
+    void acknowledgeSoloClearsImmediately() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+        partyService.spinWheel(created.code(), "leader-1");
+
+        partyService.acknowledgeWheelResult(created.code(), "leader-1");
+
+        verify(dungeonService, times(1)).clearEnteredNode(created.code());
+    }
+
+    /**
+     * The actual roll is randomized (see PartyService's SecureRandom field —
+     * deliberately not injectable, same as DungeonGenerator's), so this
+     * drives enough independent spins to hit every WheelEffect at least once
+     * and checks each roll's own mutation matches what that effect promises,
+     * rather than asserting on one specific outcome.
+     */
+    @Test
+    void spinWheelAppliesWhicheverEffectItRolls() {
+        java.util.Set<WheelEffect> observed = new java.util.HashSet<>();
+        for (int i = 0; i < 150; i++) {
+            PartyStateDto created = partyService.createParty(
+                    new AuthenticatedUser("solo-" + i, "Solo", "avatar.png"));
+            when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+            partyService.selectClass(created.code(), "solo-" + i, CharacterClass.WARRIOR);
+            partyService.startGame(created.code(), "solo-" + i, List.of("solo-" + i));
+
+            PartyStateDto updated = partyService.spinWheel(created.code(), "solo-" + i);
+
+            WheelEffect effect = updated.wheelResults().get("solo-" + i);
+            observed.add(effect);
+            PartyMemberDto self = updated.members().getFirst();
+            switch (effect) {
+                case FULL_HEAL -> assertThat(self.currentHealth()).isNull();
+                case HALVE_HEALTH -> assertThat(self.currentHealth()).isNotNull().isPositive();
+                case CLEAR_EFFECTS -> assertThat(self.pendingEffects()).isEmpty();
+                case POISON -> {
+                    assertThat(self.pendingEffects()).hasSize(1);
+                    assertThat(self.pendingEffects().getFirst().name()).isEqualTo("Poison");
+                    assertThat(self.pendingEffects().getFirst().remainingTurns()).isEqualTo(4);
+                }
+                case GIVE_ITEM -> {
+                    // A personal reward equipped directly onto the spinner —
+                    // never the shared storage grid (see Party.giveAndEquipItem).
+                    boolean hasNewGear = self.loadout().weaponItemId() != null
+                            || self.loadout().chestplateItemId() != null
+                            || self.loadout().trinketItemId() != null;
+                    assertThat(hasNewGear).isTrue();
+                    assertThat(updated.storage()).allMatch(java.util.Objects::isNull);
+                }
+            }
+        }
+        assertThat(observed).containsExactlyInAnyOrder(WheelEffect.values());
+    }
+
+    @Test
+    void spinWheelGiveItemWorksEvenWhenStorageIsAlreadyFull() {
+        // GIVE_ITEM no longer needs shared-storage room (it equips onto the
+        // spinner directly), so a full grid must never block or fail it.
+        for (int i = 0; i < 30; i++) {
+            PartyStateDto created = partyService.createParty(
+                    new AuthenticatedUser("solo-" + i, "Solo", "avatar.png"));
+            Party party = partyRepository.findByCode(created.code()).orElseThrow();
+            List<String> full = new java.util.ArrayList<>();
+            for (int cell = 0; cell < Party.STORAGE_SIZE; cell++) {
+                full.add("rusted-sword");
+            }
+            party.seedStorage(full);
+            when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
+            String userId = "solo-" + i;
+            partyService.selectClass(created.code(), userId, CharacterClass.WARRIOR);
+            partyService.startGame(created.code(), userId, List.of(userId));
+
+            assertThatCode(() -> partyService.spinWheel(created.code(), userId)).doesNotThrowAnyException();
+        }
     }
 }

@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { selectNode } from '../api'
 import { useDungeonState } from '../useDungeonState'
 import { DungeonMap } from './DungeonMap'
+import { DungeonTopBar } from './DungeonTopBar'
 import { InventoryScreen } from '../../inventory/components/InventoryScreen'
+import { MysteryWheelScreen } from './MysteryWheelScreen'
 import backpackIcon from '../../../assets/ui/backpack.png'
-import type { PartyMember, PartyState } from '../../party/types'
+import type { ClassDefinition } from '../../classes/types'
+import type { PartyMember, PartyState, WheelEffect } from '../../party/types'
 import type { DungeonState, RoomType } from '../types'
 
 interface Props {
@@ -13,6 +16,9 @@ interface Props {
   isLeader: boolean
   selfId: string
   storage: (string | null)[]
+  wheelResults: Record<string, WheelEffect>
+  turnOrder: string[]
+  definitions: ClassDefinition[]
   onEnterRoom: () => Promise<void>
   onApplyUpdate: (state: PartyState) => void
 }
@@ -22,6 +28,7 @@ const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   FIGHT: 'Fight Room',
   LOOT: 'Loot Room',
   MERCHANT: 'Merchant',
+  MYSTERY: 'Mystery Wheel',
   BOSS: 'Boss Room',
 }
 
@@ -30,6 +37,7 @@ const ROOM_TYPE_DESCRIPTIONS: Record<RoomType, string> = {
   FIGHT: 'You sense danger nearby. Enemies are waiting inside.',
   LOOT: 'Something valuable glints in the dark, worth a closer look.',
   MERCHANT: 'A traveling merchant has set up shop here.',
+  MYSTERY: 'A strange wheel hums with unpredictable magic. Everyone gets a spin.',
   BOSS: 'A powerful presence looms ahead. This is the final battle.',
 }
 
@@ -44,11 +52,30 @@ function optimisticSelect(dungeon: DungeonState, nodeId: string): DungeonState {
   return { ...dungeon, currentNodeId: nodeId }
 }
 
-export function DungeonScreen({ code, members, isLeader, selfId, storage, onEnterRoom, onApplyUpdate }: Props) {
+// Fallback for the brief window before class definitions have loaded (or the
+// unreachable case of a member with no class) — the topbar still needs some
+// max to size its health bar against rather than dividing by zero.
+const DEFAULT_MAX_HEALTH = 100
+
+export function DungeonScreen({
+  code,
+  members,
+  isLeader,
+  selfId,
+  storage,
+  wheelResults,
+  turnOrder,
+  definitions,
+  onEnterRoom,
+  onApplyUpdate,
+}: Props) {
   const { dungeon, error, applyUpdate } = useDungeonState(code)
   const [isEntering, setIsEntering] = useState(false)
   const [isInventoryOpen, setIsInventoryOpen] = useState(false)
   const self = members.find((member) => member.userId === selfId)
+  const selfMaxHealth =
+    definitions.find((definition) => definition.characterClass === self?.characterClass)?.stats.maxHealth ??
+    DEFAULT_MAX_HEALTH
 
   if (error) {
     return (
@@ -81,9 +108,12 @@ export function DungeonScreen({ code, members, isLeader, selfId, storage, onEnte
 
   const currentRoom = dungeon.nodes.find((node) => node.id === dungeon.currentNodeId)
   const hasSelectedNextRoom = dungeon.currentNodeId !== dungeon.homeNodeId
+  const enteredRoom = dungeon.enteredNodeId ? dungeon.nodes.find((node) => node.id === dungeon.enteredNodeId) : null
+  const isMysteryWheelActive = enteredRoom?.roomType === 'MYSTERY'
 
   return (
     <div className="dungeon-screen">
+      {self && <DungeonTopBar member={self} maxHealth={selfMaxHealth} />}
       <DungeonMap
         dungeon={dungeon}
         members={members}
@@ -130,6 +160,17 @@ export function DungeonScreen({ code, members, isLeader, selfId, storage, onEnte
           storage={storage}
           onApplyUpdate={onApplyUpdate}
           onClose={() => setIsInventoryOpen(false)}
+        />
+      )}
+
+      {isMysteryWheelActive && self && (
+        <MysteryWheelScreen
+          code={code}
+          selfId={self.userId}
+          members={members}
+          wheelResults={wheelResults}
+          turnOrder={turnOrder}
+          onApplyUpdate={onApplyUpdate}
         />
       )}
     </div>

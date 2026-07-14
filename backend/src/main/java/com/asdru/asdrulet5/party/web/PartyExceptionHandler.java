@@ -66,4 +66,24 @@ public class PartyExceptionHandler {
     public ResponseEntity<Map<String, String>> handleEmptyStorageSlot(EmptyStorageSlotException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
     }
+
+    @ExceptionHandler(NotInMysteryRoomException.class)
+    public ResponseEntity<Map<String, String>> handleNotInMysteryRoom(NotInMysteryRoomException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(AlreadySpunWheelException.class)
+    public ResponseEntity<Map<String, String>> handleAlreadySpunWheel(AlreadySpunWheelException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(NotYetSpunWheelException.class)
+    public ResponseEntity<Map<String, String>> handleNotYetSpunWheel(NotYetSpunWheelException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(NotYourWheelTurnException.class)
+    public ResponseEntity<Map<String, String>> handleNotYourWheelTurn(NotYourWheelTurnException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
 }

@@ -78,6 +78,18 @@ public final class Combatant implements EffectTarget {
         return currentHealth > 0;
     }
 
+    /**
+     * Overrides the health this combatant starts the fight at (e.g. carried
+     * over from a MYSTERY wheel spin), clamped to this combatant's own max —
+     * a wheel roll is computed against the member's own effective max health,
+     * which can differ slightly from this fresh combatant's if gear changed
+     * since. Raw, unlike {@link #applyDamage}/{@link #applyHeal}: no event is
+     * recorded, since nothing has actually happened in this fight yet.
+     */
+    public void setStartingHealth(int health) {
+        this.currentHealth = Math.max(0, Math.min(maxHealth, health));
+    }
+
     public List<ActiveEffect> activeEffects() {
         return List.copyOf(activeEffects);
     }

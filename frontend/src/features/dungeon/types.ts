@@ -1,4 +1,4 @@
-export type RoomType = 'START' | 'FIGHT' | 'LOOT' | 'MERCHANT' | 'BOSS'
+export type RoomType = 'START' | 'FIGHT' | 'LOOT' | 'MERCHANT' | 'MYSTERY' | 'BOSS'
 
 export interface DungeonNode {
   id: string

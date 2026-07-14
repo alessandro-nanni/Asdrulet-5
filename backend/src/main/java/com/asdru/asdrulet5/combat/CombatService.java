@@ -96,13 +96,21 @@ public class CombatService {
                 .orElseThrow()
                 .chargeThreshold();
         List<ItemPassive> passives = resolvePassives(member.loadout());
-        return new Combatant(
+        Combatant combatant = new Combatant(
                 member.userId(), member.displayName(), false, member.characterClass(),
                 Math.max(1, definition.stats().maxHealth() + sumBonus(passives, ItemPassive::bonusMaxHealth)),
                 Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)),
                 Math.max(0, definition.stats().defense() + sumBonus(passives, ItemPassive::bonusDefense)),
                 Math.max(0, definition.stats().damage() + sumBonus(passives, ItemPassive::bonusDamage)),
                 ultimateChargeThreshold, definition.abilities(), null, null, null, null, passives);
+        // Both carried over from a MYSTERY wheel spin in the room the party
+        // just left — see PartyMember's own doc for why nothing else ever
+        // touches these two fields.
+        if (member.currentHealth() != null) {
+            combatant.setStartingHealth(member.currentHealth());
+        }
+        member.pendingEffects().forEach(combatant::addActiveEffect);
+        return combatant;
     }
 
     private List<ItemPassive> resolvePassives(Loadout loadout) {

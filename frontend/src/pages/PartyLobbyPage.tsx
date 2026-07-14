@@ -88,6 +88,9 @@ export function PartyLobbyPage() {
           isLeader={isLeader}
           selfId={selfId}
           storage={party.storage}
+          wheelResults={party.wheelResults}
+          turnOrder={party.turnOrder}
+          definitions={definitions}
           onEnterRoom={handleEnterRoom}
           onApplyUpdate={applyUpdate}
         />

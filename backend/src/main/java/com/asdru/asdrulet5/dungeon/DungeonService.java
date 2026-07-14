@@ -56,6 +56,12 @@ public class DungeonService {
         return broadcast(dungeon);
     }
 
+    /** Null if nothing is currently entered — callers decide what that means for them. */
+    public RoomType enteredRoomType(String code) {
+        Dungeon dungeon = getOrThrow(code);
+        return dungeon.enteredNodeId() != null ? dungeon.currentRoomType() : null;
+    }
+
     public DungeonStateDto getState(String code) {
         return DungeonMapper.toDto(getOrThrow(code));
     }

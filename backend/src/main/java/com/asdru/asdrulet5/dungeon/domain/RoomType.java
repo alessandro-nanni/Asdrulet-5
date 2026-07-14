@@ -5,5 +5,6 @@ public enum RoomType {
     FIGHT,
     LOOT,
     MERCHANT,
+    MYSTERY,
     BOSS
 }
