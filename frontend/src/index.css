@@ -774,12 +774,25 @@ p {
   stroke-width: 4;
 }
 
+/* The home room when it's *not* the one currently being previewed — still
+   the actual "you are here" anchor, so it keeps a dim gold ring (and stays
+   clickable to browse back to) rather than fading like a plain unvisited
+   node. */
+.dungeon-node.is-home .dungeon-node-ring {
+  stroke: var(--accent);
+  opacity: 0.6;
+}
+
+.dungeon-node.is-home {
+  cursor: pointer;
+}
+
 .dungeon-node.is-selectable {
   cursor: pointer;
   animation: dungeon-node-pulse 1.1s ease-in-out infinite;
 }
 
-.dungeon-node:not(.is-visited):not(.is-current):not(.is-selectable) {
+.dungeon-node:not(.is-visited):not(.is-current):not(.is-selectable):not(.is-home) {
   opacity: 0.4;
 }
 
@@ -796,9 +809,27 @@ p {
 .dungeon-party-marker {
   position: absolute;
   transition:
-    left 0.35s ease,
-    top 0.35s ease;
+    left 0.2s ease,
+    top 0.2s ease;
   pointer-events: none;
+}
+
+/* Plays once, right after Enter is pressed — the party spins down and
+   shrinks into the node they just committed to, giving that action its own
+   distinct feedback instead of just quietly waiting on the network. */
+.dungeon-party-marker.is-entering {
+  animation: dungeon-party-swirl 0.65s ease-in forwards;
+}
+
+@keyframes dungeon-party-swirl {
+  0% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(540deg) scale(0.05);
+    opacity: 0;
+  }
 }
 
 .dungeon-party-marker-avatar {

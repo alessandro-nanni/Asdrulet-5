@@ -34,10 +34,10 @@ export function startGameAsMember(code: string, memberId: string, memberIds: str
   return apiClient.post<PartyState>(`/api/parties/dev/${code}/${memberId}/start`, { memberIds })
 }
 
-export function enterCombatAsMember(code: string, memberId: string): Promise<PartyState> {
-  return apiClient.post<PartyState>(`/api/parties/dev/${code}/${memberId}/enter-combat`)
+export function enterRoomAsMember(code: string, memberId: string): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/dev/${code}/${memberId}/enter-room`)
 }
 
-export function moveToNodeAsMember(code: string, memberId: string, nodeId: string): Promise<DungeonState> {
-  return apiClient.post<DungeonState>(`/api/parties/${code}/dungeon/dev/${memberId}/move`, { nodeId })
+export function selectNodeAsMember(code: string, memberId: string, nodeId: string): Promise<DungeonState> {
+  return apiClient.post<DungeonState>(`/api/parties/${code}/dungeon/dev/${memberId}/select`, { nodeId })
 }

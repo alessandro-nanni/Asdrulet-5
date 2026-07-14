@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.combat.CombatService;
+import com.asdru.asdrulet5.combat.CombatVictoryEvent;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
@@ -10,13 +11,13 @@ import com.asdru.asdrulet5.party.dev.FakeNameGenerator;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
-import com.asdru.asdrulet5.party.exception.NotACombatRoomException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
 import com.asdru.asdrulet5.party.web.PartyMapper;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -63,20 +64,41 @@ public class PartyService {
         return dto;
     }
 
-    public PartyStateDto enterCombat(String code, AuthenticatedUser user) {
-        return enterCombat(code, user.id());
+    public PartyStateDto enterRoom(String code, AuthenticatedUser user) {
+        return enterRoom(code, user.id());
     }
 
-    public PartyStateDto enterCombat(String code, String requesterId) {
+    /**
+     * Commits to whatever next room is currently selected on the dungeon
+     * map. Fight/boss rooms drop the party into combat (status flips to
+     * IN_PROGRESS, mirroring the old enterCombat flow); anything else has no
+     * gameplay of its own yet, so it's cleared immediately, unlocking the
+     * next set of choices right away.
+     */
+    public PartyStateDto enterRoom(String code, String requesterId) {
         Party party = getOrThrow(code);
-        RoomType roomType = dungeonService.currentRoomType(code);
-        if (roomType != RoomType.FIGHT && roomType != RoomType.BOSS) {
-            throw new NotACombatRoomException(code, roomType);
+        RoomType enteredRoomType = dungeonService.enterNode(code, requesterId);
+        if (enteredRoomType == RoomType.FIGHT || enteredRoomType == RoomType.BOSS) {
+            party.enterCombat(requesterId);
+            PartyStateDto dto = broadcast(party);
+            combatService.startCombat(party.code(), party.members(), party.turnOrder());
+            return dto;
         }
-        party.enterCombat(requesterId);
-        PartyStateDto dto = broadcast(party);
-        combatService.startCombat(party.code(), party.members(), party.turnOrder());
-        return dto;
+        dungeonService.clearEnteredNode(code);
+        return PartyMapper.toDto(party);
+    }
+
+    /**
+     * Fired by CombatService the instant a Combat's status flips to
+     * PARTY_WON — flips the party back out of combat and resolves the
+     * dungeon node the fight was fought in, so the party can keep moving.
+     */
+    @EventListener
+    public void onCombatVictory(CombatVictoryEvent event) {
+        Party party = getOrThrow(event.partyCode());
+        dungeonService.clearEnteredNode(event.partyCode());
+        party.returnToDungeon();
+        broadcast(party);
     }
 
     public PartyStateDto equipItem(String code, AuthenticatedUser user, String itemId) {

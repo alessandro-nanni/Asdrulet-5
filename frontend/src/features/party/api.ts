@@ -21,6 +21,6 @@ export function startGame(code: string, memberIds: string[]): Promise<PartyState
   return apiClient.post<PartyState>(`/api/parties/${code}/start`, { memberIds })
 }
 
-export function enterCombat(code: string): Promise<PartyState> {
-  return apiClient.post<PartyState>(`/api/parties/${code}/enter-combat`)
+export function enterRoom(code: string): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/enter-room`)
 }

@@ -2,7 +2,7 @@ package com.asdru.asdrulet5.dungeon.web;
 
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.web.dto.DungeonStateDto;
-import com.asdru.asdrulet5.dungeon.web.dto.MoveToNodeRequest;
+import com.asdru.asdrulet5.dungeon.web.dto.SelectNodeRequest;
 import com.asdru.asdrulet5.party.exception.DevToolsDisabledException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,12 +24,12 @@ public class DungeonDevController {
     @Value("${app.dev-tools.enabled:false}")
     private boolean devToolsEnabled;
 
-    @PostMapping("/move")
-    public DungeonStateDto moveToAsMember(@PathVariable String code,
+    @PostMapping("/select")
+    public DungeonStateDto selectAsMember(@PathVariable String code,
                                           @PathVariable String memberId,
-                                          @Valid @RequestBody MoveToNodeRequest request) {
+                                          @Valid @RequestBody SelectNodeRequest request) {
         requireDevToolsEnabled();
-        return dungeonService.moveTo(code.toUpperCase(), memberId, request.nodeId());
+        return dungeonService.select(code.toUpperCase(), memberId, request.nodeId());
     }
 
     private void requireDevToolsEnabled() {

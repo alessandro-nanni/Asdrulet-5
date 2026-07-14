@@ -5,6 +5,6 @@ export function getDungeon(code: string): Promise<DungeonState> {
   return apiClient.get<DungeonState>(`/api/parties/${code}/dungeon`)
 }
 
-export function moveToNode(code: string, nodeId: string): Promise<DungeonState> {
-  return apiClient.post<DungeonState>(`/api/parties/${code}/dungeon/move`, { nodeId })
+export function selectNode(code: string, nodeId: string): Promise<DungeonState> {
+  return apiClient.post<DungeonState>(`/api/parties/${code}/dungeon/select`, { nodeId })
 }

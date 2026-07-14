@@ -1,5 +1,6 @@
-import { moveToNode } from '../api'
-import { moveToNodeAsMember } from '../../dev/api'
+import { useState } from 'react'
+import { selectNode } from '../api'
+import { selectNodeAsMember } from '../../dev/api'
 import { useDungeonState } from '../useDungeonState'
 import { DungeonMap } from './DungeonMap'
 import type { PartyMember } from '../../party/types'
@@ -11,10 +12,8 @@ interface Props {
   isLeader: boolean
   selfId: string
   isGuestSession: boolean
-  onEnterCombat: () => void
+  onEnterRoom: () => Promise<void>
 }
-
-const COMBAT_ROOM_TYPES: RoomType[] = ['FIGHT', 'BOSS']
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   START: 'Starting Room',
@@ -32,24 +31,30 @@ const ROOM_TYPE_DESCRIPTIONS: Record<RoomType, string> = {
   BOSS: 'A powerful presence looms ahead. This is the final battle.',
 }
 
-// The full graph (including each node's nextNodeIds) is already in `dungeon`,
-// so the post-move state is fully predictable client-side. Applying it right
-// away — instead of waiting on the request round-trip — is what makes the
-// marker start moving the instant you click; the eventual server response
-// still arrives and reconciles via applyUpdate, but is a no-op by then since
-// it matches what we already show.
-function optimisticMove(dungeon: DungeonState, nodeId: string): DungeonState {
-  const targetNode = dungeon.nodes.find((node) => node.id === nodeId)
-  return {
-    ...dungeon,
-    currentNodeId: nodeId,
-    availableNodeIds: targetNode?.nextNodeIds ?? [],
-    visitedNodeIds: dungeon.visitedNodeIds.includes(nodeId) ? dungeon.visitedNodeIds : [...dungeon.visitedNodeIds, nodeId],
-  }
+// The swirl animation (see .dungeon-party-marker.is-entering in index.css)
+// plays for this long regardless of how fast the network round-trip is —
+// without a floor, a fast local response would cut it off after a barely
+// visible flash.
+const MIN_SWIRL_MS = 650
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession, onEnterCombat }: Props) {
+// The full graph (including each node's nextNodeIds) is already in `dungeon`,
+// so browsing to a next-room option only ever changes currentNodeId — home,
+// availableNodeIds and clearedNodeIds are untouched until something is
+// actually entered. Applying that right away — instead of waiting on the
+// request round-trip — is what makes the marker start moving the instant you
+// click; the eventual server response still arrives and reconciles via
+// applyUpdate, but is a no-op by then since it matches what we already show.
+function optimisticSelect(dungeon: DungeonState, nodeId: string): DungeonState {
+  return { ...dungeon, currentNodeId: nodeId }
+}
+
+export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession, onEnterRoom }: Props) {
   const { dungeon, error, applyUpdate } = useDungeonState(code)
+  const [isEntering, setIsEntering] = useState(false)
 
   if (error) {
     return (
@@ -63,16 +68,26 @@ export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession,
   }
 
   async function handleSelectNode(nodeId: string) {
-    applyUpdate(optimisticMove(dungeon!, nodeId))
+    if (nodeId === dungeon!.currentNodeId) return
+    applyUpdate(optimisticSelect(dungeon!, nodeId))
     if (isGuestSession) {
-      applyUpdate(await moveToNodeAsMember(code, selfId, nodeId))
+      applyUpdate(await selectNodeAsMember(code, selfId, nodeId))
     } else {
-      applyUpdate(await moveToNode(code, nodeId))
+      applyUpdate(await selectNode(code, nodeId))
+    }
+  }
+
+  async function handleEnter() {
+    setIsEntering(true)
+    try {
+      await Promise.all([onEnterRoom(), delay(MIN_SWIRL_MS)])
+    } finally {
+      setIsEntering(false)
     }
   }
 
   const currentRoom = dungeon.nodes.find((node) => node.id === dungeon.currentNodeId)
-  const isCombatRoom = currentRoom != null && COMBAT_ROOM_TYPES.includes(currentRoom.roomType)
+  const hasSelectedNextRoom = dungeon.currentNodeId !== dungeon.homeNodeId
 
   return (
     <div className="dungeon-screen">
@@ -80,6 +95,7 @@ export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession,
         dungeon={dungeon}
         members={members}
         isLeader={isLeader}
+        isEntering={isEntering}
         onSelectNode={isLeader ? handleSelectNode : undefined}
       />
       {!isLeader && <p className="muted dungeon-waiting">Waiting for the leader to choose a path...</p>}
@@ -91,15 +107,15 @@ export function DungeonScreen({ code, members, isLeader, selfId, isGuestSession,
             {currentRoom ? ROOM_TYPE_DESCRIPTIONS[currentRoom.roomType] : ''}
           </p>
         </div>
-        {/* Loot/merchant rooms have no content yet, so Enter is disabled
-            there — but the button always stays put so the footer layout
-            doesn't jump around as you move between room types. */}
-        {isLeader && (
+        {/* Nothing to enter until a next room has been picked — the home
+            room (including the very first, starting room) never shows an
+            Enter button of its own. */}
+        {isLeader && hasSelectedNextRoom && (
           <button
             type="button"
             className="btn btn-primary btn-block"
-            onClick={onEnterCombat}
-            disabled={!isCombatRoom}
+            onClick={handleEnter}
+            disabled={isEntering}
           >
             Enter
           </button>

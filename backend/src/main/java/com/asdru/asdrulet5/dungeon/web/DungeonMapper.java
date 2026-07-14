@@ -13,9 +13,11 @@ public class DungeonMapper {
         return new DungeonStateDto(
                 dungeon.code(),
                 dungeon.nodes().stream().map(DungeonMapper::toDto).toList(),
+                dungeon.homeNodeId(),
                 dungeon.currentNodeId(),
+                dungeon.enteredNodeId(),
                 dungeon.availableNodeIds(),
-                dungeon.visitedNodeIds()
+                dungeon.clearedNodeIds()
         );
     }
 

@@ -11,7 +11,9 @@ export interface DungeonNode {
 export interface DungeonState {
   code: string
   nodes: DungeonNode[]
+  homeNodeId: string
   currentNodeId: string
+  enteredNodeId: string | null
   availableNodeIds: string[]
-  visitedNodeIds: string[]
+  clearedNodeIds: string[]
 }

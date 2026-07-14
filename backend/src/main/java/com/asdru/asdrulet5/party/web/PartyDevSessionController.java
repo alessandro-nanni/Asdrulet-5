@@ -59,10 +59,10 @@ public class PartyDevSessionController {
         return partyService.startGame(code.toUpperCase(), memberId, request.memberIds());
     }
 
-    @PostMapping("/{code}/{memberId}/enter-combat")
-    public PartyStateDto enterCombat(@PathVariable String code, @PathVariable String memberId) {
+    @PostMapping("/{code}/{memberId}/enter-room")
+    public PartyStateDto enterRoom(@PathVariable String code, @PathVariable String memberId) {
         requireDevToolsEnabled();
-        return partyService.enterCombat(code.toUpperCase(), memberId);
+        return partyService.enterRoom(code.toUpperCase(), memberId);
     }
 
     @PostMapping("/{code}/{memberId}/inventory/equip")

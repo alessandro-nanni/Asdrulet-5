@@ -32,18 +32,32 @@ public class DungeonService {
         return broadcast(dungeon);
     }
 
-    public DungeonStateDto moveTo(String code, String requesterId, String targetNodeId) {
+    public DungeonStateDto select(String code, String requesterId, String targetNodeId) {
         Dungeon dungeon = getOrThrow(code);
-        dungeon.moveTo(requesterId, targetNodeId);
+        dungeon.select(requesterId, targetNodeId);
+        return broadcast(dungeon);
+    }
+
+    /**
+     * Commits to whatever's currently selected and returns its room type, so
+     * the caller (PartyService) can decide whether to start combat or
+     * auto-clear immediately.
+     */
+    public RoomType enterNode(String code, String requesterId) {
+        Dungeon dungeon = getOrThrow(code);
+        dungeon.enter(requesterId);
+        broadcast(dungeon);
+        return dungeon.currentRoomType();
+    }
+
+    public DungeonStateDto clearEnteredNode(String code) {
+        Dungeon dungeon = getOrThrow(code);
+        dungeon.clearEnteredNode();
         return broadcast(dungeon);
     }
 
     public DungeonStateDto getState(String code) {
         return DungeonMapper.toDto(getOrThrow(code));
-    }
-
-    public RoomType currentRoomType(String code) {
-        return getOrThrow(code).currentRoomType();
     }
 
     private Dungeon getOrThrow(String code) {

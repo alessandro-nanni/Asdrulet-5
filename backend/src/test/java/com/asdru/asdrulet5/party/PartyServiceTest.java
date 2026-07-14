@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.combat.CombatService;
+import com.asdru.asdrulet5.combat.CombatVictoryEvent;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
@@ -9,7 +10,6 @@ import com.asdru.asdrulet5.inventory.exception.UnknownItemDefinitionException;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.PartyStatus;
 import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
-import com.asdru.asdrulet5.party.exception.NotACombatRoomException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
@@ -146,44 +146,58 @@ class PartyServiceTest {
     }
 
     @Test
-    void enterCombatByNonLeaderThrows() {
+    void enterRoomByNonLeaderThrows() {
         PartyStateDto created = partyService.createParty(leader, "Leader");
         partyService.joinParty(created.code(), member, "Player Two");
-        when(dungeonService.currentRoomType(created.code())).thenReturn(RoomType.FIGHT);
+        when(dungeonService.enterNode(created.code(), "player-2")).thenReturn(RoomType.FIGHT);
 
-        assertThatThrownBy(() -> partyService.enterCombat(created.code(), "player-2"))
+        assertThatThrownBy(() -> partyService.enterRoom(created.code(), "player-2"))
                 .isInstanceOf(NotPartyLeaderException.class);
     }
 
     @Test
-    void enterCombatInNonCombatRoomThrows() {
+    void enterRoomInLootRoomAutoClearsWithoutStartingCombat() {
         PartyStateDto created = partyService.createParty(leader, "Leader");
-        when(dungeonService.currentRoomType(created.code())).thenReturn(RoomType.LOOT);
+        when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.LOOT);
 
-        assertThatThrownBy(() -> partyService.enterCombat(created.code(), "leader-1"))
-                .isInstanceOf(NotACombatRoomException.class);
+        PartyStateDto updated = partyService.enterRoom(created.code(), "leader-1");
+
+        assertThat(updated.status()).isEqualTo(PartyStatus.LOBBY);
+        verify(dungeonService, times(1)).clearEnteredNode(created.code());
         verifyNoInteractions(combatService);
     }
 
     @Test
-    void enterCombatByLeaderInFightRoomStartsCombatAndSetsStatus() {
+    void enterRoomByLeaderInFightRoomStartsCombatAndSetsStatus() {
         PartyStateDto created = partyService.createParty(leader, "Leader");
-        when(dungeonService.currentRoomType(created.code())).thenReturn(RoomType.FIGHT);
+        when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.FIGHT);
 
-        PartyStateDto updated = partyService.enterCombat(created.code(), "leader-1");
+        PartyStateDto updated = partyService.enterRoom(created.code(), "leader-1");
 
         assertThat(updated.status()).isEqualTo(PartyStatus.IN_PROGRESS);
         verify(combatService, times(1)).startCombat(eq(created.code()), any(), any());
     }
 
     @Test
-    void enterCombatInBossRoomIsAllowed() {
+    void enterRoomInBossRoomIsAllowed() {
         PartyStateDto created = partyService.createParty(leader, "Leader");
-        when(dungeonService.currentRoomType(created.code())).thenReturn(RoomType.BOSS);
+        when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.BOSS);
 
-        PartyStateDto updated = partyService.enterCombat(created.code(), "leader-1");
+        PartyStateDto updated = partyService.enterRoom(created.code(), "leader-1");
 
         assertThat(updated.status()).isEqualTo(PartyStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void combatVictoryEventReturnsPartyToDungeonAndClearsTheNode() {
+        PartyStateDto created = partyService.createParty(leader, "Leader");
+        when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.FIGHT);
+        partyService.enterRoom(created.code(), "leader-1");
+
+        partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
+
+        verify(dungeonService, times(1)).clearEnteredNode(created.code());
+        assertThat(partyService.getState(created.code()).status()).isEqualTo(PartyStatus.DUNGEON);
     }
 
     @Test

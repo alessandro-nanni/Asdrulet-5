@@ -1,7 +1,12 @@
 package com.asdru.asdrulet5.combat;
 
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
+import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
+import com.asdru.asdrulet5.classdata.domain.BasicAbility;
+import com.asdru.asdrulet5.classdata.domain.TargetType;
+import com.asdru.asdrulet5.combat.domain.Combat;
 import com.asdru.asdrulet5.combat.domain.CombatStatus;
+import com.asdru.asdrulet5.combat.domain.Combatant;
 import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatantDto;
@@ -13,6 +18,7 @@ import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.List;
@@ -27,6 +33,7 @@ class CombatServiceTest {
 
     private CombatService combatService;
     private SimpMessagingTemplate messagingTemplate;
+    private ApplicationEventPublisher eventPublisher;
 
     private static PartyMember member(String id, CharacterClass characterClass) {
         return member(id, characterClass, Loadout.empty());
@@ -39,8 +46,9 @@ class CombatServiceTest {
     @BeforeEach
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
         combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(),
-                new EnemyDefinitionRegistry(), new ItemDefinitionRegistry(), messagingTemplate);
+                new EnemyDefinitionRegistry(), new ItemDefinitionRegistry(), messagingTemplate, eventPublisher);
     }
 
     @Test
@@ -102,5 +110,28 @@ class CombatServiceTest {
         CombatStateDto updated = combatService.endTurn("ABC123", "p1");
 
         assertThat(updated.currentTurnCombatantId()).isEqualTo("p2");
+    }
+
+    @Test
+    void useAbilityThatDefeatsTheLastEnemyPublishesVictoryEvent() {
+        BasicAbility strike = new BasicAbility(
+                "test.strike", "Strike", "A basic attack.", "20 damage", TargetType.SINGLE_ENEMY, 10,
+                AbilityEffect.damage(20));
+        Combatant p1 = new Combatant(
+                "p1", "p1", false, CharacterClass.WARRIOR, 100, 100, 5, 10, 40, List.of(strike), null, null, null,
+                null, List.of());
+        Combatant weakEnemy = new Combatant(
+                "enemy-1", "enemy-1", true, null, 1, 0, 0, 5, 0, List.of(), "Claw", "A swipe.", "5 damage",
+                AbilityEffect.damage(5), List.of());
+        Combat combat = new Combat("VICT123", List.of(p1, weakEnemy), List.of("p1", "enemy-1"));
+        CombatRepository repository = new InMemoryCombatRepository();
+        repository.save(combat);
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(),
+                new EnemyDefinitionRegistry(), new ItemDefinitionRegistry(), messagingTemplate, eventPublisher);
+
+        CombatStateDto updated = service.useAbility("VICT123", "p1", "test.strike", "enemy-1");
+
+        assertThat(updated.status()).isEqualTo(CombatStatus.PARTY_WON);
+        verify(eventPublisher, times(1)).publishEvent(new CombatVictoryEvent("VICT123"));
     }
 }

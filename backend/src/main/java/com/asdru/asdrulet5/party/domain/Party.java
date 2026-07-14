@@ -123,6 +123,16 @@ public class Party {
         this.status = PartyStatus.IN_PROGRESS;
     }
 
+    /**
+     * Called once combat resolves in the party's favor — system-triggered
+     * (off the back of a CombatVictoryEvent), not a direct user action, so
+     * unlike enterCombat there's no leader check here.
+     */
+    @Synchronized
+    public void returnToDungeon() {
+        this.status = PartyStatus.DUNGEON;
+    }
+
     @Synchronized
     public List<PartyMember> members() {
         return List.copyOf(members.values());

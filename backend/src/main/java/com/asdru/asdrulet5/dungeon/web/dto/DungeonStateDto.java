@@ -6,8 +6,10 @@ import java.util.Set;
 public record DungeonStateDto(
         String code,
         List<DungeonNodeDto> nodes,
+        String homeNodeId,
         String currentNodeId,
+        String enteredNodeId,
         List<String> availableNodeIds,
-        Set<String> visitedNodeIds
+        Set<String> clearedNodeIds
 ) {
 }

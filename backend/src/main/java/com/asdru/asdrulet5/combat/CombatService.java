@@ -4,6 +4,7 @@ import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
 import com.asdru.asdrulet5.classdata.domain.ClassDefinition;
 import com.asdru.asdrulet5.classdata.domain.UltimateAbility;
 import com.asdru.asdrulet5.combat.domain.Combat;
+import com.asdru.asdrulet5.combat.domain.CombatStatus;
 import com.asdru.asdrulet5.combat.domain.Combatant;
 import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
 import com.asdru.asdrulet5.combat.web.CombatMapper;
@@ -16,6 +17,7 @@ import com.asdru.asdrulet5.inventory.domain.ItemPassive;
 import com.asdru.asdrulet5.inventory.domain.Loadout;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -34,6 +36,7 @@ public class CombatService {
     private final EnemyDefinitionRegistry enemyDefinitionRegistry;
     private final ItemDefinitionRegistry itemDefinitionRegistry;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CombatStateDto startCombat(String code, List<PartyMember> members, List<String> turnOrder) {
         List<Combatant> combatants = new ArrayList<>();
@@ -57,13 +60,27 @@ public class CombatService {
     public CombatStateDto useAbility(String code, String actorId, String abilityId, String targetId) {
         Combat combat = getOrThrow(code);
         combat.useAbility(actorId, abilityId, targetId);
+        publishVictoryIfWon(combat);
         return broadcast(combat);
     }
 
     public CombatStateDto endTurn(String code, String actorId) {
         Combat combat = getOrThrow(code);
         combat.endTurn(actorId);
+        publishVictoryIfWon(combat);
         return broadcast(combat);
+    }
+
+    /**
+     * Combat.requireInProgress() rejects any call once status is no longer
+     * IN_PROGRESS, so the one call whose own action caused the PARTY_WON
+     * transition is the only call that will ever observe it here — safe to
+     * publish unconditionally on that observation without double-firing.
+     */
+    private void publishVictoryIfWon(Combat combat) {
+        if (combat.status() == CombatStatus.PARTY_WON) {
+            eventPublisher.publishEvent(new CombatVictoryEvent(combat.code()));
+        }
     }
 
     public CombatStateDto getState(String code) {
