@@ -24,11 +24,6 @@ class ItemDefinitionRegistryTest {
     }
 
     @Test
-    void everyItemIsLootOnlyNotPurchasable() {
-        assertThat(registry.all()).allMatch(item -> !item.purchasable());
-    }
-
-    @Test
     void unknownIdThrows() {
         assertThatThrownBy(() -> registry.get("nope"))
                 .isInstanceOf(UnknownItemDefinitionException.class);

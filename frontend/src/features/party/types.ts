@@ -20,11 +20,11 @@ export interface PendingEffect {
   remainingTurns: number
 }
 
-// What one member found opening a LOOT room's chest — coins, an item, or
-// both (itemId is null when the roll didn't include one).
+// What one member found opening a LOOT room's chest — coins, one or more
+// items, or both (itemIds is empty when the roll didn't include one).
 export interface LootResult {
   coins: number
-  itemId: string | null
+  itemIds: string[]
 }
 
 export interface PartyMember {

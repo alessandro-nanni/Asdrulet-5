@@ -57,6 +57,6 @@ public class PartyMapper {
     }
 
     private LootResultDto toDto(LootResult result) {
-        return new LootResultDto(result.coins(), result.itemId());
+        return new LootResultDto(result.coins(), result.itemIds());
     }
 }

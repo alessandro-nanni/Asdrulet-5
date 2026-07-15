@@ -9,6 +9,7 @@ import com.asdru.asdrulet5.combat.domain.Combatant;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
+import com.asdru.asdrulet5.inventory.LootTableRegistry;
 import com.asdru.asdrulet5.inventory.exception.UnknownItemDefinitionException;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.Party;
@@ -68,7 +69,7 @@ class PartyServiceTest {
         // pointless in a unit test, so use one configured to sleep 0ms.
         roomEntryDelay = new RoomEntryDelay(0);
         partyService = new PartyService(partyRepository, messagingTemplate, dungeonService,
-                combatService, new ItemDefinitionRegistry(), new ClassDefinitionRegistry(false),
+                combatService, new ItemDefinitionRegistry(), new LootTableRegistry(), new ClassDefinitionRegistry(false),
                 victoryReturnScheduler, roomEntryDelay);
     }
 
@@ -731,20 +732,20 @@ class PartyServiceTest {
             PartyStateDto updated = partyService.lootChest(created.code(), userId);
 
             LootResultDto result = updated.lootResults().get(userId);
-            assertThat(result.coins() > 0 || result.itemId() != null).isTrue();
+            assertThat(result.coins() > 0 || !result.itemIds().isEmpty()).isTrue();
             if (result.coins() > 0) {
                 assertThat(updated.coins()).isEqualTo(result.coins());
             }
-            if (result.itemId() != null) {
+            if (!result.itemIds().isEmpty()) {
                 PartyMemberDto self = updated.members().getFirst();
                 boolean hasNewGear = self.loadout().weaponItemId() != null
                         || self.loadout().chestplateItemId() != null
                         || self.loadout().trinketItemId() != null;
                 assertThat(hasNewGear).isTrue();
             }
-            if (result.coins() > 0 && result.itemId() == null) sawCoinsOnly = true;
-            if (result.coins() == 0 && result.itemId() != null) sawItemOnly = true;
-            if (result.coins() > 0 && result.itemId() != null) sawBoth = true;
+            if (result.coins() > 0 && result.itemIds().isEmpty()) sawCoinsOnly = true;
+            if (result.coins() == 0 && !result.itemIds().isEmpty()) sawItemOnly = true;
+            if (result.coins() > 0 && !result.itemIds().isEmpty()) sawBoth = true;
         }
         assertThat(sawCoinsOnly).as("saw a coins-only find").isTrue();
         assertThat(sawItemOnly).as("saw an item-only find").isTrue();

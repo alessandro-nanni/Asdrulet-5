@@ -16,15 +16,18 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Static catalog of equippable items. To add a new item: add a factory
- * method here and add it to {@link #buildDefinitions()} — a flat stat boost
- * overrides one of ItemPassive's bonusX()/damagePercent() methods, a
- * reactive item overrides one of its onX() hooks, and one that depends on
- * live combat state or randomness overrides damagePercentBonus(wearer) or
+ * Static catalog of equippable items — mechanics and flavor only. To add a
+ * new item: add a factory method here and add it to
+ * {@link #buildDefinitions()} — a flat stat boost overrides one of
+ * ItemPassive's bonusX()/damagePercent() methods, a reactive item overrides
+ * one of its onX() hooks, and one that depends on live combat state or
+ * randomness overrides damagePercentBonus(wearer) or
  * triggersFollowUpAbility() (see {@link ItemPassive}).
  *
- * <p>Every item here is loot-chest-only ({@code purchasable = false}) —
- * none of them are meant to turn up in the merchant's shop.
+ * <p>Whether/how often an item drops (shop eligibility, weight, floor) is
+ * not this class's concern — see {@code LootPoolRegistry} for that. Adding
+ * an item here makes it equippable and describable; it still needs an entry
+ * there to actually turn up anywhere in the game.
  */
 @Component
 public class ItemDefinitionRegistry {
@@ -47,7 +50,7 @@ public class ItemDefinitionRegistry {
                     public int damagePercentBonus(EffectTarget wearer) {
                         return wearer.deadAllyCount() * 13;
                     }
-                }, 40, false);
+                }, 40);
     }
 
     private static ItemDefinition torch() {
@@ -61,7 +64,7 @@ public class ItemDefinitionRegistry {
                                     "On Fire", "Burning — takes damage each turn.", "burn", 8, 2));
                         }
                     }
-                }, 35, false);
+                }, 35);
     }
 
     private static ItemDefinition luckyCharm() {
@@ -72,7 +75,7 @@ public class ItemDefinitionRegistry {
                     public int damagePercentBonus(EffectTarget wearer) {
                         return ThreadLocalRandom.current().nextDouble() < 0.02 ? 200 : 0;
                     }
-                }, 30, false);
+                }, 30);
     }
 
     private static ItemDefinition satelliteDish() {
@@ -88,7 +91,7 @@ public class ItemDefinitionRegistry {
                     public void onStartTurn(EffectTarget wearer) {
                         wearer.drainStamina(10);
                     }
-                }, 30, false);
+                }, 30);
     }
 
     private static ItemDefinition twitchingTalisman() {
@@ -100,7 +103,7 @@ public class ItemDefinitionRegistry {
                     public boolean triggersFollowUpAbility() {
                         return ThreadLocalRandom.current().nextDouble() < 0.10;
                     }
-                }, 35, false);
+                }, 35);
     }
 
     private static ItemDefinition leatherTunic() {
@@ -111,7 +114,7 @@ public class ItemDefinitionRegistry {
                     public int bonusDefense() {
                         return 4;
                     }
-                }, 20, false);
+                }, 20);
     }
 
     private static ItemDefinition mantleOfTheUsurper() {
@@ -127,7 +130,7 @@ public class ItemDefinitionRegistry {
                     public int bonusMaxHealthPercentIfHealthierThanLeader() {
                         return 7;
                     }
-                }, 40, false);
+                }, 40);
     }
 
     public List<ItemDefinition> all() {

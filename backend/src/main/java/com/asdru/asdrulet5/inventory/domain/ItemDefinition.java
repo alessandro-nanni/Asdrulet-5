@@ -2,15 +2,21 @@ package com.asdru.asdrulet5.inventory.domain;
 
 import java.util.Objects;
 
+/**
+ * What an item is and does — mechanics and flavor only. Where/how often it
+ * can actually be obtained (shop-eligible, drop weight, which floor) is
+ * deliberately kept out of here and owned instead by {@code LootPoolEntry}/
+ * {@code LootPoolRegistry} — those are a drop-table concern (the same item
+ * could reasonably have different odds in a loot chest vs. the wheel vs. the
+ * shop later), not an intrinsic property of the item itself.
+ */
 public record ItemDefinition(
         String id,
         String displayName,
         ItemSlot slot,
         String description,
         ItemPassive passive,
-        int price,
-        /** Whether the MERCHANT shop can ever offer this item — false for items meant to only turn up as loot (e.g. a mystery wheel GIVE_ITEM). */
-        boolean purchasable
+        int price
 ) {
     public ItemDefinition {
         requireNonBlank(id, "id");

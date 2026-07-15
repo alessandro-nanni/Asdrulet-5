@@ -44,7 +44,7 @@ export function LootRoomScreen({ code, selfId, members, lootResults, turnOrder, 
   function summarize(result: LootResult): string {
     const parts: string[] = []
     if (result.coins > 0) parts.push(`${result.coins} coins`)
-    if (result.itemId) parts.push(itemLabel(result.itemId))
+    result.itemIds.forEach((itemId) => parts.push(itemLabel(itemId)))
     return parts.join(' + ')
   }
 
@@ -121,12 +121,12 @@ export function LootRoomScreen({ code, selfId, members, lootResults, turnOrder, 
                   {selfResult.coins} coins
                 </span>
               )}
-              {selfResult.itemId && (
-                <span className="loot-result-pill">
-                  <ItemIcon itemId={selfResult.itemId} className="loot-result-item-icon" />
-                  {itemLabel(selfResult.itemId)}
+              {selfResult.itemIds.map((itemId) => (
+                <span key={itemId} className="loot-result-pill">
+                  <ItemIcon itemId={itemId} className="loot-result-item-icon" />
+                  {itemLabel(itemId)}
                 </span>
-              )}
+              ))}
             </div>
           </div>
         )}

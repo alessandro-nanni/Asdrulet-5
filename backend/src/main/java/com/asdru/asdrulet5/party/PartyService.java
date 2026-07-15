@@ -8,28 +8,13 @@ import com.asdru.asdrulet5.combat.domain.Combatant;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
+import com.asdru.asdrulet5.inventory.LootTableRegistry;
 import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.domain.ItemSlot;
+import com.asdru.asdrulet5.inventory.domain.LootTable;
 import com.asdru.asdrulet5.party.dev.FakeNameGenerator;
-import com.asdru.asdrulet5.party.domain.CharacterClass;
-import com.asdru.asdrulet5.party.domain.LootResult;
-import com.asdru.asdrulet5.party.domain.Party;
-import com.asdru.asdrulet5.party.domain.PartyMember;
-import com.asdru.asdrulet5.party.domain.WheelContext;
-import com.asdru.asdrulet5.party.domain.WheelEffect;
-import com.asdru.asdrulet5.party.exception.AlreadyLootedException;
-import com.asdru.asdrulet5.party.exception.AlreadySpunWheelException;
-import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
-import com.asdru.asdrulet5.party.exception.NotInLootRoomException;
-import com.asdru.asdrulet5.party.exception.NotInMerchantRoomException;
-import com.asdru.asdrulet5.party.exception.NotInMysteryRoomException;
-import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
-import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
-import com.asdru.asdrulet5.party.exception.NotYetLootedException;
-import com.asdru.asdrulet5.party.exception.NotYetSpunWheelException;
-import com.asdru.asdrulet5.party.exception.NotYourLootTurnException;
-import com.asdru.asdrulet5.party.exception.NotYourWheelTurnException;
-import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
+import com.asdru.asdrulet5.party.domain.*;
+import com.asdru.asdrulet5.party.exception.*;
 import com.asdru.asdrulet5.party.web.PartyMapper;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
 import lombok.RequiredArgsConstructor;
@@ -38,14 +23,11 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,14 +42,12 @@ public class PartyService {
      */
     private static final long VICTORY_DISPLAY_DELAY_SECONDS = 3;
 
-    /** How many distinct items a freshly entered MERCHANT room offers for sale. */
-    private static final int SHOP_STOCK_SIZE = 3;
-
     private final PartyRepository partyRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final DungeonService dungeonService;
     private final CombatService combatService;
     private final ItemDefinitionRegistry itemDefinitionRegistry;
+    private final LootTableRegistry lootTableRegistry;
     private final ClassDefinitionRegistry classDefinitionRegistry;
     private final ScheduledExecutorService victoryReturnScheduler;
     private final RoomEntryDelay roomEntryDelay;
@@ -142,7 +122,7 @@ public class PartyService {
             // instant-clear flavor room, cleared explicitly via leaveShop.
             // Rolled fresh every visit so re-entering doesn't just replay
             // whatever was left over from a prior stop.
-            party.rollShopStock(pickRandomUnplacedItemIds(party, SHOP_STOCK_SIZE, true));
+            party.rollShopStock(rollUnplaced(party, lootTableRegistry.forFloor(CURRENT_FLOOR).merchantTable()));
             return broadcast(party);
         }
         if (enteredRoomType == RoomType.LOOT) {
@@ -251,9 +231,9 @@ public class PartyService {
         if (result.coins() > 0) {
             party.addCoins(result.coins());
         }
-        if (result.itemId() != null) {
-            ItemSlot slot = itemDefinitionRegistry.get(result.itemId()).slot();
-            party.giveAndEquipItem(userId, slot, result.itemId());
+        for (String itemId : result.itemIds()) {
+            ItemSlot slot = itemDefinitionRegistry.get(itemId).slot();
+            party.giveAndEquipItem(userId, slot, itemId);
         }
         party.recordLoot(userId, result);
         return broadcast(party);
@@ -284,17 +264,16 @@ public class PartyService {
     }
 
     /**
-     * A chest always yields something — coins, an item, or both, picked with
-     * equal odds across those three shapes. Item drops are unrestricted (not
-     * filtered to {@link ItemDefinition#purchasable()} items, unlike the
-     * shop) — this is exactly where the non-purchasable, reactive items are
-     * meant to turn up.
+     * A chest always yields something — coins, item(s), or both, picked with
+     * equal odds across those three shapes. How many items come back when
+     * the item shape hits is entirely up to the chest table's own
+     * {@code LootAmount} (currently 1-3) — see {@link LootTableRegistry}.
      */
     private LootResult rollLoot(Party party) {
         int roll = random.nextInt(3);
         int coins = roll != 1 ? rollLootCoins() : 0;
-        String itemId = roll != 0 ? pickRandomUnplacedItemId(party) : null;
-        return new LootResult(coins, itemId);
+        List<String> itemIds = roll != 0 ? rollUnplaced(party, lootTableRegistry.forFloor(CURRENT_FLOOR).chestTable()) : List.of();
+        return new LootResult(coins, itemIds);
     }
 
     private int rollLootCoins() {
@@ -320,44 +299,40 @@ public class PartyService {
 
             @Override
             public void giveRandomItemTo(PartyMember member) {
-                String itemId = pickRandomUnplacedItemId(party);
-                ItemSlot slot = itemDefinitionRegistry.get(itemId).slot();
-                party.giveAndEquipItem(member.userId(), slot, itemId);
+                // The wheel table's LootAmount is fixed at 1, so this is
+                // normally a single item — looping rather than assuming
+                // exactly one still degrades gracefully if a future floor's
+                // wheel table is ever left empty.
+                for (String itemId : rollUnplaced(party, lootTableRegistry.forFloor(CURRENT_FLOOR).wheelTable())) {
+                    ItemSlot slot = itemDefinitionRegistry.get(itemId).slot();
+                    party.giveAndEquipItem(member.userId(), slot, itemId);
+                }
             }
         };
     }
 
     /**
-     * Favors items that aren't already in play (in the shared storage or
-     * equipped by anyone) so a spin/shop visit feels like discovering
-     * something new rather than handing back a duplicate — falling back to
-     * the full catalog only once every item is already somewhere in the
-     * party. count is clamped to however many distinct candidates exist.
-     * purchasableOnly restricts the pool to {@link ItemDefinition#purchasable()}
-     * items — used by the shop, so items meant to only ever drop as loot
-     * (e.g. a wheel's GIVE_ITEM, which calls this with purchasableOnly=false)
-     * never show up for sale.
+     * The dungeon doesn't have distinct floors yet — every loot table
+     * currently sits on {@code LootTableRegistry}'s floor 1, so this is the
+     * only floor ever drawn from. Kept as its own constant (rather than a
+     * bare literal at each call site) so swapping this for the party's
+     * actual depth, once floors exist, is a one-line change here.
      */
-    private List<String> pickRandomUnplacedItemIds(Party party, int count, boolean purchasableOnly) {
+    private static final int CURRENT_FLOOR = 1;
+
+    /**
+     * Rolls the given table once, excluding items already in play (in the
+     * shared storage or equipped by anyone) so a wheel spin, chest, or shop
+     * visit feels like discovering something new rather than handing back a
+     * duplicate — the table itself falls back to its own full entry list if
+     * every entry is already in play (see {@code LootTable.rollExcluding}).
+     * How many item ids come back is entirely up to the table's own
+     * {@code LootAmount}, not this method.
+     */
+    private List<String> rollUnplaced(Party party, LootTable table) {
         Set<String> inPlay = new HashSet<>(party.storage());
         party.members().forEach(member -> inPlay.addAll(member.loadout().equippedItemIds()));
-        List<String> candidates = itemDefinitionRegistry.all().stream()
-                .filter(definition -> !purchasableOnly || definition.purchasable())
-                .map(ItemDefinition::id)
-                .filter(id -> !inPlay.contains(id))
-                .collect(Collectors.toCollection(ArrayList::new));
-        if (candidates.isEmpty()) {
-            candidates = itemDefinitionRegistry.all().stream()
-                    .filter(definition -> !purchasableOnly || definition.purchasable())
-                    .map(ItemDefinition::id)
-                    .collect(Collectors.toCollection(ArrayList::new));
-        }
-        Collections.shuffle(candidates, random);
-        return candidates.subList(0, Math.min(count, candidates.size()));
-    }
-
-    private String pickRandomUnplacedItemId(Party party) {
-        return pickRandomUnplacedItemIds(party, 1, false).get(0);
+        return table.rollExcluding(inPlay, random);
     }
 
     /**
