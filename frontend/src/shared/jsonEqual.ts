@@ -5,5 +5,5 @@
 // same change — so the second arrival doesn't trigger a redundant re-render
 // (and, in combat, redundant animations).
 export function jsonEqual<T>(a: T, b: T): boolean {
-  return JSON.stringify(a) === JSON.stringify(b)
+    return JSON.stringify(a) === JSON.stringify(b)
 }

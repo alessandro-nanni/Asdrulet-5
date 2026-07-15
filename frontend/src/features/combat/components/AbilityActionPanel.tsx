@@ -1,64 +1,64 @@
-import { useState } from 'react'
-import type { Ability } from '../../classes/types'
-import type { Combatant } from '../types'
-import { AbilityInfoOverlay } from './AbilityInfoOverlay'
+import {useState} from 'react'
+import type {Ability} from '../../classes/types'
+import type {Combatant} from '../types'
+import {AbilityInfoOverlay} from './AbilityInfoOverlay'
 
 interface Props {
-  self: Combatant
-  abilities: Ability[]
-  selectedAbility: Ability | null
-  isSubmitting: boolean
-  onSelectAbility: (abilityId: string) => void
+    self: Combatant
+    abilities: Ability[]
+    selectedAbility: Ability | null
+    isSubmitting: boolean
+    onSelectAbility: (abilityId: string) => void
 }
 
 function canAfford(self: Combatant, ability: Ability): boolean {
-  if (ability.type === 'ULTIMATE') {
-    return self.ultimateCharge >= self.ultimateChargeThreshold
-  }
-  return self.currentStamina >= (ability.staminaCost ?? 0)
+    if (ability.type === 'ULTIMATE') {
+        return self.ultimateCharge >= self.ultimateChargeThreshold
+    }
+    return self.currentStamina >= (ability.staminaCost ?? 0)
 }
 
-export function AbilityActionPanel({ self, abilities, selectedAbility, isSubmitting, onSelectAbility }: Props) {
-  const [infoAbility, setInfoAbility] = useState<Ability | null>(null)
+export function AbilityActionPanel({self, abilities, selectedAbility, isSubmitting, onSelectAbility}: Props) {
+    const [infoAbility, setInfoAbility] = useState<Ability | null>(null)
 
-  return (
-    <div className="action-panel">
-      <div className="ability-choice-list">
-        {abilities.map((ability) => (
-          <div key={ability.id} className="ability-choice-wrap">
-            <button
-              type="button"
-              className={`ability-choice ${ability.type === 'ULTIMATE' ? 'is-ultimate' : ''} ${
-                selectedAbility?.id === ability.id ? 'is-chosen' : ''
-              }`}
-              disabled={
-                isSubmitting ||
-                !canAfford(self, ability) ||
-                (selectedAbility != null && selectedAbility.id !== ability.id)
-              }
-              onClick={() => onSelectAbility(ability.id)}
-            >
-              <span className="ability-choice-name">{ability.name}</span>
-              <span className="ability-choice-cost">
+    return (
+        <div className="action-panel">
+            <div className="ability-choice-list">
+                {abilities.map((ability) => (
+                    <div key={ability.id} className="ability-choice-wrap">
+                        <button
+                            type="button"
+                            className={`ability-choice ${ability.type === 'ULTIMATE' ? 'is-ultimate' : ''} ${
+                                selectedAbility?.id === ability.id ? 'is-chosen' : ''
+                            }`}
+                            disabled={
+                                isSubmitting ||
+                                !canAfford(self, ability) ||
+                                (selectedAbility != null && selectedAbility.id !== ability.id)
+                            }
+                            onClick={() => onSelectAbility(ability.id)}
+                        >
+                            <span className="ability-choice-name">{ability.name}</span>
+                            <span className="ability-choice-cost">
                 {ability.type === 'ULTIMATE' ? `${self.ultimateCharge}/${self.ultimateChargeThreshold}` : ability.staminaCost}
               </span>
-            </button>
-            <button
-              type="button"
-              className="ability-info-btn"
-              aria-label={`View ${ability.name} details`}
-              onClick={(event) => {
-                event.stopPropagation()
-                setInfoAbility(ability)
-              }}
-            >
-              ?
-            </button>
-          </div>
-        ))}
-      </div>
+                        </button>
+                        <button
+                            type="button"
+                            className="ability-info-btn"
+                            aria-label={`View ${ability.name} details`}
+                            onClick={(event) => {
+                                event.stopPropagation()
+                                setInfoAbility(ability)
+                            }}
+                        >
+                            ?
+                        </button>
+                    </div>
+                ))}
+            </div>
 
-      {infoAbility && <AbilityInfoOverlay ability={infoAbility} onClose={() => setInfoAbility(null)} />}
-    </div>
-  )
+            {infoAbility && <AbilityInfoOverlay ability={infoAbility} onClose={() => setInfoAbility(null)}/>}
+        </div>
+    )
 }

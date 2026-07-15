@@ -9,10 +9,10 @@ import banditThug from '../../assets/enemies/bandit-thug.png'
 // suffix (see CombatService.toEnemyCombatants) — enemyDefinitionId is the
 // stable per-species key, mirroring how items are keyed by itemId.
 export const ENEMY_PORTRAITS: Record<string, string> = {
-  'goblin-marauder': goblinMarauder,
-  'cave-rat': caveRat,
-  'goblin-skirmisher': goblinSkirmisher,
-  'bandit-thug': banditThug,
+    'goblin-marauder': goblinMarauder,
+    'cave-rat': caveRat,
+    'goblin-skirmisher': goblinSkirmisher,
+    'bandit-thug': banditThug,
 }
 
 // Unrecognized (or missing) enemyDefinitionId falls back to this rather

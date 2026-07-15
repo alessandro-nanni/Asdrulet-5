@@ -2,7 +2,8 @@ const MAX_DIMENSION = 128
 const JPEG_QUALITY = 0.75
 const MAX_INPUT_BYTES = 10 * 1024 * 1024
 
-export class ImageProcessingError extends Error {}
+export class ImageProcessingError extends Error {
+}
 
 /**
  * Turns a user-picked image file into a small, self-contained JPEG data URL
@@ -15,34 +16,34 @@ export class ImageProcessingError extends Error {}
  * resulting string well under the backend's size cap.
  */
 export async function compressImageToDataUrl(file: File): Promise<string> {
-  if (!file.type.startsWith('image/')) {
-    throw new ImageProcessingError('Please choose an image file.')
-  }
-  if (file.size > MAX_INPUT_BYTES) {
-    throw new ImageProcessingError('That image is too large — please pick one under 10 MB.')
-  }
+    if (!file.type.startsWith('image/')) {
+        throw new ImageProcessingError('Please choose an image file.')
+    }
+    if (file.size > MAX_INPUT_BYTES) {
+        throw new ImageProcessingError('That image is too large — please pick one under 10 MB.')
+    }
 
-  let bitmap: ImageBitmap
-  try {
-    bitmap = await createImageBitmap(file)
-  } catch {
-    throw new ImageProcessingError('That file could not be read as an image.')
-  }
+    let bitmap: ImageBitmap
+    try {
+        bitmap = await createImageBitmap(file)
+    } catch {
+        throw new ImageProcessingError('That file could not be read as an image.')
+    }
 
-  const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
-  const width = Math.max(1, Math.round(bitmap.width * scale))
-  const height = Math.max(1, Math.round(bitmap.height * scale))
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
 
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) {
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+        bitmap.close()
+        throw new ImageProcessingError('Your browser cannot process images.')
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height)
     bitmap.close()
-    throw new ImageProcessingError('Your browser cannot process images.')
-  }
-  ctx.drawImage(bitmap, 0, 0, width, height)
-  bitmap.close()
 
-  return canvas.toDataURL('image/jpeg', JPEG_QUALITY)
+    return canvas.toDataURL('image/jpeg', JPEG_QUALITY)
 }

@@ -1,5 +1,5 @@
-import { apiClient } from '../../shared/api/client'
-import type { CharacterClass, PartyState } from '../party/types'
+import {apiClient} from '../../shared/api/client'
+import type {CharacterClass, PartyState} from '../party/types'
 
 // Talks to PartyDevController: dev-only tooling (gated behind
 // app.dev-tools.enabled on the server) for populating a party with
@@ -8,13 +8,13 @@ import type { CharacterClass, PartyState } from '../party/types'
 // uses the same unified party/dungeon/combat APIs.
 
 export function addFakeMembers(code: string, count: number): Promise<PartyState> {
-  return apiClient.post<PartyState>(`/api/parties/${code}/dev/fake-members`, { count })
+    return apiClient.post<PartyState>(`/api/parties/${code}/dev/fake-members`, {count})
 }
 
 export function selectClassAsFakeMember(
-  code: string,
-  memberId: string,
-  characterClass: CharacterClass,
+    code: string,
+    memberId: string,
+    characterClass: CharacterClass,
 ): Promise<PartyState> {
-  return apiClient.post<PartyState>(`/api/parties/${code}/dev/${memberId}/class`, { characterClass })
+    return apiClient.post<PartyState>(`/api/parties/${code}/dev/${memberId}/class`, {characterClass})
 }

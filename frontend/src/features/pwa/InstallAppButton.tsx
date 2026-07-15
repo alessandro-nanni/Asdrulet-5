@@ -1,15 +1,15 @@
-import { useInstallPrompt } from './useInstallPrompt'
+import {useInstallPrompt} from './useInstallPrompt'
 
 export function InstallAppButton() {
-  const { canInstall, promptInstall } = useInstallPrompt()
+    const {canInstall, promptInstall} = useInstallPrompt()
 
-  if (!canInstall) {
-    return null
-  }
+    if (!canInstall) {
+        return null
+    }
 
-  return (
-    <button type="button" className="btn btn-secondary btn-block" onClick={promptInstall}>
-      Install app
-    </button>
-  )
+    return (
+        <button type="button" className="btn btn-secondary btn-block" onClick={promptInstall}>
+            Install app
+        </button>
+    )
 }

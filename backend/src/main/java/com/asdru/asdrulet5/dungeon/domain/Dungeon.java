@@ -8,12 +8,7 @@ import lombok.Getter;
 import lombok.Synchronized;
 import lombok.experimental.Accessors;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class Dungeon {
 
@@ -31,7 +26,7 @@ public class Dungeon {
     private final String leaderId;
 
     private final Map<String, DungeonNode> nodesById = new LinkedHashMap<>();
-
+    private final Set<String> clearedNodeIds = new LinkedHashSet<>();
     /**
      * The last node the party actually cleared — the anchor that browsing
      * always resets back to, and the base whose {@code nextNodeIds} define
@@ -40,7 +35,6 @@ public class Dungeon {
     @Getter
     @Accessors(fluent = true)
     private String homeNodeId;
-
     /**
      * Where the party is currently looking/standing: either {@link #homeNodeId}
      * itself or one of its next-room options. Freely reassignable via
@@ -51,7 +45,6 @@ public class Dungeon {
     @Getter
     @Accessors(fluent = true)
     private String currentNodeId;
-
     /**
      * Null until {@link #enter} is called, at which point it's set to
      * (a copy of) {@link #currentNodeId} and browsing locks until
@@ -61,8 +54,6 @@ public class Dungeon {
     @Getter
     @Accessors(fluent = true)
     private String enteredNodeId;
-
-    private final Set<String> clearedNodeIds = new LinkedHashSet<>();
 
     public Dungeon(String code, String leaderId, List<DungeonNode> nodes, String startNodeId) {
         this.code = code;

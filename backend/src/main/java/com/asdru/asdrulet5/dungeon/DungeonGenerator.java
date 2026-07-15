@@ -5,13 +5,7 @@ import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Builds a procedurally-generated dungeon: a layered directed acyclic graph

@@ -5,11 +5,7 @@ import com.asdru.asdrulet5.inventory.domain.Loadout;
 import com.asdru.asdrulet5.party.domain.LootResult;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
-import com.asdru.asdrulet5.party.web.dto.LoadoutDto;
-import com.asdru.asdrulet5.party.web.dto.LootResultDto;
-import com.asdru.asdrulet5.party.web.dto.PartyMemberDto;
-import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
-import com.asdru.asdrulet5.party.web.dto.PendingEffectDto;
+import com.asdru.asdrulet5.party.web.dto.*;
 import lombok.experimental.UtilityClass;
 
 import java.util.Map;

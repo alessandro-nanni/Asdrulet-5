@@ -11,7 +11,9 @@ public interface WheelContext {
 
     Party party();
 
-    /** The spinning member's own effective max health (base class stats + equipped item bonuses). */
+    /**
+     * The spinning member's own effective max health (base class stats + equipped item bonuses).
+     */
     int effectiveMaxHealth(PartyMember member);
 
     /**

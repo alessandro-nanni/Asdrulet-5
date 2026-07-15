@@ -7,23 +7,23 @@ const MAX_NATIVE_SIZE = 64
 const DISPLAY_SIZE_AT_MAX = 28
 
 interface Props {
-  src: string
-  nativeSize: number
-  alt: string
-  className?: string
+    src: string
+    nativeSize: number
+    alt: string
+    className?: string
 }
 
-export function PixelSprite({ src, nativeSize, alt, className }: Props) {
-  const displaySize = (nativeSize / MAX_NATIVE_SIZE) * DISPLAY_SIZE_AT_MAX
+export function PixelSprite({src, nativeSize, alt, className}: Props) {
+    const displaySize = (nativeSize / MAX_NATIVE_SIZE) * DISPLAY_SIZE_AT_MAX
 
-  return (
-    <img
-      src={src}
-      alt={alt}
-      width={displaySize}
-      height={displaySize}
-      className={className}
-      style={{ imageRendering: 'pixelated' }}
-    />
-  )
+    return (
+        <img
+            src={src}
+            alt={alt}
+            width={displaySize}
+            height={displaySize}
+            className={className}
+            style={{imageRendering: 'pixelated'}}
+        />
+    )
 }

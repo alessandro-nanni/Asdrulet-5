@@ -8,12 +8,7 @@ import lombok.Getter;
 import lombok.Synchronized;
 import lombok.experimental.Accessors;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -36,7 +31,9 @@ public class Party {
      */
     public static final int MAX_MEMBERS = 4;
 
-    /** Shared party storage grid: 3 columns x 4 rows, rendered by the frontend. */
+    /**
+     * Shared party storage grid: 3 columns x 4 rows, rendered by the frontend.
+     */
     public static final int STORAGE_SIZE = 12;
 
     @Getter
@@ -50,21 +47,22 @@ public class Party {
     private final Map<String, PartyMember> members = new LinkedHashMap<>();
     private final AtomicInteger fakeMemberSequence = new AtomicInteger();
     private final SharedStorage storage = new SharedStorage(STORAGE_SIZE);
+    private final ShopStock shopStock = new ShopStock();
+    /**
+     * Bookkeeping for the MYSTERY room currently entered (if any) — see {@link RoomTurnProgress}.
+     */
+    private final RoomTurnProgress<WheelEffect> wheelProgress = new RoomTurnProgress<>();
+    /**
+     * Bookkeeping for the LOOT room currently entered (if any) — see {@link RoomTurnProgress}.
+     */
+    private final RoomTurnProgress<LootResult> lootProgress = new RoomTurnProgress<>();
     private List<String> turnOrder = List.of();
-
-    /** Shared coin pool the whole party spends from — see the shop below. */
+    /**
+     * Shared coin pool the whole party spends from — see the shop below.
+     */
     @Getter
     @Accessors(fluent = true)
     private int coins = 0;
-
-    private final ShopStock shopStock = new ShopStock();
-
-    /** Bookkeeping for the MYSTERY room currently entered (if any) — see {@link RoomTurnProgress}. */
-    private final RoomTurnProgress<WheelEffect> wheelProgress = new RoomTurnProgress<>();
-
-    /** Bookkeeping for the LOOT room currently entered (if any) — see {@link RoomTurnProgress}. */
-    private final RoomTurnProgress<LootResult> lootProgress = new RoomTurnProgress<>();
-
     @Getter
     @Accessors(fluent = true)
     private PartyStatus status = PartyStatus.LOBBY;
@@ -222,7 +220,9 @@ public class Party {
         return turnOrder;
     }
 
-    /** Called whenever a room is entered, so wheel bookkeeping never leaks from one room visit into the next. */
+    /**
+     * Called whenever a room is entered, so wheel bookkeeping never leaks from one room visit into the next.
+     */
     @Synchronized
     public void resetWheelSpins() {
         wheelProgress.reset();
@@ -248,7 +248,9 @@ public class Party {
         return wheelProgress.results();
     }
 
-    /** The WheelEffects nobody in the party has landed on yet this room visit — what a spin draws from. */
+    /**
+     * The WheelEffects nobody in the party has landed on yet this room visit — what a spin draws from.
+     */
     @Synchronized
     public List<WheelEffect> remainingWheelEffects() {
         Set<WheelEffect> claimed = Set.copyOf(wheelProgress.results().values());
@@ -282,7 +284,9 @@ public class Party {
         return wheelProgress.allMembersHaveAcknowledged(members.keySet());
     }
 
-    /** Called whenever a room is entered, so loot bookkeeping never leaks from one room visit into the next. */
+    /**
+     * Called whenever a room is entered, so loot bookkeeping never leaks from one room visit into the next.
+     */
     @Synchronized
     public void resetLootClaims() {
         lootProgress.reset();
@@ -360,7 +364,9 @@ public class Party {
         members.put(userId, member.withPendingEffects(List.of()));
     }
 
-    /** Drops itemId into the first empty storage cell; a no-op if the grid is already full. */
+    /**
+     * Drops itemId into the first empty storage cell; a no-op if the grid is already full.
+     */
     @Synchronized
     public void addItemToStorage(String itemId) {
         storage.addFirstEmpty(itemId);
@@ -390,7 +396,9 @@ public class Party {
         coins += amount;
     }
 
-    /** Called whenever a MERCHANT room is entered, replacing whatever was left over from a prior visit. */
+    /**
+     * Called whenever a MERCHANT room is entered, replacing whatever was left over from a prior visit.
+     */
     @Synchronized
     public void rollShopStock(List<String> itemIds) {
         shopStock.roll(itemIds);

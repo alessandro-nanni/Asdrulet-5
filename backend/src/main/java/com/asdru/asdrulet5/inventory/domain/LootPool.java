@@ -32,7 +32,9 @@ public class LootPool {
         return picked;
     }
 
-    /** Same as {@link #pickRandom(List, int, Random)} with count 1 — throws if candidates is empty. */
+    /**
+     * Same as {@link #pickRandom(List, int, Random)} with count 1 — throws if candidates is empty.
+     */
     public LootTableEntry pickOneRandom(List<LootTableEntry> candidates, Random random) {
         return pickRandom(candidates, 1, random).get(0);
     }
