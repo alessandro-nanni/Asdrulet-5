@@ -34,21 +34,9 @@ public interface AbilityEffect {
      */
     int DEFENSE_HALF_POINT = 25;
 
-    void apply(EffectTarget actor, EffectTarget target);
-
-    /**
-     * Called once per ability use (not once per resolved target, unlike
-     * {@link #apply}) with the actor's own full living ally roster
-     * (including the actor) — for abilities that affect the whole team
-     * alongside their primary target(s), e.g. a stamina-restoring ultimate
-     * that also strikes a single enemy. No-op by default.
-     */
-    default void applyToTeam(EffectTarget actor, List<EffectTarget> allies) {
-    }
-
     static AbilityEffect damage(int power) {
         requirePositive(power, "power");
-        return (actor, target) -> dealDamage(actor, target, power);
+        return (actor, target) -> dealDamage(actor, target, power, false);
     }
 
     /**
@@ -60,14 +48,14 @@ public interface AbilityEffect {
         requirePositive(power, "power");
         return (actor, target) -> {
             boolean isCrit = ThreadLocalRandom.current().nextDouble() < critChance;
-            dealDamage(actor, target, isCrit ? power * 2 : power);
+            dealDamage(actor, target, isCrit ? power * 2 : power, isCrit);
         };
     }
 
-    private static void dealDamage(EffectTarget actor, EffectTarget target, int power) {
+    private static void dealDamage(EffectTarget actor, EffectTarget target, int power, boolean critical) {
         int scaledPower = Math.max(1, (int) Math.round(power * (1 + actor.damagePercentBonus() / 100.0)));
         int amount = mitigatedDamage(scaledPower + actor.bonusDamage(), target.effectiveDefense());
-        target.applyDamage(amount);
+        target.applyDamage(new Damage(amount, critical));
         // Ultimates charge from damage dealt, including a damage-dealing
         // ultimate's own hit — it counts toward building the next one.
         actor.addUltimateCharge(amount);
@@ -95,7 +83,9 @@ public interface AbilityEffect {
         };
     }
 
-    /** Same as {@link #multiHitDamage(int, int)}, but each individual hit independently rolls a crit — see {@link #critDamage}. */
+    /**
+     * Same as {@link #multiHitDamage(int, int)}, but each individual hit independently rolls a crit — see {@link #critDamage}.
+     */
     static AbilityEffect multiHitCritDamage(int hits, int powerPerHit, double critChance) {
         if (hits <= 0) {
             throw new IllegalArgumentException("hits must be positive");
@@ -115,7 +105,9 @@ public interface AbilityEffect {
         return (actor, target) -> target.applyHeal(power);
     }
 
-    /** Heals the target, and also strips every currently-negative effect off them — see the Healer's ultimate. */
+    /**
+     * Heals the target, and also strips every currently-negative effect off them — see the Healer's ultimate.
+     */
     static AbilityEffect healAndClearNegativeEffects(int power) {
         AbilityEffect healEffect = heal(power);
         return (actor, target) -> {
@@ -211,7 +203,7 @@ public interface AbilityEffect {
      */
     static AbilityEffect tauntAndSelfThorns(int tauntDurationTurns, int thornsDurationTurns) {
         return (actor, target) -> {
-            target.addActiveEffect(ActiveEffect.taunt("Taunt", "taunt", tauntDurationTurns, actor.id()));
+            target.addActiveEffect(ActiveEffect.taunt("Taunt", "taunt", tauntDurationTurns, actor.combatantId()));
             actor.addActiveEffect(ActiveEffect.thorns("Thorns", "thorns", thornsDurationTurns));
         };
     }
@@ -220,5 +212,17 @@ public interface AbilityEffect {
         if (value <= 0) {
             throw new IllegalArgumentException(field + " must be positive");
         }
+    }
+
+    void apply(EffectTarget actor, EffectTarget target);
+
+    /**
+     * Called once per ability use (not once per resolved target, unlike
+     * {@link #apply}) with the actor's own full living ally roster
+     * (including the actor) — for abilities that affect the whole team
+     * alongside their primary target(s), e.g. a stamina-restoring ultimate
+     * that also strikes a single enemy. No-op by default.
+     */
+    default void applyToTeam(EffectTarget actor, List<EffectTarget> allies) {
     }
 }

@@ -30,6 +30,10 @@ public class LootTableRegistry {
     private static final int FLOOR_1 = 1;
 
     private static final Map<Integer, FloorLootTables> FLOORS = buildFloors();
+    private static final FloorLootTables EMPTY_FLOOR = new FloorLootTables(
+            new LootTable(List.of(), LootAmount.fixed(1)),
+            new LootTable(List.of(), LootAmount.fixed(1)),
+            new LootTable(List.of(), LootAmount.fixed(1)));
 
     private static Map<Integer, FloorLootTables> buildFloors() {
         return Map.of(FLOOR_1, floor1());
@@ -55,12 +59,9 @@ public class LootTableRegistry {
                 new LootTable(List.of(), LootAmount.fixed(8)));
     }
 
-    private static final FloorLootTables EMPTY_FLOOR = new FloorLootTables(
-            new LootTable(List.of(), LootAmount.fixed(1)),
-            new LootTable(List.of(), LootAmount.fixed(1)),
-            new LootTable(List.of(), LootAmount.fixed(1)));
-
-    /** This floor's chest/wheel/merchant tables, or all-empty tables if nothing's been assigned to it yet. */
+    /**
+     * This floor's chest/wheel/merchant tables, or all-empty tables if nothing's been assigned to it yet.
+     */
     public FloorLootTables forFloor(int floor) {
         return FLOORS.getOrDefault(floor, EMPTY_FLOOR);
     }

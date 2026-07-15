@@ -1,13 +1,13 @@
 package com.asdru.asdrulet5.combat.web;
 
+import com.asdru.asdrulet5.classdata.domain.Ability;
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
-import com.asdru.asdrulet5.combat.domain.Combat;
-import com.asdru.asdrulet5.combat.domain.CombatEvent;
-import com.asdru.asdrulet5.combat.domain.Combatant;
+import com.asdru.asdrulet5.combat.domain.*;
 import com.asdru.asdrulet5.combat.web.dto.ActiveEffectDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatEventDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatantDto;
+import com.asdru.asdrulet5.party.domain.CharacterClass;
 import lombok.experimental.UtilityClass;
 
 @UtilityClass
@@ -24,24 +24,35 @@ public class CombatMapper {
     }
 
     private CombatantDto toDto(Combatant combatant) {
+        CharacterClass characterClass = combatant instanceof PlayerCombatant player ? player.characterClass() : null;
+        String enemyDefinitionId = combatant instanceof EnemyCombatant enemy ? enemy.id() : null;
+        // Only enemies have ever surfaced "attack" info on the DTO — a
+        // player's own moves are already known client-side via their class
+        // definition, so this mirrors that: the enemy's first ability
+        // (see Combat.resolveEnemyTurn) stands in for what used to be a
+        // dedicated attackName/attackDescription/attackEffectSummary on
+        // Combatant itself.
+        Ability primaryAbility = combatant.enemy() && !combatant.abilities().isEmpty()
+                ? combatant.abilities().getFirst()
+                : null;
         return new CombatantDto(
-                combatant.id(),
+                combatant.combatantId(),
                 combatant.displayName(),
                 combatant.enemy(),
-                combatant.characterClass(),
-                combatant.enemyDefinitionId(),
+                characterClass,
+                enemyDefinitionId,
                 combatant.maxHealth(),
                 combatant.currentHealth(),
                 combatant.maxStamina(),
                 combatant.currentStamina(),
-                combatant.baseDefense(),
+                combatant.stats().defense(),
                 combatant.ultimateCharge(),
                 combatant.ultimateChargeThreshold(),
                 combatant.alive(),
                 combatant.activeEffects().stream().map(CombatMapper::toDto).toList(),
-                combatant.attackName(),
-                combatant.attackDescription(),
-                combatant.attackEffectSummary()
+                primaryAbility != null ? primaryAbility.name() : null,
+                primaryAbility != null ? primaryAbility.description() : null,
+                primaryAbility != null ? primaryAbility.effectSummary() : null
         );
     }
 
@@ -51,6 +62,6 @@ public class CombatMapper {
     }
 
     private CombatEventDto toDto(CombatEvent event) {
-        return new CombatEventDto(event.targetId(), event.kind(), event.amount());
+        return new CombatEventDto(event.targetId(), event.kind(), event.amount(), event.critical());
     }
 }

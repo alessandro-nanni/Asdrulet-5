@@ -14,6 +14,7 @@ import java.util.Map;
 /**
  * NotPartyLeaderException is intentionally not handled here — it's already
  * mapped to 403 by PartyExceptionHandler, and Spring throws on ambiguous
+ *
  * @ExceptionHandler mappings if two advice beans both claim the same type.
  */
 @RestControllerAdvice

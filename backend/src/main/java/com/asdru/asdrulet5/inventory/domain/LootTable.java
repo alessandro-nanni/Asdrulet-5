@@ -18,7 +18,9 @@ public record LootTable(List<LootTableEntry> entries, LootAmount amount) {
         entries = List.copyOf(entries);
     }
 
-    /** Rolls this table once: draws {@link #amount}'s count of distinct entries, weighted, and returns their item ids. */
+    /**
+     * Rolls this table once: draws {@link #amount}'s count of distinct entries, weighted, and returns their item ids.
+     */
     public List<String> roll(Random random) {
         return rollExcluding(Set.of(), random);
     }

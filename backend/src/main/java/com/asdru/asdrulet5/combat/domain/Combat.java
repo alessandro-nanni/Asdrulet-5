@@ -2,18 +2,11 @@ package com.asdru.asdrulet5.combat.domain;
 
 import com.asdru.asdrulet5.classdata.domain.*;
 import com.asdru.asdrulet5.combat.exception.*;
-import com.asdru.asdrulet5.inventory.domain.ItemPassive;
 import lombok.Getter;
 import lombok.Synchronized;
 import lombok.experimental.Accessors;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 public class Combat {
 
@@ -52,7 +45,7 @@ public class Combat {
     public Combat(String code, List<Combatant> combatants, List<String> turnSequence) {
         this.code = code;
         for (Combatant combatant : combatants) {
-            this.combatants.put(combatant.id(), combatant);
+            this.combatants.put(combatant.combatantId(), combatant);
         }
         this.turnSequence = List.copyOf(turnSequence);
         // Attached only once every combatant exists, and to a live view of
@@ -81,34 +74,49 @@ public class Combat {
                 .findFirst()
                 .orElseThrow(() -> new UnknownAbilityException(actorId, abilityId));
 
-        AbilityEffect effect = switch (ability) {
+        List<Combatant> targets = resolveTargets(actor, ability.targetType(), targetId);
+        resolveTurnAction(actor, ability, targets);
+        checkWinLoss();
+        lastEvents = drainAllEvents();
+    }
+
+    /**
+     * Spends whatever the ability costs (stamina for a basic, charge for an
+     * ultimate), applies it to every resolved target, fires the resulting
+     * hooks, and rolls a Twitching Talisman-style follow-up — the exact
+     * sequence a player's {@link #useAbility} and an enemy's
+     * {@link #resolveEnemyTurn} both need, so both funnel through here
+     * instead of each hand-rolling their own version.
+     */
+    private void resolveTurnAction(Combatant actor, Ability ability, List<Combatant> targets) {
+        AbilityEffect effect = resolveAbilityEffect(actor, ability);
+        applyEffectToTargets(actor, effect, targets);
+        // Twitching Talisman et al.: a basic ability (never an ultimate) has
+        // a chance to immediately resolve again against the same targets,
+        // free of a second cost.
+        if (ability instanceof BasicAbility && triggersFollowUp(actor)) {
+            applyEffectToTargets(actor, effect, targets);
+        }
+    }
+
+    private AbilityEffect resolveAbilityEffect(Combatant actor, Ability ability) {
+        return switch (ability) {
             case BasicAbility basic -> {
                 if (!actor.hasStamina(basic.staminaCost())) {
                     throw new InsufficientResourceException(
-                            actorId + " does not have enough stamina for " + basic.name());
+                            actor.combatantId() + " does not have enough stamina for " + basic.name());
                 }
                 actor.spendStamina(basic.staminaCost());
                 yield basic.effect();
             }
             case UltimateAbility ultimate -> {
                 if (!actor.ultimateReady()) {
-                    throw new InsufficientResourceException(actorId + "'s ultimate is not charged yet");
+                    throw new InsufficientResourceException(actor.combatantId() + "'s ultimate is not charged yet");
                 }
                 actor.resetUltimateCharge();
                 yield ultimate.effect();
             }
         };
-
-        List<Combatant> targets = resolveTargets(actor, ability.targetType(), targetId);
-        applyEffectToTargets(actor, effect, targets);
-        // Twitching Talisman et al.: a basic ability (never an ultimate) has
-        // a chance to immediately resolve again against the same targets,
-        // free of a second stamina cost.
-        if (ability instanceof BasicAbility && triggersFollowUp(actor)) {
-            applyEffectToTargets(actor, effect, targets);
-        }
-        checkWinLoss();
-        lastEvents = drainAllEvents();
     }
 
     private void applyEffectToTargets(Combatant actor, AbilityEffect effect, List<Combatant> targets) {
@@ -121,10 +129,12 @@ public class Combat {
     }
 
     private boolean triggersFollowUp(Combatant actor) {
-        return actor.passives().stream().anyMatch(ItemPassive::triggersFollowUpAbility);
+        return actor.passives().stream().anyMatch(CombatantPassive::triggersFollowUpAbility);
     }
 
-    /** actor's own living side, actor included — see {@link AbilityEffect#applyToTeam}. */
+    /**
+     * actor's own living side, actor included — see {@link AbilityEffect#applyToTeam}.
+     */
     private List<EffectTarget> aliveAllies(Combatant actor) {
         return combatants.values().stream()
                 .filter(c -> c.enemy() == actor.enemy() && c.alive())
@@ -138,20 +148,25 @@ public class Combat {
      * threaded through AbilityEffect itself — AbilityEffect operates on the
      * bare EffectTarget abstraction and has no notion of equipped items, so
      * this is the narrowest point that both knows "damage happened" and has
-     * the actual Combatants (and their passives) in hand.  A no-op for heals
+     * the actual Combatants (and their passives) in hand. A no-op for heals
      * (health only ever goes up), so this only ever fires for real damage.
+     * The critical flag comes from {@code target.lastDamageTaken()} rather
+     * than being recomputed here — for a multi-hit ability this is whichever
+     * hit landed last, since the health delta itself is already a total
+     * across every hit in the application, not a single one.
      */
     private void resolveDamageHooks(Combatant actor, Combatant target, int targetHealthBefore) {
         int damageDealt = targetHealthBefore - target.currentHealth();
         if (damageDealt <= 0) {
             return;
         }
-        actor.passives().forEach(passive -> passive.onDamageDealt(actor, target, damageDealt));
-        target.passives().forEach(passive -> passive.onDamageTaken(target, actor, damageDealt));
+        Damage damage = new Damage(damageDealt, target.lastDamageTaken().critical());
+        actor.passives().forEach(passive -> passive.onDamageDealt(actor, target, damage));
+        target.passives().forEach(passive -> passive.onDamageTaken(target, actor, damage));
         // activeEffects() is already a defensive copy (see Combatant), so
         // this is safe even though the reflected hit below can itself
         // trigger further mutation of the real underlying list.
-        target.activeEffects().forEach(effect -> effect.onDamageTaken(target, actor, damageDealt));
+        target.activeEffects().forEach(effect -> effect.onDamageTaken(target, actor, damage));
         if (!target.alive()) {
             actor.passives().forEach(passive -> passive.onKill(actor, target));
             target.passives().forEach(passive -> passive.onDeath(target));
@@ -183,7 +198,8 @@ public class Combat {
             // Area effects still hit every enemy regardless of Taunt (see
             // ActiveEffect.forcedTargetId's own doc) — only a single-enemy
             // pick has to be validated against it.
-            case SINGLE_ENEMY -> List.of(requireAliveTarget(requireUntauntedOrForcedTarget(actor, targetId), !actor.enemy()));
+            case SINGLE_ENEMY ->
+                    List.of(requireAliveTarget(requireUntauntedOrForcedTarget(actor, targetId), !actor.enemy()));
             case ALL_ALLIES -> combatants.values().stream()
                     .filter(c -> c.enemy() == actor.enemy() && c.alive())
                     .toList();
@@ -193,11 +209,13 @@ public class Combat {
         };
     }
 
-    /** Taunted actors may only choose the combatant that taunted them as a SINGLE_ENEMY target — see Taunt. */
+    /**
+     * Taunted actors may only choose the combatant that taunted them as a SINGLE_ENEMY target — see Taunt.
+     */
     private String requireUntauntedOrForcedTarget(Combatant actor, String targetId) {
         String forcedId = forcedTargetId(actor);
         if (forcedId != null && !forcedId.equals(targetId)) {
-            throw new InvalidTargetException(actor.id() + " is taunted and must target " + forcedId);
+            throw new InvalidTargetException(actor.combatantId() + " is taunted and must target " + forcedId);
         }
         return targetId;
     }
@@ -229,14 +247,20 @@ public class Combat {
                 .filter(Combatant::alive)
                 .orElseGet(() -> combatants.values().stream()
                         .filter(c -> !c.enemy() && c.alive())
-                        .min(Comparator.comparingInt(Combatant::currentHealth).thenComparing(Combatant::id))
+                        .min(Comparator.comparingInt(Combatant::currentHealth).thenComparing(Combatant::combatantId))
                         .orElse(null));
         if (target == null) {
             return;
         }
-        int healthBefore = target.currentHealth();
-        enemyActor.attackEffect().apply(enemyActor, target);
-        resolveDamageHooks(enemyActor, target, healthBefore);
+        // Same cost-spend-and-fire-hooks path a player's useAbility goes
+        // through (see resolveTurnAction) — an enemy's turn is really just
+        // "use one of my own abilities," no different in kind from a
+        // player's, so there's no reason for this to be a separate,
+        // hand-rolled sequence. Always its first ability for now — see
+        // EnemyDefinitionRegistry's own doc on enemies eventually having more
+        // than one and needing real move selection.
+        Ability ability = enemyActor.abilities().getFirst();
+        resolveTurnAction(enemyActor, ability, List.of(target));
         checkWinLoss();
     }
 

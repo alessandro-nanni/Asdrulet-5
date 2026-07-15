@@ -1231,6 +1231,11 @@ p {
   color: #35d08e;
 }
 
+.floating-text.is-critical {
+  color: #ffb703;
+  font-size: 1.25rem;
+}
+
 @keyframes float-up {
   0% {
     opacity: 0;

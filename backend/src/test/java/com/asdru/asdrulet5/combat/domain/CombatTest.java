@@ -4,6 +4,7 @@ import com.asdru.asdrulet5.classdata.domain.*;
 import com.asdru.asdrulet5.combat.exception.CombatNotInProgressException;
 import com.asdru.asdrulet5.combat.exception.InsufficientResourceException;
 import com.asdru.asdrulet5.combat.exception.NotYourTurnException;
+import com.asdru.asdrulet5.enemydata.domain.EnemyPassive;
 import com.asdru.asdrulet5.inventory.domain.ItemPassive;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 import org.junit.jupiter.api.Test;
@@ -63,7 +64,7 @@ class CombatTest {
     private static final BasicAbility TAUNT_ENEMY = new BasicAbility(
             "test.taunt-enemy", "Taunt Enemy", "Taunts an enemy.", "1 damage + Taunt for 3 turns",
             TargetType.SINGLE_ENEMY, 10,
-            AbilityEffect.damageAndApplyEffect(1, actor -> ActiveEffect.taunt("Taunt", "taunt", 3, actor.id())));
+            AbilityEffect.damageAndApplyEffect(1, actor -> ActiveEffect.taunt("Taunt", "taunt", 3, actor.combatantId())));
 
     private static final BasicAbility GAIN_THORNS = new BasicAbility(
             "test.gain-thorns", "Gain Thorns", "Gains thorns.", "Thorns for 2 turns",
@@ -85,24 +86,26 @@ class CombatTest {
     }
 
     private static Combatant player(String id, List<Ability> abilities, List<ItemPassive> passives) {
-        return new Combatant(id, id, false, CharacterClass.BERSERKER, null, 100, 100, 5, 0, 40, abilities, null, null, null, null, passives);
+        return new PlayerCombatant(id, id, CharacterClass.BERSERKER, new Stats(100, 5, 100), 0, 40, abilities, passives);
     }
 
     private static Combatant enemy(String id, int maxHealth, int defense, int attackPower) {
         return enemy(id, maxHealth, defense, attackPower, List.of());
     }
 
-    private static Combatant enemy(String id, int maxHealth, int defense, int attackPower, List<ItemPassive> passives) {
-        return new Combatant(id, id, true, null, "test-enemy", maxHealth, 0, defense, 0, 0, List.of(),
-                "Claw", "A swipe.", attackPower + " damage", AbilityEffect.damage(attackPower), passives);
+    private static Combatant enemy(String id, int maxHealth, int defense, int attackPower, List<EnemyPassive> passives) {
+        BasicAbility claw = new BasicAbility(
+                "test-enemy.claw", "Claw", "A swipe.", attackPower + " damage",
+                TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(attackPower));
+        return new EnemyCombatant(id, id, "test-enemy", new Stats(maxHealth, defense, 0), 0, List.of(claw), passives);
     }
 
     private static Combat twoPlayersOneEnemy(Combatant p1, Combatant p2, Combatant enemy) {
-        return new Combat("ABC123", List.of(p1, p2, enemy), List.of(p1.id(), p2.id(), enemy.id()));
+        return new Combat("ABC123", List.of(p1, p2, enemy), List.of(p1.combatantId(), p2.combatantId(), enemy.combatantId()));
     }
 
     private static Combatant findCombatant(Combat combat, String id) {
-        return combat.combatants().stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow();
+        return combat.combatants().stream().filter(c -> c.combatantId().equals(id)).findFirst().orElseThrow();
     }
 
     @Test
@@ -457,8 +460,8 @@ class CombatTest {
     void onDamageDealtHookHealsWearerByTheAmountDealt() {
         ItemPassive lifesteal = new ItemPassive() {
             @Override
-            public void onDamageDealt(EffectTarget wearer, EffectTarget target, int amount) {
-                wearer.applyHeal(amount);
+            public void onDamageDealt(EffectTarget wearer, EffectTarget target, Damage damage) {
+                wearer.applyHeal(damage.amount());
             }
         };
         Combatant p1 = player("p1", List.of(STRIKE), List.of(lifesteal));
@@ -483,8 +486,8 @@ class CombatTest {
     void onDamageTakenHookReflectsDamageBackAtTheAttacker() {
         ItemPassive thorns = new ItemPassive() {
             @Override
-            public void onDamageTaken(EffectTarget wearer, EffectTarget attacker, int amount) {
-                attacker.applyDamage(amount);
+            public void onDamageTaken(EffectTarget wearer, EffectTarget attacker, Damage damage) {
+                attacker.applyDamage(damage);
             }
         };
         Combatant p1 = player("p1", List.of(STRIKE), List.of(thorns));
@@ -509,7 +512,7 @@ class CombatTest {
                 log.add("kill");
             }
         };
-        ItemPassive lastGasp = new ItemPassive() {
+        EnemyPassive lastGasp = new EnemyPassive() {
             @Override
             public void onDeath(EffectTarget wearer) {
                 log.add("death");
@@ -532,7 +535,7 @@ class CombatTest {
         List<String> log = new ArrayList<>();
         ItemPassive tattletale = new ItemPassive() {
             @Override
-            public void onDamageDealt(EffectTarget wearer, EffectTarget target, int amount) {
+            public void onDamageDealt(EffectTarget wearer, EffectTarget target, Damage damage) {
                 log.add("dealt");
             }
         };
@@ -563,7 +566,7 @@ class CombatTest {
         combat.useAbility("p1", "test.strike", "enemy");
         assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 20);
 
-        p2.applyDamage(1000);
+        p2.applyDamage(Damage.of(1000));
         assertThat(p2.alive()).isFalse();
 
         // One dead ally: +13% = round(20 * 1.13) = 23.
@@ -717,7 +720,7 @@ class CombatTest {
         Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
         // p2 is put well below p1's health, so an untaunted enemy would
         // normally prefer attacking p2 instead (lowest health wins).
-        p2.applyDamage(60);
+        p2.applyDamage(Damage.of(60));
 
         combat.useAbility("p1", "test.taunt-enemy", "enemy");
         combat.endTurn("p1");
@@ -734,7 +737,7 @@ class CombatTest {
         Combatant p2 = player("p2", List.of(STRIKE));
         Combatant enemy = enemy("enemy", 200, 5, 50);
         Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
-        p1.applyDamage(99); // p1 at 1 HP — the enemy's next hit will kill them
+        p1.applyDamage(Damage.of(99)); // p1 at 1 HP — the enemy's next hit will kill them
 
         combat.useAbility("p1", "test.taunt-enemy", "enemy");
         combat.endTurn("p1"); // -> p2's turn
@@ -770,7 +773,7 @@ class CombatTest {
         Combatant p2 = player("p2", List.of(STRIKE));
         Combatant enemy = enemy("enemy", 200, 5, 1);
         Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
-        p1.applyDamage(30); // so the heal is visible instead of clamped at max
+        p1.applyDamage(Damage.of(30)); // so the heal is visible instead of clamped at max
 
         combat.useAbility("p1", "test.mark-golden", "enemy");
         combat.useAbility("p1", "test.strike", "enemy");
@@ -815,12 +818,12 @@ class CombatTest {
         for (int i = 0; i < 200 && !(sawNormalHit && sawCritHit); i++) {
             Combatant p1 = player("p1-" + i, List.of(critStrike));
             Combatant enemy = enemy("enemy-" + i, 200, 0, 1);
-            Combat combat = new Combat("C" + i, List.of(p1, enemy), List.of(p1.id(), enemy.id()));
+            Combat combat = new Combat("C" + i, List.of(p1, enemy), List.of(p1.combatantId(), enemy.combatantId()));
 
-            combat.useAbility(p1.id(), "test.crit-strike", enemy.id());
+            combat.useAbility(p1.combatantId(), "test.crit-strike", enemy.combatantId());
 
             // No defense, so mitigation is 0%: a normal hit deals exactly 10, a crit exactly 20.
-            int damageDealt = 200 - findCombatant(combat, enemy.id()).currentHealth();
+            int damageDealt = 200 - findCombatant(combat, enemy.combatantId()).currentHealth();
             if (damageDealt == 10) {
                 sawNormalHit = true;
             }
@@ -830,6 +833,55 @@ class CombatTest {
         }
         assertThat(sawNormalHit).as("saw a non-crit hit").isTrue();
         assertThat(sawCritHit).as("saw a crit hit").isTrue();
+    }
+
+    @Test
+    void guaranteedCritDamageMarksItsCombatEventCritical() {
+        BasicAbility guaranteedCrit = new BasicAbility(
+                "test.guaranteed-crit", "Guaranteed Crit", "Always crits.", "10 damage, always doubled",
+                TargetType.SINGLE_ENEMY, 0, AbilityEffect.critDamage(10, 1.0));
+        Combatant p1 = player("p1", List.of(guaranteedCrit));
+        Combatant enemy = enemy("enemy", 200, 0, 1);
+        Combat combat = new Combat("ABC123", List.of(p1, enemy), List.of(p1.combatantId(), enemy.combatantId()));
+
+        combat.useAbility("p1", "test.guaranteed-crit", "enemy");
+
+        assertThat(combat.lastEvents()).hasSize(1);
+        assertThat(combat.lastEvents().getFirst().critical()).isTrue();
+    }
+
+    @Test
+    void plainDamageNeverMarksItsCombatEventCritical() {
+        Combatant p1 = player("p1", List.of(STRIKE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.strike", "enemy");
+
+        assertThat(combat.lastEvents()).hasSize(1);
+        assertThat(combat.lastEvents().getFirst().critical()).isFalse();
+    }
+
+    @Test
+    void onDamageDealtHookReceivesTheCriticalFlagFromAGuaranteedCrit() {
+        List<Boolean> observedCritical = new ArrayList<>();
+        ItemPassive critWatcher = new ItemPassive() {
+            @Override
+            public void onDamageDealt(EffectTarget wearer, EffectTarget target, Damage damage) {
+                observedCritical.add(damage.critical());
+            }
+        };
+        BasicAbility guaranteedCrit = new BasicAbility(
+                "test.guaranteed-crit", "Guaranteed Crit", "Always crits.", "10 damage, always doubled",
+                TargetType.SINGLE_ENEMY, 0, AbilityEffect.critDamage(10, 1.0));
+        Combatant p1 = player("p1", List.of(guaranteedCrit), List.of(critWatcher));
+        Combatant enemy = enemy("enemy", 200, 0, 1);
+        Combat combat = new Combat("ABC123", List.of(p1, enemy), List.of(p1.combatantId(), enemy.combatantId()));
+
+        combat.useAbility("p1", "test.guaranteed-crit", "enemy");
+
+        assertThat(observedCritical).containsExactly(true);
     }
 
     @Test

@@ -1,7 +1,9 @@
 package com.asdru.asdrulet5.enemydata;
 
 import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
+import com.asdru.asdrulet5.classdata.domain.BasicAbility;
 import com.asdru.asdrulet5.classdata.domain.Stats;
+import com.asdru.asdrulet5.classdata.domain.TargetType;
 import com.asdru.asdrulet5.enemydata.domain.EnemyDefinition;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +18,11 @@ import java.util.stream.Stream;
  * method here and add it to {@link #buildDefinitions()} — then give it an
  * entry in {@code EnemyEncounterRegistry} to actually make it spawnable
  * anywhere (this registry just describes what an enemy is, the same way
- * {@code ItemDefinitionRegistry} does for items).
+ * {@code ItemDefinitionRegistry} does for items). Every enemy currently
+ * defines exactly one {@link BasicAbility} as its "attack" — see
+ * {@code Combat.resolveEnemyTurn}, which always uses an enemy's first
+ * ability for now, ahead of real move-selection AI for enemies with more
+ * than one.
  *
  * <p>{@link #DEFAULT_ENEMY_ID} (Goblin Marauder) is reserved for boss
  * encounters — see {@code EnemyEncounterRegistry}'s own doc — the other
@@ -40,10 +46,11 @@ public class EnemyDefinitionRegistry {
                 DEFAULT_ENEMY_ID,
                 "Goblin Marauder",
                 new Stats(220, 8, 0),
-                "Rusty Cleaver",
-                "Swings a notched blade at whoever's closest.",
-                "15 damage",
-                AbilityEffect.damage(15)
+                List.of(new BasicAbility(
+                        "goblin-marauder.rusty-cleaver", "Rusty Cleaver",
+                        "Swings a notched blade at whoever's closest.", "15 damage",
+                        TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(15))),
+                List.of()
         );
     }
 
@@ -52,10 +59,11 @@ public class EnemyDefinitionRegistry {
                 "cave-rat",
                 "Cave Rat",
                 new Stats(60, 1, 0),
-                "Gnawing Bite",
-                "Latches on and gnaws with needle-sharp teeth.",
-                "8 damage",
-                AbilityEffect.damage(8)
+                List.of(new BasicAbility(
+                        "cave-rat.gnawing-bite", "Gnawing Bite",
+                        "Latches on and gnaws with needle-sharp teeth.", "8 damage",
+                        TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(8))),
+                List.of()
         );
     }
 
@@ -64,10 +72,11 @@ public class EnemyDefinitionRegistry {
                 "goblin-skirmisher",
                 "Goblin Skirmisher",
                 new Stats(90, 4, 0),
-                "Jagged Dagger",
-                "Darts in for a quick stab, then dances back.",
-                "10 damage",
-                AbilityEffect.damage(10)
+                List.of(new BasicAbility(
+                        "goblin-skirmisher.jagged-dagger", "Jagged Dagger",
+                        "Darts in for a quick stab, then dances back.", "10 damage",
+                        TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(10))),
+                List.of()
         );
     }
 
@@ -76,10 +85,11 @@ public class EnemyDefinitionRegistry {
                 "bandit-thug",
                 "Bandit Thug",
                 new Stats(110, 6, 0),
-                "Club Swing",
-                "A clumsy but heavy overhead swing.",
-                "12 damage",
-                AbilityEffect.damage(12)
+                List.of(new BasicAbility(
+                        "bandit-thug.club-swing", "Club Swing",
+                        "A clumsy but heavy overhead swing.", "12 damage",
+                        TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(12))),
+                List.of()
         );
     }
 

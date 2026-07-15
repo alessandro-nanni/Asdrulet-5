@@ -22,8 +22,9 @@ class EnemyDefinitionRegistryTest {
         EnemyDefinition definition = registry.get(EnemyDefinitionRegistry.DEFAULT_ENEMY_ID);
 
         assertThat(definition.stats().maxHealth()).isPositive();
-        assertThat(definition.attackEffectSummary()).isNotBlank();
-        assertThat(definition.attackEffect()).isNotNull();
+        assertThat(definition.abilities()).isNotEmpty();
+        assertThat(definition.abilities().getFirst().effectSummary()).isNotBlank();
+        assertThat(definition.abilities().getFirst().effect()).isNotNull();
     }
 
     @Test
@@ -31,7 +32,7 @@ class EnemyDefinitionRegistryTest {
         for (String enemyId : List.of("cave-rat", "goblin-skirmisher", "bandit-thug")) {
             EnemyDefinition definition = registry.get(enemyId);
             assertThat(definition.stats().maxHealth()).isPositive();
-            assertThat(definition.attackEffect()).isNotNull();
+            assertThat(definition.abilities()).isNotEmpty();
         }
     }
 

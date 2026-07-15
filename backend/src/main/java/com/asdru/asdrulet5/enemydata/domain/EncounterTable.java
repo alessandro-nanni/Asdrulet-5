@@ -14,7 +14,9 @@ public record EncounterTable(List<EnemyPoolEntry> entries, EncounterSize size) {
         entries = List.copyOf(entries);
     }
 
-    /** Rolls this table once: draws {@link #size}'s count of enemies (with replacement — see {@link EnemyPool}) and returns their enemy ids. */
+    /**
+     * Rolls this table once: draws {@link #size}'s count of enemies (with replacement — see {@link EnemyPool}) and returns their enemy ids.
+     */
     public List<String> roll(Random random) {
         int count = size.roll(random);
         return EnemyPool.pickRandom(entries, count, random).stream().map(EnemyPoolEntry::enemyId).toList();

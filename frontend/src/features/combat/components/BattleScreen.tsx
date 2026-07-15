@@ -120,8 +120,9 @@ export function BattleScreen({ code, members, actingAsId }: Props) {
           const kind: 'damage' | 'heal' = event.kind === 'HEAL' ? 'heal' : 'damage'
           const entry: FloatingText = {
             key: `f${floatingKeyRef.current++}`,
-            text: kind === 'heal' ? `+${event.amount}` : `-${event.amount}`,
+            text: kind === 'heal' ? `+${event.amount}` : `-${event.amount}${event.critical ? '!' : ''}`,
             kind,
+            critical: event.critical,
             offsetX: (Math.random() - 0.5) * 2 * FLOAT_SPREAD_PX,
             delayMs: index * FLOAT_STAGGER_MS + Math.random() * FLOAT_STAGGER_MS * 0.6,
           }

@@ -22,7 +22,9 @@ public record EncounterSize(int min, int max) {
         return new EncounterSize(amount, amount);
     }
 
-    /** Rolls a single amount within [min, max], inclusive. */
+    /**
+     * Rolls a single amount within [min, max], inclusive.
+     */
     public int roll(Random random) {
         return min == max ? min : min + random.nextInt(max - min + 1);
     }

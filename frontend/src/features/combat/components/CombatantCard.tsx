@@ -21,6 +21,7 @@ export interface FloatingText {
   key: string
   text: string
   kind: 'damage' | 'heal'
+  critical?: boolean
   offsetX: number
   delayMs: number
 }
@@ -94,7 +95,7 @@ export function CombatantCard({
         {floatingTexts.map((floating) => (
           <span
             key={floating.key}
-            className={`floating-text floating-text-${floating.kind}`}
+            className={`floating-text floating-text-${floating.kind}${floating.critical ? ' is-critical' : ''}`}
             style={
               {
                 '--float-offset-x': `${floating.offsetX}px`,

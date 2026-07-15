@@ -1,13 +1,8 @@
 package com.asdru.asdrulet5.combat;
 
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
-import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
-import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
-import com.asdru.asdrulet5.classdata.domain.BasicAbility;
-import com.asdru.asdrulet5.classdata.domain.TargetType;
-import com.asdru.asdrulet5.combat.domain.Combat;
-import com.asdru.asdrulet5.combat.domain.CombatStatus;
-import com.asdru.asdrulet5.combat.domain.Combatant;
+import com.asdru.asdrulet5.classdata.domain.*;
+import com.asdru.asdrulet5.combat.domain.*;
 import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatantDto;
@@ -137,7 +132,7 @@ class CombatServiceTest {
 
         List<Combatant> partyCombatants = combatService.partyCombatantsFor("ABC123");
 
-        assertThat(partyCombatants).extracting(Combatant::id).containsExactlyInAnyOrder("p1", "p2");
+        assertThat(partyCombatants).extracting(Combatant::combatantId).containsExactlyInAnyOrder("p1", "p2");
         assertThat(partyCombatants).noneMatch(Combatant::enemy);
     }
 
@@ -243,12 +238,13 @@ class CombatServiceTest {
         BasicAbility strike = new BasicAbility(
                 "test.strike", "Strike", "A basic attack.", "20 damage", TargetType.SINGLE_ENEMY, 10,
                 AbilityEffect.damage(20));
-        Combatant p1 = new Combatant(
-                "p1", "p1", false, CharacterClass.BERSERKER, null, 100, 100, 5, 0, 40, List.of(strike), null, null, null,
-                null, List.of());
-        Combatant weakEnemy = new Combatant(
-                "enemy-1", "enemy-1", true, null, "test-enemy", 1, 0, 0, 0, 0, List.of(), "Claw", "A swipe.", "5 damage",
-                AbilityEffect.damage(5), List.of());
+        Combatant p1 = new PlayerCombatant(
+                "p1", "p1", CharacterClass.BERSERKER, new Stats(100, 5, 100), 0, 40, List.of(strike), List.of());
+        BasicAbility weakEnemyAttack = new BasicAbility(
+                "test-enemy.claw", "Claw", "A swipe.", "5 damage", TargetType.SINGLE_ENEMY, 0,
+                AbilityEffect.damage(5));
+        Combatant weakEnemy = new EnemyCombatant(
+                "enemy-1", "enemy-1", "test-enemy", new Stats(1, 0, 0), 0, List.of(weakEnemyAttack), List.of());
         Combat combat = new Combat("VICT123", List.of(p1, weakEnemy), List.of("p1", "enemy-1"));
         CombatRepository repository = new InMemoryCombatRepository();
         repository.save(combat);

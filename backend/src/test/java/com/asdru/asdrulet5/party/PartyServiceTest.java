@@ -3,9 +3,12 @@ package com.asdru.asdrulet5.party;
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
+import com.asdru.asdrulet5.classdata.domain.Damage;
+import com.asdru.asdrulet5.classdata.domain.Stats;
 import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.combat.CombatVictoryEvent;
 import com.asdru.asdrulet5.combat.domain.Combatant;
+import com.asdru.asdrulet5.combat.domain.PlayerCombatant;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
@@ -15,11 +18,7 @@ import com.asdru.asdrulet5.party.domain.CharacterClass;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyStatus;
 import com.asdru.asdrulet5.party.domain.WheelEffect;
-import com.asdru.asdrulet5.party.exception.ClassAlreadyTakenException;
-import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
-import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
-import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
-import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
+import com.asdru.asdrulet5.party.exception.*;
 import com.asdru.asdrulet5.party.web.dto.LootResultDto;
 import com.asdru.asdrulet5.party.web.dto.PartyMemberDto;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
@@ -32,9 +31,7 @@ import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PartyServiceTest {
@@ -49,6 +46,11 @@ class PartyServiceTest {
     private CombatService combatService;
     private ScheduledExecutorService victoryReturnScheduler;
     private RoomEntryDelay roomEntryDelay;
+
+    private static Combatant playerCombatant(String userId, int maxHealth) {
+        return new PlayerCombatant(userId, userId, CharacterClass.BERSERKER,
+                new Stats(maxHealth, 5, 100), 0, 40, List.of(), List.of());
+    }
 
     @BeforeEach
     void setUp() {
@@ -235,11 +237,6 @@ class PartyServiceTest {
         assertThat(partyService.getState(created.code()).status()).isEqualTo(PartyStatus.DUNGEON);
     }
 
-    private static Combatant playerCombatant(String userId, int maxHealth) {
-        return new Combatant(userId, userId, false, CharacterClass.BERSERKER, null,
-                maxHealth, 100, 5, 0, 40, List.of(), null, null, null, null, List.of());
-    }
-
     @Test
     void combatVictoryCarriesTheFightsEndingDamageOntoTheMember() {
         // A fight's own outcome must survive into the next room — a member
@@ -247,7 +244,7 @@ class PartyServiceTest {
         // the party returns to the dungeon.
         PartyStateDto created = partyService.createParty(leader);
         Combatant combatant = playerCombatant("leader-1", 100);
-        combatant.applyDamage(30);
+        combatant.applyDamage(Damage.of(30));
         when(combatService.partyCombatantsFor(created.code())).thenReturn(List.of(combatant));
 
         partyService.onCombatVictory(new CombatVictoryEvent(created.code()));

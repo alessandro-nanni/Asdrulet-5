@@ -21,7 +21,9 @@ class SharedStorage {
         this.cells = new ArrayList<>(Collections.nCopies(size, null));
     }
 
-    /** Fills cells from the front — called once, right after creation, with whatever the catalog currently holds. */
+    /**
+     * Fills cells from the front — called once, right after creation, with whatever the catalog currently holds.
+     */
     void seed(List<String> itemIds) {
         for (int i = 0; i < itemIds.size() && i < cells.size(); i++) {
             cells.set(i, itemIds.get(i));
@@ -46,7 +48,9 @@ class SharedStorage {
         cells.set(index, itemId);
     }
 
-    /** Drops itemId into the first empty cell; a no-op if the grid is already full. */
+    /**
+     * Drops itemId into the first empty cell; a no-op if the grid is already full.
+     */
     void addFirstEmpty(String itemId) {
         int emptyIndex = cells.indexOf(null);
         if (emptyIndex >= 0) {

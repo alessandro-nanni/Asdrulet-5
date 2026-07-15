@@ -8,7 +8,10 @@ package com.asdru.asdrulet5.classdata.domain;
  */
 public interface EffectTarget {
 
-    String id();
+    /**
+     * This fight's own unique identifier for this combatant (e.g. "p1", "enemy-2") — not a species/definition id, see combat.domain.EnemyCombatant's own id() for that.
+     */
+    String combatantId();
 
     int currentHealth();
 
@@ -20,23 +23,31 @@ public interface EffectTarget {
 
     int damagePercentBonus();
 
-    void applyDamage(int amount);
+    void applyDamage(Damage damage);
 
     void applyHeal(int amount);
 
-    /** Restores stamina, capped at max — same clamped-add shape as {@link #applyHeal}, just for the other resource. */
+    /**
+     * Restores stamina, capped at max — same clamped-add shape as {@link #applyHeal}, just for the other resource.
+     */
     void restoreStamina(int amount);
 
-    /** Spends stamina, floored at 0 — the wearer-facing counterpart to {@link #restoreStamina}, for items like Satellite Dish that tax their own wearer. */
+    /**
+     * Spends stamina, floored at 0 — the wearer-facing counterpart to {@link #restoreStamina}, for items like Satellite Dish that tax their own wearer.
+     */
     void drainStamina(int amount);
 
     void addActiveEffect(ActiveEffect effect);
 
-    /** Removes every currently-attached effect for which {@link ActiveEffect#isNegative()} is true. */
+    /**
+     * Removes every currently-attached effect for which {@link ActiveEffect#isNegative()} is true.
+     */
     void clearNegativeActiveEffects();
 
     void addUltimateCharge(int amount);
 
-    /** How many of this combatant's own allies (same side, self excluded) are no longer alive — see Scythe. */
+    /**
+     * How many of this combatant's own allies (same side, self excluded) are no longer alive — see Scythe.
+     */
     int deadAllyCount();
 }

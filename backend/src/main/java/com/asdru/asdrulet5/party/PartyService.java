@@ -41,7 +41,14 @@ public class PartyService {
      * before the player ever sees the victory banner.
      */
     private static final long VICTORY_DISPLAY_DELAY_SECONDS = 3;
-
+    /**
+     * The dungeon doesn't have distinct floors yet — every loot table
+     * currently sits on {@code LootTableRegistry}'s floor 1, so this is the
+     * only floor ever drawn from. Kept as its own constant (rather than a
+     * bare literal at each call site) so swapping this for the party's
+     * actual depth, once floors exist, is a one-line change here.
+     */
+    private static final int CURRENT_FLOOR = 1;
     private final PartyRepository partyRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final DungeonService dungeonService;
@@ -312,15 +319,6 @@ public class PartyService {
     }
 
     /**
-     * The dungeon doesn't have distinct floors yet — every loot table
-     * currently sits on {@code LootTableRegistry}'s floor 1, so this is the
-     * only floor ever drawn from. Kept as its own constant (rather than a
-     * bare literal at each call site) so swapping this for the party's
-     * actual depth, once floors exist, is a one-line change here.
-     */
-    private static final int CURRENT_FLOOR = 1;
-
-    /**
      * Rolls the given table once, excluding items already in play (in the
      * shared storage or equipped by anyone) so a wheel spin, chest, or shop
      * visit feels like discovering something new rather than handing back a
@@ -372,9 +370,9 @@ public class PartyService {
     private void syncMembersAfterCombat(Party party, String combatCode) {
         for (Combatant combatant : combatService.partyCombatantsFor(combatCode)) {
             Integer health = combatant.currentHealth() >= combatant.maxHealth() ? null : combatant.currentHealth();
-            party.setMemberHealth(combatant.id(), health);
-            party.clearPendingEffects(combatant.id());
-            combatant.activeEffects().forEach(effect -> party.addPendingEffect(combatant.id(), effect));
+            party.setMemberHealth(combatant.combatantId(), health);
+            party.clearPendingEffects(combatant.combatantId());
+            combatant.activeEffects().forEach(effect -> party.addPendingEffect(combatant.combatantId(), effect));
         }
     }
 

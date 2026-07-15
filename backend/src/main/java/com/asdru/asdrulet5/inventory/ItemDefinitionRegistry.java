@@ -1,6 +1,7 @@
 package com.asdru.asdrulet5.inventory;
 
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
+import com.asdru.asdrulet5.classdata.domain.Damage;
 import com.asdru.asdrulet5.classdata.domain.EffectTarget;
 import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.domain.ItemPassive;
@@ -58,7 +59,7 @@ public class ItemDefinitionRegistry {
                 "Never quite goes out — every hit carries a 10% chance to set its target on fire for 2 turns.",
                 new ItemPassive() {
                     @Override
-                    public void onDamageDealt(EffectTarget wearer, EffectTarget target, int amount) {
+                    public void onDamageDealt(EffectTarget wearer, EffectTarget target, Damage damage) {
                         if (ThreadLocalRandom.current().nextDouble() < 0.10) {
                             target.addActiveEffect(ActiveEffect.damageOverTime(
                                     "On Fire", "Burning — takes damage each turn.", "burn", 8, 2));

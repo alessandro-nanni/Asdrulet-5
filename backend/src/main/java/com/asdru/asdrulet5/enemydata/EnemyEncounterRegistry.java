@@ -32,6 +32,7 @@ public class EnemyEncounterRegistry {
     private static final int FLOOR_1 = 1;
 
     private static final Map<Integer, EncounterTable> ENCOUNTER_TABLES = buildTables();
+    private static final EncounterTable EMPTY_TABLE = new EncounterTable(List.of(), EncounterSize.fixed(1));
 
     private static Map<Integer, EncounterTable> buildTables() {
         List<EnemyPoolEntry> entries = List.of(
@@ -42,9 +43,9 @@ public class EnemyEncounterRegistry {
         return Map.of(FLOOR_1, new EncounterTable(entries, new EncounterSize(2, 3)));
     }
 
-    private static final EncounterTable EMPTY_TABLE = new EncounterTable(List.of(), EncounterSize.fixed(1));
-
-    /** This floor's encounter table, or an all-empty one if nothing's been assigned to it yet. */
+    /**
+     * This floor's encounter table, or an all-empty one if nothing's been assigned to it yet.
+     */
     public EncounterTable forFloor(int floor) {
         return ENCOUNTER_TABLES.getOrDefault(floor, EMPTY_TABLE);
     }

@@ -17,7 +17,9 @@ import java.util.Random;
 @UtilityClass
 public class EnemyPool {
 
-    /** Picks {@code count} entries independently (each its own fresh weighted roll), returning an empty list if candidates is empty. */
+    /**
+     * Picks {@code count} entries independently (each its own fresh weighted roll), returning an empty list if candidates is empty.
+     */
     public List<EnemyPoolEntry> pickRandom(List<EnemyPoolEntry> candidates, int count, Random random) {
         if (candidates.isEmpty()) {
             return List.of();

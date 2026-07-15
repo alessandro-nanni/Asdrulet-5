@@ -56,7 +56,9 @@ public class DungeonService {
         return broadcast(dungeon);
     }
 
-    /** Null if nothing is currently entered — callers decide what that means for them. */
+    /**
+     * Null if nothing is currently entered — callers decide what that means for them.
+     */
     public RoomType enteredRoomType(String code) {
         Dungeon dungeon = getOrThrow(code);
         return dungeon.enteredNodeId() != null ? dungeon.currentRoomType() : null;

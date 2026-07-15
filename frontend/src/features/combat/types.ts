@@ -38,6 +38,9 @@ export interface CombatEvent {
   targetId: string
   kind: 'DAMAGE' | 'HEAL'
   amount: number
+  // Always false for HEAL events — only a DAMAGE event can come from a
+  // critical hit.
+  critical: boolean
 }
 
 export interface CombatState {

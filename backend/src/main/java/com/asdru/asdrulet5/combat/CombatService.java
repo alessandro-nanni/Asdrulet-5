@@ -2,10 +2,9 @@ package com.asdru.asdrulet5.combat;
 
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
 import com.asdru.asdrulet5.classdata.domain.ClassDefinition;
+import com.asdru.asdrulet5.classdata.domain.Stats;
 import com.asdru.asdrulet5.classdata.domain.UltimateAbility;
-import com.asdru.asdrulet5.combat.domain.Combat;
-import com.asdru.asdrulet5.combat.domain.CombatStatus;
-import com.asdru.asdrulet5.combat.domain.Combatant;
+import com.asdru.asdrulet5.combat.domain.*;
 import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
 import com.asdru.asdrulet5.combat.web.CombatMapper;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
@@ -72,7 +71,7 @@ public class CombatService {
         combatants.addAll(enemyCombatants);
 
         List<String> turnSequence = new ArrayList<>(turnOrder);
-        enemyCombatants.forEach(enemy -> turnSequence.add(enemy.id()));
+        enemyCombatants.forEach(enemy -> turnSequence.add(enemy.combatantId()));
 
         Combat combat = new Combat(code, combatants, turnSequence);
         combatRepository.save(combat);
@@ -135,7 +134,9 @@ public class CombatService {
                 .orElse(0);
     }
 
-    /** A member's health entering the fight: whatever carried over, or their full effective max if nothing did. */
+    /**
+     * A member's health entering the fight: whatever carried over, or their full effective max if nothing did.
+     */
     private int effectiveStartingHealth(PartyMember member) {
         if (member.currentHealth() != null) {
             return member.currentHealth();
@@ -161,15 +162,17 @@ public class CombatService {
         int baseMaxHealth = definition.stats().maxHealth();
         int maxHealthBonus = sumBonus(passives, ItemPassive::bonusMaxHealth)
                 + (healthierThanLeader ? baseMaxHealth * sumBonus(passives, ItemPassive::bonusMaxHealthPercentIfHealthierThanLeader) / 100 : 0);
-        int damagePercentBonus = sumBonus(passives, ItemPassive::damagePercent)
-                + (healthierThanLeader ? sumBonus(passives, ItemPassive::damagePercentIfHealthierThanLeader) : 0);
-        Combatant combatant = new Combatant(
-                member.userId(), member.displayName(), false, member.characterClass(), null,
+        // Only the party-leader-relative slice needs to be resolved here —
+        // a passive's own flat/dynamic damagePercent contribution is now
+        // summed live by Combatant.damagePercentBonus() itself.
+        int bonusDamagePercent = healthierThanLeader ? sumBonus(passives, ItemPassive::damagePercentIfHealthierThanLeader) : 0;
+        Stats stats = new Stats(
                 Math.max(1, baseMaxHealth + maxHealthBonus),
-                Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)),
                 Math.max(0, definition.stats().defense() + sumBonus(passives, ItemPassive::bonusDefense)),
-                damagePercentBonus,
-                ultimateChargeThreshold, definition.abilities(), null, null, null, null, passives);
+                Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)));
+        Combatant combatant = new PlayerCombatant(
+                member.userId(), member.displayName(), member.characterClass(), stats,
+                bonusDamagePercent, ultimateChargeThreshold, definition.abilities(), passives);
         // Both carried over from whatever the member's last room left them
         // with — a wheel/loot roll, or the ending state of their last fight
         // (see PartyService.syncMembersAfterCombat) — so a fresh Combatant
@@ -221,11 +224,9 @@ public class CombatService {
             String displayName = occurrences.get(definitionId) > 1
                     ? definition.displayName() + " " + seenSoFar.merge(definitionId, 1, Integer::sum)
                     : definition.displayName();
-            enemies.add(new Combatant(
-                    "enemy-" + (i + 1), displayName, true, null, definitionId,
-                    definition.stats().maxHealth(), definition.stats().maxStamina(), definition.stats().defense(),
-                    0, 0, List.of(), definition.attackName(), definition.attackDescription(),
-                    definition.attackEffectSummary(), definition.attackEffect(), List.of()));
+            enemies.add(new EnemyCombatant(
+                    "enemy-" + (i + 1), displayName, definitionId, definition.stats(),
+                    0, definition.abilities(), definition.passives()));
         }
         return enemies;
     }

@@ -1,11 +1,6 @@
 package com.asdru.asdrulet5.combat.domain;
 
-import com.asdru.asdrulet5.classdata.domain.Ability;
-import com.asdru.asdrulet5.classdata.domain.AbilityEffect;
-import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
-import com.asdru.asdrulet5.classdata.domain.EffectTarget;
-import com.asdru.asdrulet5.inventory.domain.ItemPassive;
-import com.asdru.asdrulet5.party.domain.CharacterClass;
+import com.asdru.asdrulet5.classdata.domain.*;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
@@ -14,74 +9,83 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Mutable, unlike most domain objects in this codebase (e.g. PartyMember):
+ * Shared state and behavior for anyone in a fight — see {@link PlayerCombatant}
+ * and {@link EnemyCombatant} for the two things a Combatant actually is.
+ * Everything here applies equally to both sides: stats, health/stamina/charge,
+ * active effects, abilities, and passives. What's deliberately *not* here —
+ * {@code characterClass} (players only) and each side's own notion of "which
+ * one am I" ({@code PlayerCombatant} just reuses the party member's own id;
+ * {@code EnemyCombatant} additionally tracks which {@code EnemyDefinition} it
+ * came from) — lives on the concrete subclasses instead, since a raw
+ * {@code boolean enemy} field passed into one shared constructor was exactly
+ * the kind of thing that let player-only and enemy-only concerns leak into
+ * each other.
+ *
+ * <p>Mutable, unlike most domain objects in this codebase (e.g. PartyMember):
  * health/stamina/charge/buffs all change on nearly every combat action, so an
- * immutable-record-plus-withers approach would mean an 10+ argument
+ * immutable-record-plus-withers approach would mean a 10+ argument
  * constructor call on every mutation.
  *
  * <p>Implements {@link EffectTarget} so ability effects (classdata.domain)
  * can apply themselves directly to a Combatant without classdata depending
  * on the combat package — the mutators below are public only because Java
  * requires interface implementations to be; callers other than
- * {@link Combat} and applied {@link AbilityEffect}s still shouldn't invoke
- * them directly.
+ * {@link Combat} and applied ability effects still shouldn't invoke them
+ * directly.
  */
 @Getter
 @Accessors(fluent = true)
-public final class Combatant implements EffectTarget {
+public abstract class Combatant implements EffectTarget {
 
-    private final String id;
+    private final String combatantId;
     private final String displayName;
-    private final boolean enemy;
-    private final CharacterClass characterClass;
-    /** Which {@code EnemyDefinition} this enemy combatant was built from (e.g. "cave-rat") — null for party members. Lets the frontend key a per-species portrait the same way it keys item icons by itemId, since {@link #id} is just this fight's own "enemy-1"/"enemy-2"/... and {@link #displayName} may carry a disambiguating suffix (see CombatService). */
-    private final String enemyDefinitionId;
-    private final int maxHealth;
-    private final int maxStamina;
-    private final int baseDefense;
-    private final int equipmentDamagePercentBonus;
+    private final Stats stats;
     private final int ultimateChargeThreshold;
     private final List<ActiveEffect> activeEffects = new ArrayList<>();
     private final List<CombatEvent> events = new ArrayList<>();
     private final List<Ability> abilities;
-    private final String attackName;
-    private final String attackDescription;
-    private final String attackEffectSummary;
-    private final AbilityEffect attackEffect;
-    private final List<ItemPassive> passives;
+    private final List<CombatantPassive> passives;
     private int currentHealth;
     private int currentStamina;
     private int ultimateCharge;
-    /** Every combatant in this fight (both sides), attached by {@link Combat}'s constructor once the whole roster exists — see {@link #deadAllyCount()}. Empty (not null) until then, so a bare Combatant built outside a Combat just reports zero dead allies. */
+    /**
+     * Every combatant in this fight (both sides), attached by {@link Combat}'s constructor once the whole roster exists — see {@link #deadAllyCount()}. Empty (not null) until then, so a bare Combatant built outside a Combat just reports zero dead allies.
+     */
     private Collection<Combatant> roster = List.of();
+    /**
+     * The most recent {@link Damage} this combatant took — read by {@code Combat.resolveDamageHooks} to recover whether the hit that just landed was critical, since that method otherwise only sees the net health delta. Starts as a harmless zero, non-critical placeholder.
+     */
+    private Damage lastDamageTaken = Damage.of(0);
 
-    public Combatant(String id, String displayName, boolean enemy, CharacterClass characterClass, String enemyDefinitionId,
-                     int maxHealth, int maxStamina, int baseDefense, int equipmentDamagePercentBonus, int ultimateChargeThreshold,
-                     List<Ability> abilities, String attackName, String attackDescription,
-                     String attackEffectSummary, AbilityEffect attackEffect, List<ItemPassive> passives) {
-        this.id = id;
+    protected Combatant(String combatantId, String displayName, Stats stats, int ultimateChargeThreshold,
+                        List<Ability> abilities, List<? extends CombatantPassive> passives) {
+        this.combatantId = combatantId;
         this.displayName = displayName;
-        this.enemy = enemy;
-        this.characterClass = characterClass;
-        this.enemyDefinitionId = enemyDefinitionId;
-        this.maxHealth = maxHealth;
-        this.currentHealth = maxHealth;
-        this.maxStamina = maxStamina;
-        this.currentStamina = maxStamina;
-        this.baseDefense = baseDefense;
-        this.equipmentDamagePercentBonus = equipmentDamagePercentBonus;
+        this.stats = stats;
+        this.currentHealth = stats.maxHealth();
+        this.currentStamina = stats.maxStamina();
         this.ultimateCharge = 0;
         this.ultimateChargeThreshold = ultimateChargeThreshold;
         this.abilities = List.copyOf(abilities);
-        this.attackName = attackName;
-        this.attackDescription = attackDescription;
-        this.attackEffectSummary = attackEffectSummary;
-        this.attackEffect = attackEffect;
         this.passives = List.copyOf(passives);
     }
 
+    /**
+     * Owned entirely by the concrete subclass — see this class's own doc.
+     */
+    public abstract boolean enemy();
+
     public boolean alive() {
         return currentHealth > 0;
+    }
+
+    @Override
+    public int maxHealth() {
+        return stats.maxHealth();
+    }
+
+    public int maxStamina() {
+        return stats.maxStamina();
     }
 
     /**
@@ -93,7 +97,7 @@ public final class Combatant implements EffectTarget {
      * recorded, since nothing has actually happened in this fight yet.
      */
     public void setStartingHealth(int health) {
-        this.currentHealth = Math.max(0, Math.min(maxHealth, health));
+        this.currentHealth = Math.max(0, Math.min(stats.maxHealth(), health));
     }
 
     public List<ActiveEffect> activeEffects() {
@@ -102,7 +106,7 @@ public final class Combatant implements EffectTarget {
 
     @Override
     public int effectiveDefense() {
-        return baseDefense + activeEffects.stream().mapToInt(ActiveEffect::defenseBonus).sum();
+        return stats.defense() + activeEffects.stream().mapToInt(ActiveEffect::defenseBonus).sum();
     }
 
     @Override
@@ -110,14 +114,25 @@ public final class Combatant implements EffectTarget {
         return activeEffects.stream().mapToInt(ActiveEffect::damageBonus).sum();
     }
 
+    /**
+     * Summed fresh from {@link #passives} on every call rather than
+     * precomputed once at construction — a passive's own contribution can
+     * depend on live combat state (Scythe) or randomness (Lucky Charm), and
+     * even the flat {@link CombatantPassive#damagePercent()} case is cheap
+     * enough to just re-sum. Subclasses that need to add a fight-start-only,
+     * externally-computed extra (see PlayerCombatant's party-leader-relative
+     * bonus) do so by overriding and adding to {@code super.damagePercentBonus()}.
+     */
     @Override
     public int damagePercentBonus() {
-        return equipmentDamagePercentBonus
+        return passives.stream().mapToInt(CombatantPassive::damagePercent).sum()
                 + activeEffects.stream().mapToInt(ActiveEffect::damagePercentBonus).sum()
                 + passives.stream().mapToInt(passive -> passive.damagePercentBonus(this)).sum();
     }
 
-    /** Called once by {@link Combat}'s constructor, after every combatant in the fight has been created — see {@link #roster}. */
+    /**
+     * Called once by {@link Combat}'s constructor, after every combatant in the fight has been created — see {@link #roster}.
+     */
     void attachRoster(Collection<Combatant> roster) {
         this.roster = roster;
     }
@@ -125,7 +140,7 @@ public final class Combatant implements EffectTarget {
     @Override
     public int deadAllyCount() {
         return (int) roster.stream()
-                .filter(other -> other != this && other.enemy == this.enemy && !other.alive())
+                .filter(other -> other != this && other.enemy() == this.enemy() && !other.alive())
                 .count();
     }
 
@@ -138,17 +153,18 @@ public final class Combatant implements EffectTarget {
     }
 
     @Override
-    public void applyDamage(int amount) {
+    public void applyDamage(Damage damage) {
         int before = currentHealth;
-        currentHealth = Math.max(0, currentHealth - amount);
-        recordEvent(CombatEvent.Kind.DAMAGE, before - currentHealth);
+        currentHealth = Math.max(0, currentHealth - damage.amount());
+        lastDamageTaken = damage;
+        recordEvent(CombatEvent.Kind.DAMAGE, before - currentHealth, damage.critical());
     }
 
     @Override
     public void applyHeal(int amount) {
         int before = currentHealth;
-        currentHealth = Math.min(maxHealth, currentHealth + amount);
-        recordEvent(CombatEvent.Kind.HEAL, currentHealth - before);
+        currentHealth = Math.min(stats.maxHealth(), currentHealth + amount);
+        recordEvent(CombatEvent.Kind.HEAL, currentHealth - before, false);
     }
 
     /**
@@ -158,9 +174,9 @@ public final class Combatant implements EffectTarget {
      * raw input. Zero-change applications (already dead, already full) are
      * dropped rather than recorded as no-op events.
      */
-    private void recordEvent(CombatEvent.Kind kind, int actualAmount) {
+    private void recordEvent(CombatEvent.Kind kind, int actualAmount, boolean critical) {
         if (actualAmount > 0) {
-            events.add(new CombatEvent(id, kind, actualAmount));
+            events.add(new CombatEvent(combatantId, kind, actualAmount, critical));
         }
     }
 
@@ -189,7 +205,7 @@ public final class Combatant implements EffectTarget {
 
     @Override
     public void restoreStamina(int amount) {
-        currentStamina = Math.min(maxStamina, currentStamina + amount);
+        currentStamina = Math.min(stats.maxStamina(), currentStamina + amount);
     }
 
     @Override
@@ -201,7 +217,9 @@ public final class Combatant implements EffectTarget {
         ultimateCharge = 0;
     }
 
-    /** Returns and clears the events recorded since the last drain. */
+    /**
+     * Returns and clears the events recorded since the last drain.
+     */
     List<CombatEvent> drainEvents() {
         List<CombatEvent> drained = List.copyOf(events);
         events.clear();
