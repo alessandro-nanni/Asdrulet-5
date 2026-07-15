@@ -2,7 +2,7 @@ export type CharacterClass = 'HEALER' | 'TANK' | 'WARRIOR' | 'MAGE'
 
 export type PartyStatus = 'LOBBY' | 'DUNGEON' | 'IN_PROGRESS'
 
-export type WheelEffect = 'FULL_HEAL' | 'HALVE_HEALTH' | 'GIVE_ITEM' | 'CLEAR_EFFECTS' | 'POISON'
+export type WheelEffect = 'FULL_HEAL' | 'HALVE_HEALTH' | 'GIVE_ITEM' | 'GIVE_COINS' | 'CLEAR_EFFECTS' | 'POISON'
 
 export interface Loadout {
   weaponItemId: string | null
@@ -18,6 +18,13 @@ export interface PendingEffect {
   description: string
   icon: string
   remainingTurns: number
+}
+
+// What one member found opening a LOOT room's chest — coins, an item, or
+// both (itemId is null when the roll didn't include one).
+export interface LootResult {
+  coins: number
+  itemId: string | null
 }
 
 export interface PartyMember {
@@ -46,4 +53,12 @@ export interface PartyState {
   // Keyed by userId — only ever holds entries for the MYSTERY room currently
   // entered, reset the moment a new room is entered.
   wheelResults: Record<string, WheelEffect>
+  // Shared party-wide pool, spent from the shop — not per-member.
+  coins: number
+  // Item ids currently for sale — only holds entries for the MERCHANT room
+  // currently entered, reset the moment a new room is entered.
+  shopStock: string[]
+  // Keyed by userId — only ever holds entries for the LOOT room currently
+  // entered, reset the moment a new room is entered.
+  lootResults: Record<string, LootResult>
 }

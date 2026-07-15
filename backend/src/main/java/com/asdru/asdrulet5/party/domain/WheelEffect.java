@@ -30,6 +30,15 @@ public enum WheelEffect {
             context.giveRandomItemTo(member);
         }
     },
+    GIVE_COINS {
+        /** Fixed payout so every "Coins" spin feels equally worth landing on. */
+        private static final int COIN_AMOUNT = 30;
+
+        @Override
+        public void applyTo(PartyMember member, WheelContext context) {
+            context.party().addCoins(COIN_AMOUNT);
+        }
+    },
     CLEAR_EFFECTS {
         @Override
         public void applyTo(PartyMember member, WheelContext context) {

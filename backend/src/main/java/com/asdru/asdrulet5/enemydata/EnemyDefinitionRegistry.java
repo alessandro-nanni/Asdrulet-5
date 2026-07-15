@@ -31,7 +31,7 @@ public class EnemyDefinitionRegistry {
         return new EnemyDefinition(
                 DEFAULT_ENEMY_ID,
                 "Goblin Marauder",
-                new Stats(220, 15, 8, 0),
+                new Stats(220, 8, 0),
                 "Rusty Cleaver",
                 "Swings a notched blade at whoever's closest.",
                 "15 damage",

@@ -19,7 +19,6 @@ export interface Combatant {
   maxStamina: number
   currentStamina: number
   defense: number
-  damage: number
   ultimateCharge: number
   ultimateChargeThreshold: number
   alive: boolean

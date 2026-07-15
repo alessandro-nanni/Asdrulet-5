@@ -22,7 +22,6 @@ public class ClassDefinitionMapper {
     private StatsDto toDto(Stats stats) {
         return new StatsDto(
                 stats.maxHealth(),
-                stats.damage(),
                 stats.defense(),
                 stats.maxStamina()
         );

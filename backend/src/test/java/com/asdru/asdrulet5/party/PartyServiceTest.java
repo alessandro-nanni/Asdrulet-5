@@ -2,8 +2,10 @@ package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
+import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.combat.CombatVictoryEvent;
+import com.asdru.asdrulet5.combat.domain.Combatant;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
@@ -17,8 +19,10 @@ import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
 import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
+import com.asdru.asdrulet5.party.web.dto.LootResultDto;
 import com.asdru.asdrulet5.party.web.dto.PartyMemberDto;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
+import com.asdru.asdrulet5.party.web.dto.PendingEffectDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -180,14 +184,17 @@ class PartyServiceTest {
     }
 
     @Test
-    void enterRoomInLootRoomAutoClearsWithoutStartingCombat() {
+    void enterRoomInLootRoomDoesNotAutoClearOrStartCombat() {
+        // Same as MYSTERY/MERCHANT — a real chest to open, not an
+        // instant-clear flavor room; clearing is driven entirely by
+        // acknowledgeLootResult (see below).
         PartyStateDto created = partyService.createParty(leader);
         when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.LOOT);
 
         PartyStateDto updated = partyService.enterRoom(created.code(), "leader-1");
 
         assertThat(updated.status()).isEqualTo(PartyStatus.LOBBY);
-        verify(dungeonService, times(1)).clearEnteredNode(created.code());
+        verify(dungeonService, never()).clearEnteredNode(created.code());
         verifyNoInteractions(combatService);
     }
 
@@ -223,6 +230,57 @@ class PartyServiceTest {
         verify(victoryReturnScheduler).schedule(any(Runnable.class), eq(3L), eq(TimeUnit.SECONDS));
         verify(dungeonService, times(1)).clearEnteredNode(created.code());
         assertThat(partyService.getState(created.code()).status()).isEqualTo(PartyStatus.DUNGEON);
+    }
+
+    private static Combatant playerCombatant(String userId, int maxHealth) {
+        return new Combatant(userId, userId, false, CharacterClass.WARRIOR,
+                maxHealth, 100, 5, 0, 40, List.of(), null, null, null, null, List.of());
+    }
+
+    @Test
+    void combatVictoryCarriesTheFightsEndingDamageOntoTheMember() {
+        // A fight's own outcome must survive into the next room — a member
+        // who took damage shouldn't show back up at full health the moment
+        // the party returns to the dungeon.
+        PartyStateDto created = partyService.createParty(leader);
+        Combatant combatant = playerCombatant("leader-1", 100);
+        combatant.applyDamage(30);
+        when(combatService.partyCombatantsFor(created.code())).thenReturn(List.of(combatant));
+
+        partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
+
+        assertThat(partyService.getState(created.code()).members().getFirst().currentHealth()).isEqualTo(70);
+    }
+
+    @Test
+    void combatVictoryNormalizesFullEndingHealthToNull() {
+        // Matches the "null means full health" convention used everywhere
+        // else this field is set (e.g. the wheel's FULL_HEAL).
+        PartyStateDto created = partyService.createParty(leader);
+        Combatant combatant = playerCombatant("leader-1", 100);
+        when(combatService.partyCombatantsFor(created.code())).thenReturn(List.of(combatant));
+
+        partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
+
+        assertThat(partyService.getState(created.code()).members().getFirst().currentHealth()).isNull();
+    }
+
+    @Test
+    void combatVictoryCarriesStillActiveEffectsIntoPendingEffects() {
+        // A buff/DoT that hadn't expired yet when the fight ended should
+        // still be waiting for the member going into their next fight —
+        // exactly like a MYSTERY wheel's poison result would be.
+        PartyStateDto created = partyService.createParty(leader);
+        Combatant combatant = playerCombatant("leader-1", 100);
+        combatant.addActiveEffect(ActiveEffect.defenseBuff("Taunt", "shield", 10, 2));
+        when(combatService.partyCombatantsFor(created.code())).thenReturn(List.of(combatant));
+
+        partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
+
+        List<PendingEffectDto> pending = partyService.getState(created.code()).members().getFirst().pendingEffects();
+        assertThat(pending).hasSize(1);
+        assertThat(pending.getFirst().name()).isEqualTo("Taunt");
+        assertThat(pending.getFirst().remainingTurns()).isEqualTo(2);
     }
 
     @Test
@@ -498,6 +556,7 @@ class PartyServiceTest {
                     assertThat(hasNewGear).isTrue();
                     assertThat(updated.storage()).allMatch(java.util.Objects::isNull);
                 }
+                case GIVE_COINS -> assertThat(updated.coins()).isEqualTo(30);
             }
         }
         assertThat(observed).containsExactlyInAnyOrder(WheelEffect.values());
@@ -523,5 +582,172 @@ class PartyServiceTest {
 
             assertThatCode(() -> partyService.spinWheel(created.code(), userId)).doesNotThrowAnyException();
         }
+    }
+
+    @Test
+    void lootChestWhenNoRoomIsEnteredThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.lootChest(created.code(), "leader-1"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.NotInLootRoomException.class);
+    }
+
+    @Test
+    void lootChestByUnknownMemberThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.lootChest(created.code(), "nobody"))
+                .isInstanceOf(NotPartyMemberException.class);
+    }
+
+    @Test
+    void lootChestTwiceInTheSameRoomThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
+
+        partyService.lootChest(created.code(), "leader-1");
+
+        assertThatThrownBy(() -> partyService.lootChest(created.code(), "leader-1"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.AlreadyLootedException.class);
+    }
+
+    @Test
+    void lootChestOutOfTurnOrderThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
+
+        assertThatThrownBy(() -> partyService.lootChest(created.code(), "player-2"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.NotYourLootTurnException.class);
+    }
+
+    @Test
+    void lootChestInTurnOrderSucceedsForEachMemberInSequence() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        // Deliberately not join order, to prove this is genuinely turnOrder-driven.
+        partyService.startGame(created.code(), "leader-1", List.of("player-2", "leader-1"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
+
+        assertThatThrownBy(() -> partyService.lootChest(created.code(), "leader-1"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.NotYourLootTurnException.class);
+
+        assertThatCode(() -> partyService.lootChest(created.code(), "player-2")).doesNotThrowAnyException();
+        assertThatCode(() -> partyService.lootChest(created.code(), "leader-1")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void lootChestNeverClearsTheRoomByItself() {
+        // Clearing is driven entirely by acknowledgeLootResult now (see
+        // below) — looting alone, even by every member, must never clear
+        // the room on its own.
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
+
+        partyService.lootChest(created.code(), "leader-1");
+        partyService.lootChest(created.code(), "player-2");
+
+        verify(dungeonService, never()).clearEnteredNode(created.code());
+    }
+
+    @Test
+    void acknowledgeLootBeforeLootingThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.acknowledgeLootResult(created.code(), "leader-1"))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.NotYetLootedException.class);
+    }
+
+    @Test
+    void acknowledgeLootByUnknownMemberThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+
+        assertThatThrownBy(() -> partyService.acknowledgeLootResult(created.code(), "nobody"))
+                .isInstanceOf(NotPartyMemberException.class);
+    }
+
+    @Test
+    void acknowledgeLootClearsTheRoomOnlyOnceEveryMemberHasAcknowledged() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
+        partyService.lootChest(created.code(), "leader-1");
+        partyService.lootChest(created.code(), "player-2");
+
+        partyService.acknowledgeLootResult(created.code(), "leader-1");
+        verify(dungeonService, never()).clearEnteredNode(created.code());
+
+        partyService.acknowledgeLootResult(created.code(), "player-2");
+        verify(dungeonService, times(1)).clearEnteredNode(created.code());
+    }
+
+    @Test
+    void acknowledgeLootSoloClearsImmediately() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.startGame(created.code(), "leader-1", List.of("leader-1"));
+        when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
+        partyService.lootChest(created.code(), "leader-1");
+
+        partyService.acknowledgeLootResult(created.code(), "leader-1");
+
+        verify(dungeonService, times(1)).clearEnteredNode(created.code());
+    }
+
+    /**
+     * The actual roll is randomized (see PartyService's SecureRandom field),
+     * so this drives enough independent chest-openings to observe all three
+     * find shapes (coins-only, item-only, both) and checks each roll's own
+     * mutation matches what it claims to have found, rather than asserting
+     * on one specific outcome.
+     */
+    @Test
+    void lootChestAlwaysYieldsCoinsAnItemOrBoth() {
+        boolean sawCoinsOnly = false;
+        boolean sawItemOnly = false;
+        boolean sawBoth = false;
+        for (int i = 0; i < 150 && !(sawCoinsOnly && sawItemOnly && sawBoth); i++) {
+            PartyStateDto created = partyService.createParty(
+                    new AuthenticatedUser("loot-" + i, "Looter", "avatar.png"));
+            when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
+            String userId = "loot-" + i;
+            partyService.selectClass(created.code(), userId, CharacterClass.WARRIOR);
+            partyService.startGame(created.code(), userId, List.of(userId));
+
+            PartyStateDto updated = partyService.lootChest(created.code(), userId);
+
+            LootResultDto result = updated.lootResults().get(userId);
+            assertThat(result.coins() > 0 || result.itemId() != null).isTrue();
+            if (result.coins() > 0) {
+                assertThat(updated.coins()).isEqualTo(result.coins());
+            }
+            if (result.itemId() != null) {
+                PartyMemberDto self = updated.members().getFirst();
+                boolean hasNewGear = self.loadout().weaponItemId() != null
+                        || self.loadout().chestplateItemId() != null
+                        || self.loadout().trinketItemId() != null;
+                assertThat(hasNewGear).isTrue();
+            }
+            if (result.coins() > 0 && result.itemId() == null) sawCoinsOnly = true;
+            if (result.coins() == 0 && result.itemId() != null) sawItemOnly = true;
+            if (result.coins() > 0 && result.itemId() != null) sawBoth = true;
+        }
+        assertThat(sawCoinsOnly).as("saw a coins-only find").isTrue();
+        assertThat(sawItemOnly).as("saw an item-only find").isTrue();
+        assertThat(sawBoth).as("saw a coins-and-item find").isTrue();
     }
 }

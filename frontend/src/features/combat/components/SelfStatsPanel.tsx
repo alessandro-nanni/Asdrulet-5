@@ -1,6 +1,5 @@
 import { HeartIcon } from '../../../shared/ui/HeartIcon'
 import { ShieldIcon } from '../../../shared/ui/ShieldIcon'
-import { SwordIcon } from '../../../shared/ui/SwordIcon'
 import type { Stats } from '../../classes/types'
 import type { Combatant } from '../types'
 
@@ -39,10 +38,6 @@ export function SelfStatsPanel({
             <span className="self-stat-tile-value">
               {self.currentHealth}/{self.maxHealth}
             </span>
-          </span>
-          <span className="self-stat-pill-item" aria-label={`Damage ${stats.damage}`}>
-            <SwordIcon className="self-stat-tile-icon" />
-            <span className="self-stat-tile-value">{stats.damage}</span>
           </span>
           <span className="self-stat-pill-item" aria-label={`Defense ${stats.defense}`}>
             <ShieldIcon className="self-stat-tile-icon" />

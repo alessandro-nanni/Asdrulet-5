@@ -43,6 +43,18 @@ public class Party {
     private final List<String> storage = new ArrayList<>(Collections.nCopies(STORAGE_SIZE, null));
     private List<String> turnOrder = List.of();
 
+    /** Shared coin pool the whole party spends from — see the shop below. */
+    @Getter
+    @Accessors(fluent = true)
+    private int coins = 0;
+
+    /**
+     * Items currently for sale in the MERCHANT room the party has entered —
+     * rolled fresh each time one is entered (see {@link #rollShopStock}) and
+     * consumed as members buy from it, same shared-pool spirit as coins.
+     */
+    private List<String> shopStock = List.of();
+
     /**
      * Bookkeeping for the MYSTERY room currently entered (if any): who has
      * spun already, what they landed on (drawn from one shared pool of
@@ -57,6 +69,20 @@ public class Party {
     private final Map<String, WheelEffect> wheelResults = new LinkedHashMap<>();
     private final Set<String> wheelAcknowledgedMemberIds = new LinkedHashSet<>();
     private final Set<WheelEffect> claimedWheelEffects = new LinkedHashSet<>();
+
+    /**
+     * Bookkeeping for the LOOT room currently entered (if any) — same shape
+     * as the MYSTERY wheel's own bookkeeping above (one turn-ordered pass
+     * through the party, each member's own result recorded once, room clears
+     * once everyone's both looted and acknowledged), just without a shared
+     * pool to draw from: unlike WheelEffect, a LootResult is rolled fresh
+     * per member rather than drawn from a fixed exhaustible set, so there's
+     * no claimed-results counterpart to {@link #claimedWheelEffects} here.
+     * Reset every time a new room is entered — see {@link #resetLootClaims()}.
+     */
+    private final Set<String> lootedMemberIds = new LinkedHashSet<>();
+    private final Map<String, LootResult> lootResults = new LinkedHashMap<>();
+    private final Set<String> lootAcknowledgedMemberIds = new LinkedHashSet<>();
 
     @Getter
     @Accessors(fluent = true)
@@ -288,6 +314,65 @@ public class Party {
         return wheelAcknowledgedMemberIds.containsAll(members.keySet());
     }
 
+    /** Called whenever a room is entered, so loot bookkeeping never leaks from one room visit into the next. */
+    @Synchronized
+    public void resetLootClaims() {
+        lootedMemberIds.clear();
+        lootResults.clear();
+        lootAcknowledgedMemberIds.clear();
+    }
+
+    @Synchronized
+    public boolean hasLooted(String userId) {
+        return lootedMemberIds.contains(userId);
+    }
+
+    @Synchronized
+    public void recordLoot(String userId, LootResult result) {
+        lootedMemberIds.add(userId);
+        lootResults.put(userId, result);
+    }
+
+    @Synchronized
+    public boolean allMembersHaveLooted() {
+        return lootedMemberIds.containsAll(members.keySet());
+    }
+
+    @Synchronized
+    public Map<String, LootResult> lootResults() {
+        return Map.copyOf(lootResults);
+    }
+
+    /**
+     * Whether userId is next in line to loot, per the same turnOrder set at
+     * game start (see {@link #start}) — the first member in that sequence
+     * who hasn't looted yet gets the chest next, everyone else has to wait.
+     */
+    @Synchronized
+    public boolean isMembersLootTurn(String userId) {
+        for (String candidate : turnOrder) {
+            if (!lootedMemberIds.contains(candidate)) {
+                return candidate.equals(userId);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Called once a member's own client has finished locally announcing
+     * their loot result — see PartyService.acknowledgeLootResult for why
+     * the room's actual clear waits on this instead of a fixed delay.
+     */
+    @Synchronized
+    public void recordLootAcknowledgement(String userId) {
+        lootAcknowledgedMemberIds.add(userId);
+    }
+
+    @Synchronized
+    public boolean allMembersHaveAcknowledgedLoot() {
+        return lootAcknowledgedMemberIds.containsAll(members.keySet());
+    }
+
     @Synchronized
     public void setMemberHealth(String userId, Integer currentHealth) {
         PartyMember member = requireMember(userId);
@@ -341,5 +426,43 @@ public class Party {
             addItemToStorage(previousItemId);
         }
         members.put(userId, member.withLoadout(member.loadout().withItem(slot, itemId)));
+    }
+
+    @Synchronized
+    public void addCoins(int amount) {
+        coins += amount;
+    }
+
+    /** Called whenever a MERCHANT room is entered, replacing whatever was left over from a prior visit. */
+    @Synchronized
+    public void rollShopStock(List<String> itemIds) {
+        shopStock = List.copyOf(itemIds);
+    }
+
+    @Synchronized
+    public List<String> shopStock() {
+        return shopStock;
+    }
+
+    /**
+     * Spends coins on an item currently for sale, atomically: validates the
+     * item is actually in stock and the party can afford it, then removes it
+     * from {@link #shopStock} and drops it into shared storage — same
+     * destination a LOOT pickup would use, so a bought item is equippable by
+     * anyone, not just whoever paid for it.
+     */
+    @Synchronized
+    public void buyFromShop(String itemId, int price) {
+        if (!shopStock.contains(itemId)) {
+            throw new ItemNotInShopException(code, itemId);
+        }
+        if (coins < price) {
+            throw new InsufficientCoinsException(code, price, coins);
+        }
+        List<String> updated = new ArrayList<>(shopStock);
+        updated.remove(itemId);
+        shopStock = updated;
+        coins -= price;
+        addItemToStorage(itemId);
     }
 }

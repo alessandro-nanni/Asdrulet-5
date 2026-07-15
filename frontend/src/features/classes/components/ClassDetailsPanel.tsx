@@ -11,7 +11,6 @@ export function ClassDetailsPanel({ definition }: { definition: ClassDefinition 
 
       <div className="stat-bar-list">
         <StatBar label="Health" value={stats.maxHealth} max={200} theme={characterClass.toLowerCase()} />
-        <StatBar label="Damage" value={stats.damage} max={30} theme={characterClass.toLowerCase()} />
         <StatBar label="Defense" value={stats.defense} max={30} theme={characterClass.toLowerCase()} />
         <StatBar label="Stamina" value={stats.maxStamina} max={150} theme={characterClass.toLowerCase()} />
       </div>

@@ -16,6 +16,8 @@ public interface EffectTarget {
 
     int bonusDamage();
 
+    int damagePercentBonus();
+
     void applyDamage(int amount);
 
     void applyHeal(int amount);

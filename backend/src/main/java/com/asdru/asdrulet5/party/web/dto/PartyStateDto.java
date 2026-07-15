@@ -13,6 +13,9 @@ public record PartyStateDto(
         List<String> turnOrder,
         PartyStatus status,
         List<String> storage,
-        Map<String, WheelEffect> wheelResults
+        Map<String, WheelEffect> wheelResults,
+        int coins,
+        List<String> shopStock,
+        Map<String, LootResultDto> lootResults
 ) {
 }

@@ -14,7 +14,7 @@ public class TankClassDefinition {
                 CharacterClass.TANK,
                 "Tank",
                 "A wall of steel that dares the enemy to try.",
-                new Stats(160, 10, 18, 90),
+                new Stats(160, 18, 90),
                 List.of(
                         new BasicAbility("tank.shield-bash", "Shield Bash",
                                 "Slams an enemy with a shield, staggering them.",

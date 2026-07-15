@@ -41,3 +41,19 @@ export function spinWheel(code: string, memberId: string): Promise<PartyState> {
 export function acknowledgeWheelResult(code: string, memberId: string): Promise<PartyState> {
   return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/wheel/acknowledge`)
 }
+
+export function buyShopItem(code: string, memberId: string, itemId: string): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/shop/buy`, { itemId })
+}
+
+export function leaveShop(code: string, memberId: string): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/shop/leave`)
+}
+
+export function lootChest(code: string, memberId: string): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/loot/claim`)
+}
+
+export function acknowledgeLootResult(code: string, memberId: string): Promise<PartyState> {
+  return apiClient.post<PartyState>(`/api/parties/${code}/${memberId}/loot/acknowledge`)
+}

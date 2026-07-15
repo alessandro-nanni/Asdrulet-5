@@ -47,7 +47,7 @@ public class WarriorClassDefinition {
                 CharacterClass.WARRIOR,
                 "Warrior",
                 "Charges in first and asks questions never.",
-                new Stats(120, 18, 10, 100),
+                new Stats(120, 10, 100),
                 abilities
         );
     }

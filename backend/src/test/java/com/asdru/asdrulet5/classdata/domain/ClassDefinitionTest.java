@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ClassDefinitionTest {
 
-    private static final Stats STATS = new Stats(100, 10, 10, 100);
+    private static final Stats STATS = new Stats(100, 10, 100);
 
     private static final AbilityEffect DAMAGE_EFFECT = AbilityEffect.damage(10);
 

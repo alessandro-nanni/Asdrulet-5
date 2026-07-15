@@ -82,6 +82,20 @@ class CombatServiceTest {
     }
 
     @Test
+    void partyCombatantsForReturnsOnlyTheNonEnemyCombatantsInTheirCurrentState() {
+        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR), member("p2", CharacterClass.HEALER));
+        combatService.startCombat("ABC123", members, List.of("p1", "p2"));
+        String enemyId = combatService.getState("ABC123").combatants().stream()
+                .filter(CombatantDto::enemy).findFirst().orElseThrow().id();
+        combatService.useAbility("ABC123", "p1", "warrior.cleave", enemyId);
+
+        List<Combatant> partyCombatants = combatService.partyCombatantsFor("ABC123");
+
+        assertThat(partyCombatants).extracting(Combatant::id).containsExactlyInAnyOrder("p1", "p2");
+        assertThat(partyCombatants).noneMatch(Combatant::enemy);
+    }
+
+    @Test
     void useAbilityAppliesEffectAndBroadcasts() {
         List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR), member("p2", CharacterClass.HEALER));
         CombatStateDto started = combatService.startCombat("ABC123", members, List.of("p1", "p2"));
@@ -99,9 +113,9 @@ class CombatServiceTest {
 
     @Test
     void startCombatAppliesEquippedItemPassiveBonusesToStats() {
-        // Warrior base stats: 120 health, 18 damage, 10 defense (see WarriorClassDefinition).
+        // Warrior base stats: 120 health, 10 defense (see WarriorClassDefinition).
         Loadout loadout = Loadout.empty()
-                .withItem(ItemSlot.WEAPON, "flame-edge")      // +7 damage
+                .withItem(ItemSlot.WEAPON, "flame-edge")      // +20% damage
                 .withItem(ItemSlot.CHESTPLATE, "plate-armor"); // +20 health, +6 defense
         List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR, loadout));
 
@@ -109,8 +123,19 @@ class CombatServiceTest {
 
         CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
         assertThat(warrior.maxHealth()).isEqualTo(140);
-        assertThat(warrior.damage()).isEqualTo(25);
         assertThat(warrior.defense()).isEqualTo(16);
+
+        String enemyId = dto.combatants().stream().filter(CombatantDto::enemy).findFirst().orElseThrow().id();
+        int enemyHealthBefore = dto.combatants().stream()
+                .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
+
+        CombatStateDto updated = combatService.useAbility("ABC123", "p1", "warrior.cleave", enemyId);
+
+        int enemyHealthAfter = updated.combatants().stream()
+                .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
+        // Cleave's 22 power scaled by flame-edge's +20% = round(22 * 1.2) = 26,
+        // mitigated by the goblin's 8 defense: round(26 * (1 - 8/33)) = 20.
+        assertThat(enemyHealthBefore - enemyHealthAfter).isEqualTo(20);
     }
 
     @Test
@@ -164,10 +189,10 @@ class CombatServiceTest {
                 "test.strike", "Strike", "A basic attack.", "20 damage", TargetType.SINGLE_ENEMY, 10,
                 AbilityEffect.damage(20));
         Combatant p1 = new Combatant(
-                "p1", "p1", false, CharacterClass.WARRIOR, 100, 100, 5, 10, 40, List.of(strike), null, null, null,
+                "p1", "p1", false, CharacterClass.WARRIOR, 100, 100, 5, 0, 40, List.of(strike), null, null, null,
                 null, List.of());
         Combatant weakEnemy = new Combatant(
-                "enemy-1", "enemy-1", true, null, 1, 0, 0, 5, 0, List.of(), "Claw", "A swipe.", "5 damage",
+                "enemy-1", "enemy-1", true, null, 1, 0, 0, 0, 0, List.of(), "Claw", "A swipe.", "5 damage",
                 AbilityEffect.damage(5), List.of());
         Combat combat = new Combat("VICT123", List.of(p1, weakEnemy), List.of("p1", "enemy-1"));
         CombatRepository repository = new InMemoryCombatRepository();

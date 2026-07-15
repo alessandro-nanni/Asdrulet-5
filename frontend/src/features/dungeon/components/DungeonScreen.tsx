@@ -5,9 +5,11 @@ import { DungeonMap } from './DungeonMap'
 import { DungeonTopBar } from './DungeonTopBar'
 import { InventoryScreen } from '../../inventory/components/InventoryScreen'
 import { MysteryWheelScreen } from './MysteryWheelScreen'
+import { ShopScreen } from './ShopScreen'
+import { LootRoomScreen } from './LootRoomScreen'
 import backpackIcon from '../../../assets/ui/backpack.png'
 import type { ClassDefinition } from '../../classes/types'
-import type { PartyMember, PartyState, WheelEffect } from '../../party/types'
+import type { LootResult, PartyMember, PartyState, WheelEffect } from '../../party/types'
 import type { DungeonState, RoomType } from '../types'
 
 interface Props {
@@ -17,8 +19,11 @@ interface Props {
   selfId: string
   storage: (string | null)[]
   wheelResults: Record<string, WheelEffect>
+  lootResults: Record<string, LootResult>
   turnOrder: string[]
   definitions: ClassDefinition[]
+  coins: number
+  shopStock: string[]
   onEnterRoom: () => Promise<void>
   onApplyUpdate: (state: PartyState) => void
 }
@@ -64,8 +69,11 @@ export function DungeonScreen({
   selfId,
   storage,
   wheelResults,
+  lootResults,
   turnOrder,
   definitions,
+  coins,
+  shopStock,
   onEnterRoom,
   onApplyUpdate,
 }: Props) {
@@ -110,10 +118,12 @@ export function DungeonScreen({
   const hasSelectedNextRoom = dungeon.currentNodeId !== dungeon.homeNodeId
   const enteredRoom = dungeon.enteredNodeId ? dungeon.nodes.find((node) => node.id === dungeon.enteredNodeId) : null
   const isMysteryWheelActive = enteredRoom?.roomType === 'MYSTERY'
+  const isShopActive = enteredRoom?.roomType === 'MERCHANT'
+  const isLootRoomActive = enteredRoom?.roomType === 'LOOT'
 
   return (
     <div className="dungeon-screen">
-      {self && <DungeonTopBar member={self} maxHealth={selfMaxHealth} />}
+      {self && <DungeonTopBar member={self} maxHealth={selfMaxHealth} coins={coins} />}
       <DungeonMap
         dungeon={dungeon}
         members={members}
@@ -169,6 +179,28 @@ export function DungeonScreen({
           selfId={self.userId}
           members={members}
           wheelResults={wheelResults}
+          turnOrder={turnOrder}
+          onApplyUpdate={onApplyUpdate}
+        />
+      )}
+
+      {isShopActive && self && (
+        <ShopScreen
+          code={code}
+          selfId={self.userId}
+          isLeader={isLeader}
+          coins={coins}
+          shopStock={shopStock}
+          onApplyUpdate={onApplyUpdate}
+        />
+      )}
+
+      {isLootRoomActive && self && (
+        <LootRoomScreen
+          code={code}
+          selfId={self.userId}
+          members={members}
+          lootResults={lootResults}
           turnOrder={turnOrder}
           onApplyUpdate={onApplyUpdate}
         />

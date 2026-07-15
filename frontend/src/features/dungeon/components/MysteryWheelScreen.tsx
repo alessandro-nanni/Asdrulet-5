@@ -15,7 +15,7 @@ interface Props {
 // Order here is only a tiebreaker for laying out whatever's left — as slices
 // get claimed, the remaining ones are recomputed to fill the whole 360°
 // rather than leaving a gap where a claimed slice used to be.
-const SEGMENTS: WheelEffect[] = ['FULL_HEAL', 'HALVE_HEALTH', 'GIVE_ITEM', 'CLEAR_EFFECTS', 'POISON']
+const SEGMENTS: WheelEffect[] = ['FULL_HEAL', 'HALVE_HEALTH', 'GIVE_ITEM', 'GIVE_COINS', 'CLEAR_EFFECTS', 'POISON']
 const EXTRA_SPINS = 5
 const SPIN_DURATION_MS = 2600
 // How long the result stays on screen, announced, before this client tells
@@ -40,6 +40,11 @@ const EFFECT_INFO: Record<WheelEffect, { title: string; description: string; col
     title: 'Treasure',
     description: 'A random item is equipped onto you, and only you.',
     color: '#ffb703',
+  },
+  GIVE_COINS: {
+    title: 'Coins',
+    description: "30 coins are added to the party's shared pool.",
+    color: '#f4c542',
   },
   CLEAR_EFFECTS: {
     title: 'Cleansed',

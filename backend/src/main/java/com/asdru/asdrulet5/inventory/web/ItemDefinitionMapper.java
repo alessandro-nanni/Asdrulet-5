@@ -15,7 +15,8 @@ public class ItemDefinitionMapper {
                 definition.displayName(),
                 definition.slot(),
                 definition.description(),
-                toDto(definition.passive())
+                toDto(definition.passive()),
+                definition.price()
         );
     }
 
@@ -31,7 +32,7 @@ public class ItemDefinitionMapper {
                 passive.bonusMaxHealth(),
                 passive.bonusMaxStamina(),
                 passive.bonusDefense(),
-                passive.bonusDamage()
+                passive.damagePercent()
         );
     }
 }

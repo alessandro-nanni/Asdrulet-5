@@ -4,6 +4,7 @@ import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
 import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.combat.CombatVictoryEvent;
+import com.asdru.asdrulet5.combat.domain.Combatant;
 import com.asdru.asdrulet5.dungeon.DungeonService;
 import com.asdru.asdrulet5.dungeon.domain.RoomType;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
@@ -11,15 +12,22 @@ import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.domain.ItemSlot;
 import com.asdru.asdrulet5.party.dev.FakeNameGenerator;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
+import com.asdru.asdrulet5.party.domain.LootResult;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import com.asdru.asdrulet5.party.domain.WheelContext;
 import com.asdru.asdrulet5.party.domain.WheelEffect;
+import com.asdru.asdrulet5.party.exception.AlreadyLootedException;
 import com.asdru.asdrulet5.party.exception.AlreadySpunWheelException;
 import com.asdru.asdrulet5.party.exception.NotAFakeMemberException;
+import com.asdru.asdrulet5.party.exception.NotInLootRoomException;
+import com.asdru.asdrulet5.party.exception.NotInMerchantRoomException;
 import com.asdru.asdrulet5.party.exception.NotInMysteryRoomException;
+import com.asdru.asdrulet5.party.exception.NotPartyLeaderException;
 import com.asdru.asdrulet5.party.exception.NotPartyMemberException;
+import com.asdru.asdrulet5.party.exception.NotYetLootedException;
 import com.asdru.asdrulet5.party.exception.NotYetSpunWheelException;
+import com.asdru.asdrulet5.party.exception.NotYourLootTurnException;
 import com.asdru.asdrulet5.party.exception.NotYourWheelTurnException;
 import com.asdru.asdrulet5.party.exception.PartyNotFoundException;
 import com.asdru.asdrulet5.party.web.PartyMapper;
@@ -30,11 +38,14 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -48,6 +59,9 @@ public class PartyService {
      * before the player ever sees the victory banner.
      */
     private static final long VICTORY_DISPLAY_DELAY_SECONDS = 3;
+
+    /** How many distinct items a freshly entered MERCHANT room offers for sale. */
+    private static final int SHOP_STOCK_SIZE = 3;
 
     private final PartyRepository partyRepository;
     private final SimpMessagingTemplate messagingTemplate;
@@ -115,12 +129,30 @@ public class PartyService {
             return dto;
         }
         if (enteredRoomType == RoomType.MYSTERY) {
-            // Stays entered — unlike LOOT/MERCHANT there's real gameplay
-            // here, so the room only clears once every member has spun (see
-            // spinWheel). resetWheelSpins() means a MYSTERY room visited a
-            // second time (a fresh dungeon run, or in principle a re-roll)
-            // starts with a clean slate rather than reusing stale spins.
+            // Stays entered — unlike LOOT there's real gameplay here, so the
+            // room only clears once every member has spun (see spinWheel).
+            // resetWheelSpins() means a MYSTERY room visited a second time (a
+            // fresh dungeon run, or in principle a re-roll) starts with a
+            // clean slate rather than reusing stale spins.
             party.resetWheelSpins();
+            return broadcast(party);
+        }
+        if (enteredRoomType == RoomType.MERCHANT) {
+            // Also stays entered — a real shop to browse rather than an
+            // instant-clear flavor room, cleared explicitly via leaveShop.
+            // Rolled fresh every visit so re-entering doesn't just replay
+            // whatever was left over from a prior stop.
+            party.rollShopStock(pickRandomUnplacedItemIds(party, SHOP_STOCK_SIZE, true));
+            return broadcast(party);
+        }
+        if (enteredRoomType == RoomType.LOOT) {
+            // Also stays entered — same turn-ordered, one-chest-per-member
+            // shape as MYSTERY (see lootChest), so the room only clears once
+            // every member has both looted and acknowledged.
+            // resetLootClaims() means a LOOT room visited a second time (a
+            // fresh dungeon run) starts with a clean slate rather than
+            // reusing stale claims.
+            party.resetLootClaims();
             return broadcast(party);
         }
         dungeonService.clearEnteredNode(code);
@@ -189,6 +221,86 @@ public class PartyService {
         return broadcast(party);
     }
 
+    /**
+     * One party member opening the chest in the LOOT room the party
+     * currently has entered. Same turn-ordered shape as {@link #spinWheel},
+     * minus a shared pool to draw from — unlike a WheelEffect, each member's
+     * find is rolled fresh (see {@link #rollLoot}) rather than drawn from a
+     * fixed exhaustible set, so results can repeat in kind (e.g. two members
+     * can both find coins) even though each member only ever opens the
+     * chest once. Never touches the room's clear state directly — see
+     * {@link #acknowledgeLootResult} for that.
+     */
+    public PartyStateDto lootChest(String code, String userId) {
+        Party party = getOrThrow(code);
+        boolean isMember = party.members().stream().anyMatch(candidate -> candidate.userId().equals(userId));
+        if (!isMember) {
+            throw new NotPartyMemberException(code, userId);
+        }
+        if (dungeonService.enteredRoomType(code) != RoomType.LOOT) {
+            throw new NotInLootRoomException(code);
+        }
+        if (party.hasLooted(userId)) {
+            throw new AlreadyLootedException(code, userId);
+        }
+        if (!party.isMembersLootTurn(userId)) {
+            throw new NotYourLootTurnException(code, userId);
+        }
+
+        LootResult result = rollLoot(party);
+        if (result.coins() > 0) {
+            party.addCoins(result.coins());
+        }
+        if (result.itemId() != null) {
+            ItemSlot slot = itemDefinitionRegistry.get(result.itemId()).slot();
+            party.giveAndEquipItem(userId, slot, result.itemId());
+        }
+        party.recordLoot(userId, result);
+        return broadcast(party);
+    }
+
+    /**
+     * Called once a member's own client has finished locally announcing
+     * their loot result (see LootRoomScreen's open-then-announce timing on
+     * the frontend). The room only actually clears once every member has
+     * both looted and acknowledged — driven by the clients themselves
+     * rather than a fixed backend delay, same as the wheel's own
+     * acknowledgement flow.
+     */
+    public PartyStateDto acknowledgeLootResult(String code, String userId) {
+        Party party = getOrThrow(code);
+        boolean isMember = party.members().stream().anyMatch(candidate -> candidate.userId().equals(userId));
+        if (!isMember) {
+            throw new NotPartyMemberException(code, userId);
+        }
+        if (!party.hasLooted(userId)) {
+            throw new NotYetLootedException(code, userId);
+        }
+        party.recordLootAcknowledgement(userId);
+        if (party.allMembersHaveAcknowledgedLoot()) {
+            dungeonService.clearEnteredNode(code);
+        }
+        return broadcast(party);
+    }
+
+    /**
+     * A chest always yields something — coins, an item, or both, picked with
+     * equal odds across those three shapes. Item drops are unrestricted (not
+     * filtered to {@link ItemDefinition#purchasable()} items, unlike the
+     * shop) — this is exactly where the non-purchasable, reactive items are
+     * meant to turn up.
+     */
+    private LootResult rollLoot(Party party) {
+        int roll = random.nextInt(3);
+        int coins = roll != 1 ? rollLootCoins() : 0;
+        String itemId = roll != 0 ? pickRandomUnplacedItemId(party) : null;
+        return new LootResult(coins, itemId);
+    }
+
+    private int rollLootCoins() {
+        return 10 + random.nextInt(16);
+    }
+
     private WheelContext wheelContextFor(Party party) {
         return new WheelContext() {
             @Override
@@ -216,36 +328,83 @@ public class PartyService {
     }
 
     /**
-     * Favors an item that isn't already in play (in the shared storage or
-     * equipped by anyone) so a spin feels like discovering something new
-     * rather than handing back a duplicate — falling back to the full
-     * catalog only once every item is already somewhere in the party.
+     * Favors items that aren't already in play (in the shared storage or
+     * equipped by anyone) so a spin/shop visit feels like discovering
+     * something new rather than handing back a duplicate — falling back to
+     * the full catalog only once every item is already somewhere in the
+     * party. count is clamped to however many distinct candidates exist.
+     * purchasableOnly restricts the pool to {@link ItemDefinition#purchasable()}
+     * items — used by the shop, so items meant to only ever drop as loot
+     * (e.g. a wheel's GIVE_ITEM, which calls this with purchasableOnly=false)
+     * never show up for sale.
      */
-    private String pickRandomUnplacedItemId(Party party) {
+    private List<String> pickRandomUnplacedItemIds(Party party, int count, boolean purchasableOnly) {
         Set<String> inPlay = new HashSet<>(party.storage());
         party.members().forEach(member -> inPlay.addAll(member.loadout().equippedItemIds()));
         List<String> candidates = itemDefinitionRegistry.all().stream()
+                .filter(definition -> !purchasableOnly || definition.purchasable())
                 .map(ItemDefinition::id)
                 .filter(id -> !inPlay.contains(id))
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
         if (candidates.isEmpty()) {
-            candidates = itemDefinitionRegistry.all().stream().map(ItemDefinition::id).toList();
+            candidates = itemDefinitionRegistry.all().stream()
+                    .filter(definition -> !purchasableOnly || definition.purchasable())
+                    .map(ItemDefinition::id)
+                    .collect(Collectors.toCollection(ArrayList::new));
         }
-        return candidates.get(random.nextInt(candidates.size()));
+        Collections.shuffle(candidates, random);
+        return candidates.subList(0, Math.min(count, candidates.size()));
+    }
+
+    private String pickRandomUnplacedItemId(Party party) {
+        return pickRandomUnplacedItemIds(party, 1, false).get(0);
     }
 
     /**
      * Fired by CombatService the instant a Combat's status flips to
-     * PARTY_WON. The actual return-to-dungeon transition is scheduled a few
-     * seconds out rather than applied immediately, so the victory banner
-     * has time to actually be seen — see VICTORY_DISPLAY_DELAY_SECONDS.
+     * PARTY_WON. Each member's ending health and any still-active effects
+     * are carried back onto their PartyMember right away (see
+     * {@link #syncMembersAfterCombat}) — otherwise, per PartyMember's own
+     * prior doc, a fight's outcome was never written back onto it and every
+     * room after a battle would silently reset the party to how it looked
+     * going in. The coin reward is granted right away too — broadcast
+     * immediately so it (and its toast) show up while the "Victory!" screen
+     * is still up — but the actual return-to-dungeon transition is scheduled
+     * a few seconds out, so the victory banner itself has time to actually
+     * be seen — see VICTORY_DISPLAY_DELAY_SECONDS.
      */
     @EventListener
     public void onCombatVictory(CombatVictoryEvent event) {
+        Party party = getOrThrow(event.partyCode());
+        syncMembersAfterCombat(party, event.partyCode());
+        party.addCoins(rollVictoryCoins());
+        broadcast(party);
         victoryReturnScheduler.schedule(
                 () -> returnToDungeonAfterVictory(event.partyCode()),
                 VICTORY_DISPLAY_DELAY_SECONDS,
                 TimeUnit.SECONDS);
+    }
+
+    /**
+     * Copies each party combatant's final health and remaining active
+     * effects (buffs, DoTs, ...) from the just-resolved Combat back onto its
+     * matching PartyMember — reusing the exact same currentHealth/
+     * pendingEffects fields a MYSTERY wheel roll writes to, so a fight's
+     * outcome flows into the next room the same way a wheel result would.
+     * Health at (or above) max is normalized back to null, matching the
+     * "null means full health" convention everywhere else this field is set.
+     */
+    private void syncMembersAfterCombat(Party party, String combatCode) {
+        for (Combatant combatant : combatService.partyCombatantsFor(combatCode)) {
+            Integer health = combatant.currentHealth() >= combatant.maxHealth() ? null : combatant.currentHealth();
+            party.setMemberHealth(combatant.id(), health);
+            party.clearPendingEffects(combatant.id());
+            combatant.activeEffects().forEach(effect -> party.addPendingEffect(combatant.id(), effect));
+        }
+    }
+
+    private int rollVictoryCoins() {
+        return 15 + random.nextInt(16);
     }
 
     private void returnToDungeonAfterVictory(String code) {
@@ -253,6 +412,39 @@ public class PartyService {
         dungeonService.clearEnteredNode(code);
         party.returnToDungeon();
         broadcast(party);
+    }
+
+    /**
+     * Leader-only, like {@link #leaveShop} — everyone can browse the shop's
+     * stock (see the read-only PartyStateDto.shopStock broadcast to all
+     * members), but only the leader spends the party's shared coins.
+     */
+    public PartyStateDto buyItem(String code, String userId, String itemId) {
+        Party party = getOrThrow(code);
+        if (!party.leaderId().equals(userId)) {
+            throw new NotPartyLeaderException(code, userId);
+        }
+        if (dungeonService.enteredRoomType(code) != RoomType.MERCHANT) {
+            throw new NotInMerchantRoomException(code);
+        }
+        int price = itemDefinitionRegistry.get(itemId).price();
+        party.buyFromShop(itemId, price);
+        return broadcast(party);
+    }
+
+    /**
+     * Closes the currently entered MERCHANT room, leader-only like every
+     * other room-navigation action — there's no per-member turn-taking here
+     * (unlike the wheel), so whoever's driving the map just calls this once
+     * everyone's done shopping.
+     */
+    public PartyStateDto leaveShop(String code, String requesterId) {
+        Party party = getOrThrow(code);
+        if (!party.leaderId().equals(requesterId)) {
+            throw new NotPartyLeaderException(code, requesterId);
+        }
+        dungeonService.clearEnteredNode(code);
+        return broadcast(party);
     }
 
     public PartyStateDto equipItem(String code, String userId, String itemId) {

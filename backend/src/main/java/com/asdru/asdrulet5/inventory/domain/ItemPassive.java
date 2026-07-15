@@ -32,7 +32,8 @@ public interface ItemPassive {
         return 0;
     }
 
-    default int bonusDamage() {
+    /** Percentage modifier applied to an ability's own power (e.g. 20 = +20%, -10 = -10%). */
+    default int damagePercent() {
         return 0;
     }
 

@@ -13,11 +13,12 @@ import java.util.List;
  * same {@link ActiveEffect} classdata already applies during combat (e.g. a
  * MYSTERY wheel's "poison" result is just a damage-over-time ActiveEffect
  * sitting here until the next fight starts) — CombatService seeds a fresh
- * Combatant's own activeEffects from whatever's here. Both fields only ever
- * change via a wheel spin today; nothing here is touched by combat itself,
- * so a member's health/pending effects carry unchanged from one fight's end
- * into the next room, but a fight's own outcome is never written back onto
- * it.
+ * Combatant's own activeEffects from whatever's here. Set by a wheel/loot
+ * roll, and also written back here the instant a fight ends (see
+ * PartyService.syncMembersAfterCombat) with that fight's own ending health
+ * and still-active effects — so both fields always reflect whatever's
+ * carrying into the next room, whether that came from a room's own reward
+ * or from how the last battle was left.
  */
 public record PartyMember(
         String userId,

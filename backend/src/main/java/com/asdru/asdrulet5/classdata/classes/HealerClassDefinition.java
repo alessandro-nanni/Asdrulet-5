@@ -14,7 +14,7 @@ public class HealerClassDefinition {
                 CharacterClass.HEALER,
                 "Healer",
                 "A steady hand that keeps the party standing when everything else falls apart.",
-                new Stats(80, 8, 4, 100),
+                new Stats(80, 4, 100),
                 List.of(
                         new BasicAbility("healer.mending-light", "Mending Light",
                                 "Channels restorative light into a single ally.",

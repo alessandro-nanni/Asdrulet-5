@@ -780,7 +780,21 @@ p {
   gap: 4px;
 }
 
+.dungeon-topbar-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  /* Reserves room on the right for the floating inventory button, which
+     overlaps this row's vertical band (see .dungeon-inventory-btn) — without
+     this the coin pill, right-aligned by justify-content, would render
+     underneath it. */
+  padding-right: 56px;
+}
+
 .dungeon-topbar-name {
+  min-width: 0;
+  flex: 1;
   font-weight: 700;
   font-size: 0.95rem;
   white-space: nowrap;
@@ -810,6 +824,25 @@ p {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-muted);
+}
+
+.dungeon-topbar-coins {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+
+.dungeon-topbar-coins-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: #f4c542;
 }
 
 .dungeon-map {
@@ -1210,6 +1243,59 @@ p {
   100% {
     opacity: 0;
     transform: translateX(calc(-50% + var(--float-offset-x))) translateY(-38px) scale(1);
+  }
+}
+
+.coin-toast {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--shadow-card);
+  font-weight: 800;
+  font-size: 1rem;
+  pointer-events: none;
+  animation: coin-toast-pop 1.8s ease-out forwards;
+}
+
+.coin-toast-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #f4c542;
+}
+
+.coin-toast.is-gain {
+  color: #35d08e;
+}
+
+.coin-toast.is-loss {
+  color: #ff5c5c;
+}
+
+@keyframes coin-toast-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.9);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.95);
   }
 }
 
@@ -1856,6 +1942,123 @@ p {
   gap: 6px;
 }
 
+/* Shop */
+
+.shop-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: rgba(10, 8, 20, 0.97);
+  padding: calc(20px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.shop-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shop-balance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  font-weight: 800;
+}
+
+.shop-balance-icon {
+  width: 16px;
+  height: 16px;
+  color: #f4c542;
+}
+
+.shop-detail-panel {
+  flex-shrink: 0;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.shop-item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shop-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+}
+
+.shop-item-info {
+  appearance: none;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  min-width: 0;
+}
+
+.shop-item-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.shop-item-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-item-buy-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  padding: 8px 14px;
+}
+
+.shop-item-buy-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.shop-item-price {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
 .wheel-member-row {
   display: flex;
   align-items: center;
@@ -1868,5 +2071,139 @@ p {
 }
 
 .wheel-member-row.is-current-turn {
+  border-color: var(--accent);
+}
+
+/* Loot room */
+
+.loot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  background: rgba(10, 8, 20, 0.97);
+  padding: calc(28px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  text-align: center;
+}
+
+.loot-chest-shell {
+  width: 140px;
+  height: 140px;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loot-chest-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+  transition: transform 0.15s ease-in-out;
+}
+
+.loot-chest-image.is-opening {
+  animation: loot-chest-shake 0.9s ease-in-out;
+}
+
+@keyframes loot-chest-shake {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  15% {
+    transform: rotate(-6deg) scale(1.02);
+  }
+  30% {
+    transform: rotate(6deg) scale(1.02);
+  }
+  45% {
+    transform: rotate(-6deg) scale(1.04);
+  }
+  60% {
+    transform: rotate(6deg) scale(1.04);
+  }
+  75% {
+    transform: rotate(-3deg) scale(1.08);
+  }
+  90% {
+    transform: rotate(0deg) scale(1.1);
+  }
+}
+
+.loot-result {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  max-width: 320px;
+  width: 100%;
+}
+
+.loot-result-title {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.loot-result-items {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.loot-result-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.loot-result-icon {
+  width: 16px;
+  height: 16px;
+  color: #f4c542;
+}
+
+.loot-result-item-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.loot-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loot-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+}
+
+.loot-member-row.is-current-turn {
   border-color: var(--accent);
 }

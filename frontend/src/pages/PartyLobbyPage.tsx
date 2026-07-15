@@ -11,6 +11,7 @@ import { selectClassAsFakeMember } from '../features/dev/api'
 import { useClassDefinitions } from '../features/classes/useClassDefinitions'
 import { BattleScreen } from '../features/combat/components/BattleScreen'
 import { DungeonScreen } from '../features/dungeon/components/DungeonScreen'
+import { CoinChangeToast } from '../features/party/components/CoinChangeToast'
 import type { CharacterClass } from '../features/party/types'
 
 export function PartyLobbyPage() {
@@ -82,6 +83,7 @@ export function PartyLobbyPage() {
   if (party.status === 'DUNGEON') {
     return (
       <div className="battle-page">
+        <CoinChangeToast coins={party.coins} />
         <DungeonScreen
           code={party.code}
           members={party.members}
@@ -89,8 +91,11 @@ export function PartyLobbyPage() {
           selfId={selfId}
           storage={party.storage}
           wheelResults={party.wheelResults}
+          lootResults={party.lootResults}
           turnOrder={party.turnOrder}
           definitions={definitions}
+          coins={party.coins}
+          shopStock={party.shopStock}
           onEnterRoom={handleEnterRoom}
           onApplyUpdate={applyUpdate}
         />
@@ -101,6 +106,7 @@ export function PartyLobbyPage() {
   if (party.status === 'IN_PROGRESS') {
     return (
       <div className="battle-page">
+        <CoinChangeToast coins={party.coins} />
         {import.meta.env.DEV && party.members.some((member) => member.bot) && (
           <section className="card dev-panel">
             <h2 className="section-title">Playing as (dev)</h2>

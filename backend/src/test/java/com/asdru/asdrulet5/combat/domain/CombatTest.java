@@ -55,7 +55,7 @@ class CombatTest {
     }
 
     private static Combatant player(String id, List<Ability> abilities, List<ItemPassive> passives) {
-        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 10, 40, abilities, null, null, null, null, passives);
+        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 0, 40, abilities, null, null, null, null, passives);
     }
 
     private static Combatant enemy(String id, int maxHealth, int defense, int attackPower) {
@@ -63,7 +63,7 @@ class CombatTest {
     }
 
     private static Combatant enemy(String id, int maxHealth, int defense, int attackPower, List<ItemPassive> passives) {
-        return new Combatant(id, id, true, null, maxHealth, 0, defense, attackPower, 0, List.of(),
+        return new Combatant(id, id, true, null, maxHealth, 0, defense, 0, 0, List.of(),
                 "Claw", "A swipe.", attackPower + " damage", AbilityEffect.damage(attackPower), passives);
     }
 

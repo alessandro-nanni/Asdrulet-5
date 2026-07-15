@@ -6,7 +6,6 @@ export type AbilityKind = 'BASIC' | 'ULTIMATE'
 
 export interface Stats {
   maxHealth: number
-  damage: number
   defense: number
   speed: number
   maxStamina: number

@@ -6,7 +6,7 @@ const STAT_LABELS: Record<keyof PassiveEffect, string> = {
   bonusMaxHealth: 'Max Health',
   bonusMaxStamina: 'Max Stamina',
   bonusDefense: 'Defense',
-  bonusDamage: 'Damage',
+  damagePercent: 'Damage',
 }
 
 export function ItemDetailCard({ definition }: { definition: ItemDefinition }) {
@@ -25,10 +25,12 @@ export function ItemDetailCard({ definition }: { definition: ItemDefinition }) {
           .filter((stat) => definition.passiveEffect[stat] !== 0)
           .map((stat) => {
             const value = definition.passiveEffect[stat]
+            const suffix = stat === 'damagePercent' ? '%' : ''
             return (
               <li key={stat} className={value > 0 ? 'is-positive' : 'is-negative'}>
                 {STAT_LABELS[stat]} {value > 0 ? '+' : ''}
                 {value}
+                {suffix}
               </li>
             )
           })}

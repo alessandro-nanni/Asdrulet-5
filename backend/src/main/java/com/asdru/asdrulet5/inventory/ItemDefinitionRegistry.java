@@ -37,10 +37,10 @@ public class ItemDefinitionRegistry {
                 "A pitted old blade — better than fists.",
                 new ItemPassive() {
                     @Override
-                    public int bonusDamage() {
-                        return 3;
+                    public int damagePercent() {
+                        return 8;
                     }
-                });
+                }, 15, true);
     }
 
     private static ItemDefinition flameEdge() {
@@ -48,12 +48,13 @@ public class ItemDefinitionRegistry {
                 "Still warm from the forge.",
                 new ItemPassive() {
                     @Override
-                    public int bonusDamage() {
-                        return 7;
+                    public int damagePercent() {
+                        return 20;
                     }
-                });
+                }, 45, true);
     }
 
+    /** Reactive weapon, kept loot-only — never turns up in the shop, only as a wheel reward. */
     private static ItemDefinition vampiricFang() {
         return new ItemDefinition("vampiric-fang", "Vampiric Fang", ItemSlot.WEAPON,
                 "Drinks deep with every cut, feeding a quarter of the wound back to its wielder.",
@@ -62,7 +63,7 @@ public class ItemDefinitionRegistry {
                     public void onDamageDealt(EffectTarget wearer, EffectTarget target, int amount) {
                         wearer.applyHeal(Math.max(1, amount / 4));
                     }
-                });
+                }, 50, false);
     }
 
     private static ItemDefinition leatherVest() {
@@ -78,7 +79,7 @@ public class ItemDefinitionRegistry {
                     public int bonusDefense() {
                         return 2;
                     }
-                });
+                }, 20, true);
     }
 
     private static ItemDefinition plateArmor() {
@@ -94,9 +95,10 @@ public class ItemDefinitionRegistry {
                     public int bonusDefense() {
                         return 6;
                     }
-                });
+                }, 40, true);
     }
 
+    /** Reactive chestplate, kept loot-only — never turns up in the shop, only as a wheel reward. */
     private static ItemDefinition thornedPlate() {
         return new ItemDefinition("thorned-plate", "Thorned Plate", ItemSlot.CHESTPLATE,
                 "Studded with barbs that bite back — a fifth of any hit lands right back on the attacker.",
@@ -105,7 +107,7 @@ public class ItemDefinitionRegistry {
                     public void onDamageTaken(EffectTarget wearer, EffectTarget attacker, int amount) {
                         attacker.applyDamage(Math.max(1, amount / 5));
                     }
-                });
+                }, 45, false);
     }
 
     private static ItemDefinition luckyCharm() {
@@ -116,7 +118,7 @@ public class ItemDefinitionRegistry {
                     public int bonusMaxStamina() {
                         return 15;
                     }
-                });
+                }, 20, true);
     }
 
     private static ItemDefinition berserkersRing() {
@@ -134,12 +136,13 @@ public class ItemDefinitionRegistry {
                     }
 
                     @Override
-                    public int bonusDamage() {
-                        return 5;
+                    public int damagePercent() {
+                        return 15;
                     }
-                });
+                }, 35, true);
     }
 
+    /** Reactive trinket, kept loot-only — never turns up in the shop, only as a wheel reward. */
     private static ItemDefinition executionersBadge() {
         return new ItemDefinition("executioners-badge", "Executioner's Badge", ItemSlot.TRINKET,
                 "A grim trophy that rewards finishing the job — heals 10 health on a kill.",
@@ -148,7 +151,7 @@ public class ItemDefinitionRegistry {
                     public void onKill(EffectTarget wearer, EffectTarget victim) {
                         wearer.applyHeal(10);
                     }
-                });
+                }, 60, false);
     }
 
     public List<ItemDefinition> all() {

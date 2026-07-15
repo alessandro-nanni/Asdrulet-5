@@ -7,6 +7,7 @@ public record ItemDefinitionDto(
         String displayName,
         ItemSlot slot,
         String description,
-        PassiveEffectDto passiveEffect
+        PassiveEffectDto passiveEffect,
+        int price
 ) {
 }

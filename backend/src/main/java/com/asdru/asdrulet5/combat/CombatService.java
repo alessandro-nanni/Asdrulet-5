@@ -87,6 +87,17 @@ public class CombatService {
         return CombatMapper.toDto(getOrThrow(code));
     }
 
+    /**
+     * The non-enemy combatants from a resolved fight, in their exact ending
+     * state (health, remaining active effects) — used by PartyService right
+     * after a victory to carry that state back onto each PartyMember, so it
+     * persists into whatever room comes next instead of being lost the
+     * moment combat ends.
+     */
+    public List<Combatant> partyCombatantsFor(String code) {
+        return getOrThrow(code).combatants().stream().filter(combatant -> !combatant.enemy()).toList();
+    }
+
     private Combatant toCombatant(PartyMember member) {
         ClassDefinition definition = classDefinitionRegistry.get(member.characterClass());
         int ultimateChargeThreshold = definition.abilities().stream()
@@ -101,11 +112,12 @@ public class CombatService {
                 Math.max(1, definition.stats().maxHealth() + sumBonus(passives, ItemPassive::bonusMaxHealth)),
                 Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)),
                 Math.max(0, definition.stats().defense() + sumBonus(passives, ItemPassive::bonusDefense)),
-                Math.max(0, definition.stats().damage() + sumBonus(passives, ItemPassive::bonusDamage)),
+                sumBonus(passives, ItemPassive::damagePercent),
                 ultimateChargeThreshold, definition.abilities(), null, null, null, null, passives);
-        // Both carried over from a MYSTERY wheel spin in the room the party
-        // just left — see PartyMember's own doc for why nothing else ever
-        // touches these two fields.
+        // Both carried over from whatever the member's last room left them
+        // with — a wheel/loot roll, or the ending state of their last fight
+        // (see PartyService.syncMembersAfterCombat) — so a fresh Combatant
+        // always starts from where the party actually left off.
         if (member.currentHealth() != null) {
             combatant.setStartingHealth(member.currentHealth());
         }
@@ -135,7 +147,7 @@ public class CombatService {
         return new Combatant(
                 ENEMY_ID, definition.displayName(), true, null,
                 definition.stats().maxHealth(), definition.stats().maxStamina(), definition.stats().defense(),
-                definition.stats().damage(), 0, List.of(), definition.attackName(), definition.attackDescription(),
+                0, 0, List.of(), definition.attackName(), definition.attackDescription(),
                 definition.attackEffectSummary(), definition.attackEffect(), List.of());
     }
 

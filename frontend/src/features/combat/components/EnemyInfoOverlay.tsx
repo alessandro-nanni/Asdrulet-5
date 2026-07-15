@@ -25,7 +25,6 @@ export function EnemyInfoOverlay({ combatant, onClose }: Props) {
 
           <div className="stat-bar-list">
             <StatBar label="Health" value={combatant.maxHealth} max={300} theme="enemy" />
-            <StatBar label="Damage" value={combatant.damage} max={30} theme="enemy" />
             <StatBar label="Defense" value={combatant.defense} max={30} theme="enemy" />
           </div>
 

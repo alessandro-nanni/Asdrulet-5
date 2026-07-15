@@ -36,7 +36,8 @@ public interface AbilityEffect {
             throw new IllegalArgumentException("power must be positive");
         }
         return (actor, target) -> {
-            int amount = mitigatedDamage(power + actor.bonusDamage(), target.effectiveDefense());
+            int scaledPower = Math.max(1, (int) Math.round(power * (1 + actor.damagePercentBonus() / 100.0)));
+            int amount = mitigatedDamage(scaledPower + actor.bonusDamage(), target.effectiveDefense());
             target.applyDamage(amount);
             // Ultimates charge from damage dealt, including a damage-dealing
             // ultimate's own hit — it counts toward building the next one.

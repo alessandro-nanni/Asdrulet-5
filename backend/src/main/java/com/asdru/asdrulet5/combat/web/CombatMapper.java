@@ -34,7 +34,6 @@ public class CombatMapper {
                 combatant.maxStamina(),
                 combatant.currentStamina(),
                 combatant.baseDefense(),
-                combatant.baseDamage(),
                 combatant.ultimateCharge(),
                 combatant.ultimateChargeThreshold(),
                 combatant.alive(),

@@ -84,4 +84,26 @@ public class PartyController {
     public PartyStateDto acknowledgeWheelResult(@PathVariable String code, @PathVariable String memberId) {
         return partyService.acknowledgeWheelResult(code.toUpperCase(), memberId);
     }
+
+    @PostMapping("/{code}/{memberId}/shop/buy")
+    public PartyStateDto buyItem(@PathVariable String code,
+                                 @PathVariable String memberId,
+                                 @Valid @RequestBody BuyItemRequest request) {
+        return partyService.buyItem(code.toUpperCase(), memberId, request.itemId());
+    }
+
+    @PostMapping("/{code}/{memberId}/shop/leave")
+    public PartyStateDto leaveShop(@PathVariable String code, @PathVariable String memberId) {
+        return partyService.leaveShop(code.toUpperCase(), memberId);
+    }
+
+    @PostMapping("/{code}/{memberId}/loot/claim")
+    public PartyStateDto lootChest(@PathVariable String code, @PathVariable String memberId) {
+        return partyService.lootChest(code.toUpperCase(), memberId);
+    }
+
+    @PostMapping("/{code}/{memberId}/loot/acknowledge")
+    public PartyStateDto acknowledgeLootResult(@PathVariable String code, @PathVariable String memberId) {
+        return partyService.acknowledgeLootResult(code.toUpperCase(), memberId);
+    }
 }

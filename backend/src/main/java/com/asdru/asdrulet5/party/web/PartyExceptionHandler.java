@@ -86,4 +86,39 @@ public class PartyExceptionHandler {
     public ResponseEntity<Map<String, String>> handleNotYourWheelTurn(NotYourWheelTurnException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
     }
+
+    @ExceptionHandler(NotInMerchantRoomException.class)
+    public ResponseEntity<Map<String, String>> handleNotInMerchantRoom(NotInMerchantRoomException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ItemNotInShopException.class)
+    public ResponseEntity<Map<String, String>> handleItemNotInShop(ItemNotInShopException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(InsufficientCoinsException.class)
+    public ResponseEntity<Map<String, String>> handleInsufficientCoins(InsufficientCoinsException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(NotInLootRoomException.class)
+    public ResponseEntity<Map<String, String>> handleNotInLootRoom(NotInLootRoomException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(AlreadyLootedException.class)
+    public ResponseEntity<Map<String, String>> handleAlreadyLooted(AlreadyLootedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(NotYetLootedException.class)
+    public ResponseEntity<Map<String, String>> handleNotYetLooted(NotYetLootedException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(NotYourLootTurnException.class)
+    public ResponseEntity<Map<String, String>> handleNotYourLootTurn(NotYourLootTurnException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
 }

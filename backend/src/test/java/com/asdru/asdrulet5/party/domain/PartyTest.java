@@ -397,7 +397,8 @@ class PartyTest {
         party.recordWheelSpin("leader-1", WheelEffect.POISON);
 
         assertThat(party.remainingWheelEffects()).containsExactlyInAnyOrder(
-                WheelEffect.FULL_HEAL, WheelEffect.HALVE_HEALTH, WheelEffect.GIVE_ITEM, WheelEffect.CLEAR_EFFECTS);
+                WheelEffect.FULL_HEAL, WheelEffect.HALVE_HEALTH, WheelEffect.GIVE_ITEM, WheelEffect.GIVE_COINS,
+                WheelEffect.CLEAR_EFFECTS);
     }
 
     @Test

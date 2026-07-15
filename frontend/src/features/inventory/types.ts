@@ -10,7 +10,7 @@ export interface PassiveEffect {
   bonusMaxHealth: number
   bonusMaxStamina: number
   bonusDefense: number
-  bonusDamage: number
+  damagePercent: number
 }
 
 export interface ItemDefinition {
@@ -19,4 +19,5 @@ export interface ItemDefinition {
   slot: ItemSlot
   description: string
   passiveEffect: PassiveEffect
+  price: number
 }

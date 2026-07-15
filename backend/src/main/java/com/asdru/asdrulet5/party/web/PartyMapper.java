@@ -2,13 +2,18 @@ package com.asdru.asdrulet5.party.web;
 
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.inventory.domain.Loadout;
+import com.asdru.asdrulet5.party.domain.LootResult;
 import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import com.asdru.asdrulet5.party.web.dto.LoadoutDto;
+import com.asdru.asdrulet5.party.web.dto.LootResultDto;
 import com.asdru.asdrulet5.party.web.dto.PartyMemberDto;
 import com.asdru.asdrulet5.party.web.dto.PartyStateDto;
 import com.asdru.asdrulet5.party.web.dto.PendingEffectDto;
 import lombok.experimental.UtilityClass;
+
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @UtilityClass
 public class PartyMapper {
@@ -21,7 +26,11 @@ public class PartyMapper {
                 party.turnOrder(),
                 party.status(),
                 party.storage(),
-                party.wheelResults()
+                party.wheelResults(),
+                party.coins(),
+                party.shopStock(),
+                party.lootResults().entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, entry -> toDto(entry.getValue())))
         );
     }
 
@@ -45,5 +54,9 @@ public class PartyMapper {
 
     private PendingEffectDto toDto(ActiveEffect effect) {
         return new PendingEffectDto(effect.name(), effect.description(), effect.icon(), effect.remainingTurns());
+    }
+
+    private LootResultDto toDto(LootResult result) {
+        return new LootResultDto(result.coins(), result.itemId());
     }
 }
