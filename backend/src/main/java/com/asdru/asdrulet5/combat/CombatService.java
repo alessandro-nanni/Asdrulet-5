@@ -40,12 +40,13 @@ public class CombatService {
 
     public CombatStateDto startCombat(String code, List<PartyMember> members, List<String> turnOrder) {
         List<Combatant> combatants = new ArrayList<>();
+        int leaderCurrentHealth = leaderCurrentHealth(members);
         for (String userId : turnOrder) {
             PartyMember member = members.stream()
                     .filter(candidate -> candidate.userId().equals(userId))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Turn order references unknown member " + userId));
-            combatants.add(toCombatant(member));
+            combatants.add(toCombatant(member, leaderCurrentHealth));
         }
         combatants.add(toEnemyCombatant());
 
@@ -98,7 +99,32 @@ public class CombatService {
         return getOrThrow(code).combatants().stream().filter(combatant -> !combatant.enemy()).toList();
     }
 
-    private Combatant toCombatant(PartyMember member) {
+    /**
+     * The party leader's own starting health for this fight — the baseline
+     * Mantle of the Usurper compares every other member against, evaluated
+     * once here rather than continuously during the fight (see
+     * ItemPassive.damagePercentIfHealthierThanLeader's own doc). 0 if
+     * there's somehow no leader in the roster.
+     */
+    private int leaderCurrentHealth(List<PartyMember> members) {
+        return members.stream()
+                .filter(PartyMember::leader)
+                .findFirst()
+                .map(this::effectiveStartingHealth)
+                .orElse(0);
+    }
+
+    /** A member's health entering the fight: whatever carried over, or their full effective max if nothing did. */
+    private int effectiveStartingHealth(PartyMember member) {
+        if (member.currentHealth() != null) {
+            return member.currentHealth();
+        }
+        ClassDefinition definition = classDefinitionRegistry.get(member.characterClass());
+        List<ItemPassive> passives = resolvePassives(member.loadout());
+        return Math.max(1, definition.stats().maxHealth() + sumBonus(passives, ItemPassive::bonusMaxHealth));
+    }
+
+    private Combatant toCombatant(PartyMember member, int leaderCurrentHealth) {
         ClassDefinition definition = classDefinitionRegistry.get(member.characterClass());
         int ultimateChargeThreshold = definition.abilities().stream()
                 .filter(UltimateAbility.class::isInstance)
@@ -107,12 +133,21 @@ public class CombatService {
                 .orElseThrow()
                 .chargeThreshold();
         List<ItemPassive> passives = resolvePassives(member.loadout());
+        // Evaluated once against this member's own starting health (not the
+        // max health this very bonus would produce) to avoid a circular
+        // definition — see ItemPassive.bonusMaxHealthPercentIfHealthierThanLeader.
+        boolean healthierThanLeader = effectiveStartingHealth(member) > leaderCurrentHealth;
+        int baseMaxHealth = definition.stats().maxHealth();
+        int maxHealthBonus = sumBonus(passives, ItemPassive::bonusMaxHealth)
+                + (healthierThanLeader ? baseMaxHealth * sumBonus(passives, ItemPassive::bonusMaxHealthPercentIfHealthierThanLeader) / 100 : 0);
+        int damagePercentBonus = sumBonus(passives, ItemPassive::damagePercent)
+                + (healthierThanLeader ? sumBonus(passives, ItemPassive::damagePercentIfHealthierThanLeader) : 0);
         Combatant combatant = new Combatant(
                 member.userId(), member.displayName(), false, member.characterClass(),
-                Math.max(1, definition.stats().maxHealth() + sumBonus(passives, ItemPassive::bonusMaxHealth)),
+                Math.max(1, baseMaxHealth + maxHealthBonus),
                 Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)),
                 Math.max(0, definition.stats().defense() + sumBonus(passives, ItemPassive::bonusDefense)),
-                sumBonus(passives, ItemPassive::damagePercent),
+                damagePercentBonus,
                 ultimateChargeThreshold, definition.abilities(), null, null, null, null, passives);
         // Both carried over from whatever the member's last room left them
         // with — a wheel/loot roll, or the ending state of their last fight

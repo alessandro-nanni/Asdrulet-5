@@ -1,5 +1,6 @@
 package com.asdru.asdrulet5.inventory;
 
+import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.classdata.domain.EffectTarget;
 import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.domain.ItemPassive;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -16,8 +18,13 @@ import java.util.stream.Stream;
 /**
  * Static catalog of equippable items. To add a new item: add a factory
  * method here and add it to {@link #buildDefinitions()} — a flat stat boost
- * overrides one of ItemPassive's bonusX() methods, a reactive item overrides
- * one of its onX() hooks (see {@link ItemPassive}).
+ * overrides one of ItemPassive's bonusX()/damagePercent() methods, a
+ * reactive item overrides one of its onX() hooks, and one that depends on
+ * live combat state or randomness overrides damagePercentBonus(wearer) or
+ * triggersFollowUpAbility() (see {@link ItemPassive}).
+ *
+ * <p>Every item here is loot-chest-only ({@code purchasable = false}) —
+ * none of them are meant to turn up in the merchant's shop.
  */
 @Component
 public class ItemDefinitionRegistry {
@@ -26,132 +33,101 @@ public class ItemDefinitionRegistry {
 
     private static Map<String, ItemDefinition> buildDefinitions() {
         return Stream.of(
-                        rustedSword(), flameEdge(), vampiricFang(),
-                        leatherVest(), plateArmor(), thornedPlate(),
-                        luckyCharm(), berserkersRing(), executionersBadge())
+                        scythe(), torch(),
+                        luckyCharm(), satelliteDish(), twitchingTalisman(),
+                        leatherTunic(), mantleOfTheUsurper())
                 .collect(Collectors.toMap(ItemDefinition::id, Function.identity()));
     }
 
-    private static ItemDefinition rustedSword() {
-        return new ItemDefinition("rusted-sword", "Rusted Sword", ItemSlot.WEAPON,
-                "A pitted old blade — better than fists.",
+    private static ItemDefinition scythe() {
+        return new ItemDefinition("scythe", "Scythe", ItemSlot.WEAPON,
+                "Grows deadlier with every ally who doesn't make it back — +13% damage for each dead teammate.",
                 new ItemPassive() {
                     @Override
-                    public int damagePercent() {
-                        return 8;
+                    public int damagePercentBonus(EffectTarget wearer) {
+                        return wearer.deadAllyCount() * 13;
                     }
-                }, 15, true);
+                }, 40, false);
     }
 
-    private static ItemDefinition flameEdge() {
-        return new ItemDefinition("flame-edge", "Flame Edge", ItemSlot.WEAPON,
-                "Still warm from the forge.",
-                new ItemPassive() {
-                    @Override
-                    public int damagePercent() {
-                        return 20;
-                    }
-                }, 45, true);
-    }
-
-    /** Reactive weapon, kept loot-only — never turns up in the shop, only as a wheel reward. */
-    private static ItemDefinition vampiricFang() {
-        return new ItemDefinition("vampiric-fang", "Vampiric Fang", ItemSlot.WEAPON,
-                "Drinks deep with every cut, feeding a quarter of the wound back to its wielder.",
+    private static ItemDefinition torch() {
+        return new ItemDefinition("torch", "Torch", ItemSlot.WEAPON,
+                "Never quite goes out — every hit carries a 10% chance to set its target on fire for 2 turns.",
                 new ItemPassive() {
                     @Override
                     public void onDamageDealt(EffectTarget wearer, EffectTarget target, int amount) {
-                        wearer.applyHeal(Math.max(1, amount / 4));
+                        if (ThreadLocalRandom.current().nextDouble() < 0.10) {
+                            target.addActiveEffect(ActiveEffect.damageOverTime(
+                                    "On Fire", "Burning — takes damage each turn.", "burn", 8, 2));
+                        }
                     }
-                }, 50, false);
-    }
-
-    private static ItemDefinition leatherVest() {
-        return new ItemDefinition("leather-vest", "Leather Vest", ItemSlot.CHESTPLATE,
-                "Light and flexible.",
-                new ItemPassive() {
-                    @Override
-                    public int bonusMaxHealth() {
-                        return 10;
-                    }
-
-                    @Override
-                    public int bonusDefense() {
-                        return 2;
-                    }
-                }, 20, true);
-    }
-
-    private static ItemDefinition plateArmor() {
-        return new ItemDefinition("plate-armor", "Plate Armor", ItemSlot.CHESTPLATE,
-                "Heavy, but it'll stop most things.",
-                new ItemPassive() {
-                    @Override
-                    public int bonusMaxHealth() {
-                        return 20;
-                    }
-
-                    @Override
-                    public int bonusDefense() {
-                        return 6;
-                    }
-                }, 40, true);
-    }
-
-    /** Reactive chestplate, kept loot-only — never turns up in the shop, only as a wheel reward. */
-    private static ItemDefinition thornedPlate() {
-        return new ItemDefinition("thorned-plate", "Thorned Plate", ItemSlot.CHESTPLATE,
-                "Studded with barbs that bite back — a fifth of any hit lands right back on the attacker.",
-                new ItemPassive() {
-                    @Override
-                    public void onDamageTaken(EffectTarget wearer, EffectTarget attacker, int amount) {
-                        attacker.applyDamage(Math.max(1, amount / 5));
-                    }
-                }, 45, false);
+                }, 35, false);
     }
 
     private static ItemDefinition luckyCharm() {
         return new ItemDefinition("lucky-charm", "Lucky Charm", ItemSlot.TRINKET,
-                "Warm to the touch.",
+                "Warm to the touch — a rare 2% chance for any hit to land for 300% damage.",
                 new ItemPassive() {
                     @Override
-                    public int bonusMaxStamina() {
-                        return 15;
+                    public int damagePercentBonus(EffectTarget wearer) {
+                        return ThreadLocalRandom.current().nextDouble() < 0.02 ? 200 : 0;
                     }
-                }, 20, true);
+                }, 30, false);
     }
 
-    private static ItemDefinition berserkersRing() {
-        return new ItemDefinition("berserkers-ring", "Berserker's Ring", ItemSlot.TRINKET,
-                "Hums with restrained aggression — a trade of safety for power.",
+    private static ItemDefinition satelliteDish() {
+        return new ItemDefinition("satellite-dish", "Satellite Dish", ItemSlot.TRINKET,
+                "Draws power from somewhere overhead. +6 defense, but bleeds 10 stamina at the start of every turn.",
                 new ItemPassive() {
-                    @Override
-                    public int bonusMaxHealth() {
-                        return -10;
-                    }
-
                     @Override
                     public int bonusDefense() {
-                        return -2;
+                        return 6;
                     }
 
                     @Override
-                    public int damagePercent() {
-                        return 15;
+                    public void onStartTurn(EffectTarget wearer) {
+                        wearer.drainStamina(10);
                     }
-                }, 35, true);
+                }, 30, false);
     }
 
-    /** Reactive trinket, kept loot-only — never turns up in the shop, only as a wheel reward. */
-    private static ItemDefinition executionersBadge() {
-        return new ItemDefinition("executioners-badge", "Executioner's Badge", ItemSlot.TRINKET,
-                "A grim trophy that rewards finishing the job — heals 10 health on a kill.",
+    private static ItemDefinition twitchingTalisman() {
+        return new ItemDefinition("twitching-talisman", "Twitching Talisman", ItemSlot.TRINKET,
+                "Jitters with restless energy — a 10% chance to immediately act again with the same basic ability "
+                        + "(never an ultimate).",
                 new ItemPassive() {
                     @Override
-                    public void onKill(EffectTarget wearer, EffectTarget victim) {
-                        wearer.applyHeal(10);
+                    public boolean triggersFollowUpAbility() {
+                        return ThreadLocalRandom.current().nextDouble() < 0.10;
                     }
-                }, 60, false);
+                }, 35, false);
+    }
+
+    private static ItemDefinition leatherTunic() {
+        return new ItemDefinition("leather-tunic", "Leather Tunic", ItemSlot.CHESTPLATE,
+                "Simple and sturdy.",
+                new ItemPassive() {
+                    @Override
+                    public int bonusDefense() {
+                        return 4;
+                    }
+                }, 20, false);
+    }
+
+    private static ItemDefinition mantleOfTheUsurper() {
+        return new ItemDefinition("mantle-of-the-usurper", "Mantle of the Usurper", ItemSlot.CHESTPLATE,
+                "As long as you have more health than your party's leader: +5% damage and +7% max health.",
+                new ItemPassive() {
+                    @Override
+                    public int damagePercentIfHealthierThanLeader() {
+                        return 5;
+                    }
+
+                    @Override
+                    public int bonusMaxHealthPercentIfHealthierThanLeader() {
+                        return 7;
+                    }
+                }, 40, false);
     }
 
     public List<ItemDefinition> all() {

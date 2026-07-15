@@ -2,7 +2,7 @@ interface Props {
   label: string
   value: number
   max: number
-  /** Lowercase theme key, e.g. 'warrior' or 'enemy' — see the `.stat-bar.class-*` rules in index.css. */
+  /** Lowercase theme key, e.g. 'berserker' or 'enemy' — see the `.stat-bar.class-*` rules in index.css. */
   theme: string
 }
 

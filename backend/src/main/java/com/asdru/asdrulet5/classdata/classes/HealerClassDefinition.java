@@ -14,23 +14,24 @@ public class HealerClassDefinition {
                 CharacterClass.HEALER,
                 "Healer",
                 "A steady hand that keeps the party standing when everything else falls apart.",
-                new Stats(80, 4, 100),
+                new Stats(60, 0, 80),
                 List.of(
-                        new BasicAbility("healer.mending-light", "Mending Light",
-                                "Channels restorative light into a single ally.",
-                                "20 healing",
-                                TargetType.SINGLE_ALLY, 15,
-                                AbilityEffect.heal(20)),
-                        new BasicAbility("healer.smite", "Smite",
-                                "Calls down a bolt of holy energy on an enemy.",
-                                "18 damage",
-                                TargetType.SINGLE_ENEMY, 10,
-                                AbilityEffect.damage(18)),
+                        new BasicAbility("healer.healing-light", "Healing Light",
+                                "Channels warm light into a single ally, mending their wounds.",
+                                "15 healing",
+                                TargetType.SINGLE_ALLY, 45,
+                                AbilityEffect.heal(15)),
+                        new BasicAbility("healer.golden-strike", "Golden Strike",
+                                "Smites a foe with radiant force, marking them for allies to profit from.",
+                                "8 damage + Golden Touch for 2 turns",
+                                TargetType.SINGLE_ENEMY, 50,
+                                AbilityEffect.damageAndApplyEffect(8,
+                                        actor -> ActiveEffect.goldenTouch("Golden Touch", "goldenTouch", 2))),
                         new UltimateAbility("healer.circle-of-renewal", "Circle of Renewal",
-                                "Floods the whole party with healing light.",
-                                "35 healing to all allies",
+                                "Floods the party with cleansing light, purging harm and mending wounds.",
+                                "Clears negative effects, 20 healing to all allies",
                                 TargetType.ALL_ALLIES, 100,
-                                AbilityEffect.heal(35))
+                                AbilityEffect.healAndClearNegativeEffects(20))
                 )
         );
     }

@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -36,7 +37,7 @@ public final class Combatant implements EffectTarget {
     private final int maxHealth;
     private final int maxStamina;
     private final int baseDefense;
-    private final int damagePercentBonus;
+    private final int equipmentDamagePercentBonus;
     private final int ultimateChargeThreshold;
     private final List<ActiveEffect> activeEffects = new ArrayList<>();
     private final List<CombatEvent> events = new ArrayList<>();
@@ -49,9 +50,11 @@ public final class Combatant implements EffectTarget {
     private int currentHealth;
     private int currentStamina;
     private int ultimateCharge;
+    /** Every combatant in this fight (both sides), attached by {@link Combat}'s constructor once the whole roster exists — see {@link #deadAllyCount()}. Empty (not null) until then, so a bare Combatant built outside a Combat just reports zero dead allies. */
+    private Collection<Combatant> roster = List.of();
 
     public Combatant(String id, String displayName, boolean enemy, CharacterClass characterClass,
-                     int maxHealth, int maxStamina, int baseDefense, int damagePercentBonus, int ultimateChargeThreshold,
+                     int maxHealth, int maxStamina, int baseDefense, int equipmentDamagePercentBonus, int ultimateChargeThreshold,
                      List<Ability> abilities, String attackName, String attackDescription,
                      String attackEffectSummary, AbilityEffect attackEffect, List<ItemPassive> passives) {
         this.id = id;
@@ -63,7 +66,7 @@ public final class Combatant implements EffectTarget {
         this.maxStamina = maxStamina;
         this.currentStamina = maxStamina;
         this.baseDefense = baseDefense;
-        this.damagePercentBonus = damagePercentBonus;
+        this.equipmentDamagePercentBonus = equipmentDamagePercentBonus;
         this.ultimateCharge = 0;
         this.ultimateChargeThreshold = ultimateChargeThreshold;
         this.abilities = List.copyOf(abilities);
@@ -102,6 +105,25 @@ public final class Combatant implements EffectTarget {
     @Override
     public int bonusDamage() {
         return activeEffects.stream().mapToInt(ActiveEffect::damageBonus).sum();
+    }
+
+    @Override
+    public int damagePercentBonus() {
+        return equipmentDamagePercentBonus
+                + activeEffects.stream().mapToInt(ActiveEffect::damagePercentBonus).sum()
+                + passives.stream().mapToInt(passive -> passive.damagePercentBonus(this)).sum();
+    }
+
+    /** Called once by {@link Combat}'s constructor, after every combatant in the fight has been created — see {@link #roster}. */
+    void attachRoster(Collection<Combatant> roster) {
+        this.roster = roster;
+    }
+
+    @Override
+    public int deadAllyCount() {
+        return (int) roster.stream()
+                .filter(other -> other != this && other.enemy == this.enemy && !other.alive())
+                .count();
     }
 
     public boolean hasStamina(int amount) {
@@ -149,6 +171,11 @@ public final class Combatant implements EffectTarget {
     }
 
     @Override
+    public void clearNegativeActiveEffects() {
+        activeEffects.removeIf(ActiveEffect::isNegative);
+    }
+
+    @Override
     public void addUltimateCharge(int amount) {
         ultimateCharge = Math.min(ultimateChargeThreshold, ultimateCharge + amount);
     }
@@ -157,8 +184,14 @@ public final class Combatant implements EffectTarget {
         currentStamina = Math.max(0, currentStamina - amount);
     }
 
-    void regenerateStamina(int amount) {
+    @Override
+    public void restoreStamina(int amount) {
         currentStamina = Math.min(maxStamina, currentStamina + amount);
+    }
+
+    @Override
+    public void drainStamina(int amount) {
+        currentStamina = Math.max(0, currentStamina - amount);
     }
 
     void resetUltimateCharge() {

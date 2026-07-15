@@ -37,6 +37,43 @@ public interface ItemPassive {
         return 0;
     }
 
+    /**
+     * Same shape as {@link #damagePercent()}, but re-evaluated fresh on
+     * every single hit instead of being summed once when the wearer's
+     * Combatant is built — for bonuses that depend on live combat state
+     * (Scythe, scaling off {@code wearer.deadAllyCount()}) or that are
+     * themselves randomized per swing (Lucky Charm's crit chance). 0 by
+     * default.
+     */
+    default int damagePercentBonus(EffectTarget wearer) {
+        return 0;
+    }
+
+    /**
+     * Whether this wearer's basic ability should immediately resolve a
+     * second time against the same targets, free of an extra stamina cost —
+     * rolled once per {@code useAbility} call, only for basic abilities
+     * (never ultimates). See Twitching Talisman. False by default.
+     */
+    default boolean triggersFollowUpAbility() {
+        return false;
+    }
+
+    /**
+     * Extra {@link #damagePercent()}-shaped bonus granted only while this
+     * wearer has more current health than their party's leader — checked
+     * once, when the fight starts (see CombatService), not re-evaluated
+     * turn to turn. See Mantle of the Usurper. 0 by default.
+     */
+    default int damagePercentIfHealthierThanLeader() {
+        return 0;
+    }
+
+    /** Same condition as {@link #damagePercentIfHealthierThanLeader()}, but a percentage of base max health instead. */
+    default int bonusMaxHealthPercentIfHealthierThanLeader() {
+        return 0;
+    }
+
     /** Called on the wearer when it becomes their turn, after active effects tick. */
     default void onStartTurn(EffectTarget wearer) {
     }

@@ -3,7 +3,7 @@ import type { CharacterClass, PartyMember } from '../types'
 import type { ClassDefinition } from '../../classes/types'
 import { ClassInfoOverlay } from './ClassInfoOverlay'
 
-const CLASSES: CharacterClass[] = ['HEALER', 'TANK', 'WARRIOR', 'MAGE']
+const CLASSES: CharacterClass[] = ['HEALER', 'PALADIN', 'BERSERKER', 'MAGE']
 
 interface Props {
   members: PartyMember[]

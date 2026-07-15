@@ -1,9 +1,9 @@
 package com.asdru.asdrulet5.classdata;
 
+import com.asdru.asdrulet5.classdata.classes.BerserkerClassDefinition;
 import com.asdru.asdrulet5.classdata.classes.HealerClassDefinition;
 import com.asdru.asdrulet5.classdata.classes.MageClassDefinition;
-import com.asdru.asdrulet5.classdata.classes.TankClassDefinition;
-import com.asdru.asdrulet5.classdata.classes.WarriorClassDefinition;
+import com.asdru.asdrulet5.classdata.classes.PaladinClassDefinition;
 import com.asdru.asdrulet5.classdata.domain.ClassDefinition;
 import com.asdru.asdrulet5.classdata.exception.UnknownClassDefinitionException;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
@@ -35,8 +35,8 @@ public class ClassDefinitionRegistry {
     private static Map<CharacterClass, ClassDefinition> buildDefinitions(boolean devToolsEnabled) {
         return Stream.of(
                         HealerClassDefinition.define(),
-                        TankClassDefinition.define(),
-                        WarriorClassDefinition.define(devToolsEnabled),
+                        PaladinClassDefinition.define(),
+                        BerserkerClassDefinition.define(devToolsEnabled),
                         MageClassDefinition.define())
                 .collect(Collectors.toMap(ClassDefinition::characterClass, Function.identity(),
                         (a, b) -> {

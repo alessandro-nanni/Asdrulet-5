@@ -45,16 +45,16 @@ class ClassDefinitionRegistryTest {
     }
 
     @Test
-    void warriorHasNoDebugAbilityWhenDevToolsDisabled() {
-        ClassDefinition warrior = registry.get(CharacterClass.WARRIOR);
+    void berserkerHasNoDebugAbilityWhenDevToolsDisabled() {
+        ClassDefinition berserker = registry.get(CharacterClass.BERSERKER);
 
-        assertThat(warrior.abilities()).extracting(Ability::id).doesNotContain("warrior.debug-nuke");
+        assertThat(berserker.abilities()).extracting(Ability::id).doesNotContain("berserker.debug-nuke");
     }
 
     @Test
-    void warriorHasDebugAbilityWhenDevToolsEnabled() {
-        ClassDefinition warrior = new ClassDefinitionRegistry(true).get(CharacterClass.WARRIOR);
+    void berserkerHasDebugAbilityWhenDevToolsEnabled() {
+        ClassDefinition berserker = new ClassDefinitionRegistry(true).get(CharacterClass.BERSERKER);
 
-        assertThat(warrior.abilities()).extracting(Ability::id).contains("warrior.debug-nuke");
+        assertThat(berserker.abilities()).extracting(Ability::id).contains("berserker.debug-nuke");
     }
 }

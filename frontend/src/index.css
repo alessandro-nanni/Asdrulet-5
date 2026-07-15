@@ -11,8 +11,8 @@
   --radius-sm: 10px;
   --shadow-card: 0 10px 30px rgba(0, 0, 0, 0.35);
   --class-healer: #35d08e;
-  --class-tank: #4f8fe0;
-  --class-warrior: #ff5c5c;
+  --class-paladin: #4f8fe0;
+  --class-berserker: #ff5c5c;
   --class-mage: #a06bff;
   --enemy: #7cb342;
 
@@ -442,14 +442,14 @@ p {
   color: var(--class-healer);
 }
 
-.badge-class.class-tank {
+.badge-class.class-paladin {
   background: rgba(79, 143, 224, 0.2);
-  color: var(--class-tank);
+  color: var(--class-paladin);
 }
 
-.badge-class.class-warrior {
+.badge-class.class-berserker {
   background: rgba(255, 92, 92, 0.2);
-  color: var(--class-warrior);
+  color: var(--class-berserker);
 }
 
 .badge-class.class-mage {
@@ -535,19 +535,19 @@ p {
   box-shadow: 0 0 0 3px rgba(53, 208, 142, 0.25);
 }
 
-.class-card.class-tank {
+.class-card.class-paladin {
   border-color: rgba(79, 143, 224, 0.3);
 }
-.class-card.class-tank.is-selected {
-  border-color: var(--class-tank);
+.class-card.class-paladin.is-selected {
+  border-color: var(--class-paladin);
   box-shadow: 0 0 0 3px rgba(79, 143, 224, 0.25);
 }
 
-.class-card.class-warrior {
+.class-card.class-berserker {
   border-color: rgba(255, 92, 92, 0.3);
 }
-.class-card.class-warrior.is-selected {
-  border-color: var(--class-warrior);
+.class-card.class-berserker.is-selected {
+  border-color: var(--class-berserker);
   box-shadow: 0 0 0 3px rgba(255, 92, 92, 0.25);
 }
 
@@ -605,11 +605,11 @@ p {
 .stat-bar.class-healer .stat-bar-fill {
   background: var(--class-healer);
 }
-.stat-bar.class-tank .stat-bar-fill {
-  background: var(--class-tank);
+.stat-bar.class-paladin .stat-bar-fill {
+  background: var(--class-paladin);
 }
-.stat-bar.class-warrior .stat-bar-fill {
-  background: var(--class-warrior);
+.stat-bar.class-berserker .stat-bar-fill {
+  background: var(--class-berserker);
 }
 .stat-bar.class-mage .stat-bar-fill {
   background: var(--class-mage);
@@ -1091,7 +1091,7 @@ p {
 }
 
 .combatant-card.is-current-turn {
-  border-color: var(--accent);
+  border-color: #fff;
   z-index: 2;
 }
 
@@ -1364,9 +1364,13 @@ p {
 
 .active-effects-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .active-effect-badge {
@@ -1374,10 +1378,9 @@ p {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 5px;
-  border-radius: 999px;
+  padding: 0;
   border: none;
-  background: rgba(0, 0, 0, 0.3);
+  background: transparent;
   color: var(--text);
   cursor: pointer;
 }
@@ -1735,7 +1738,7 @@ p {
 }
 
 .inventory-stat-list li.is-negative {
-  color: var(--class-warrior);
+  color: var(--class-berserker);
 }
 
 .inventory-storage-scroll {

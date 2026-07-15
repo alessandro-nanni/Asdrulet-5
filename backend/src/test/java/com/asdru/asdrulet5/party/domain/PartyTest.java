@@ -59,7 +59,7 @@ class PartyTest {
     void selectClassForUnknownUserThrows() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
 
-        assertThatThrownBy(() -> party.selectClass("nobody", CharacterClass.TANK))
+        assertThatThrownBy(() -> party.selectClass("nobody", CharacterClass.PALADIN))
                 .isInstanceOf(NotPartyMemberException.class);
     }
 
@@ -67,20 +67,20 @@ class PartyTest {
     void selectClassAlreadyTakenByAnotherMemberThrows() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
-        party.selectClass("leader-1", CharacterClass.WARRIOR);
+        party.selectClass("leader-1", CharacterClass.BERSERKER);
 
-        assertThatThrownBy(() -> party.selectClass("player-2", CharacterClass.WARRIOR))
+        assertThatThrownBy(() -> party.selectClass("player-2", CharacterClass.BERSERKER))
                 .isInstanceOf(ClassAlreadyTakenException.class);
     }
 
     @Test
     void reselectingOwnCurrentClassIsAllowed() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
-        party.selectClass("leader-1", CharacterClass.WARRIOR);
+        party.selectClass("leader-1", CharacterClass.BERSERKER);
 
-        party.selectClass("leader-1", CharacterClass.WARRIOR);
+        party.selectClass("leader-1", CharacterClass.BERSERKER);
 
-        assertThat(party.members().getFirst().characterClass()).isEqualTo(CharacterClass.WARRIOR);
+        assertThat(party.members().getFirst().characterClass()).isEqualTo(CharacterClass.BERSERKER);
     }
 
     @Test
@@ -115,7 +115,7 @@ class PartyTest {
     void startWithMemberMissingClassSelectionThrows() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
-        party.selectClass("leader-1", CharacterClass.WARRIOR);
+        party.selectClass("leader-1", CharacterClass.BERSERKER);
 
         assertThatThrownBy(() -> party.start("leader-1", List.of("player-2", "leader-1")))
                 .isInstanceOf(MissingClassSelectionException.class);
@@ -126,7 +126,7 @@ class PartyTest {
     void startByLeaderWithValidPermutationSetsOrderAndStatus() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
-        party.selectClass("leader-1", CharacterClass.WARRIOR);
+        party.selectClass("leader-1", CharacterClass.BERSERKER);
         party.selectClass("player-2", CharacterClass.HEALER);
         assertThat(party.status()).isEqualTo(PartyStatus.LOBBY);
 
@@ -154,13 +154,13 @@ class PartyTest {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         PartyMember bot = party.addFakeMember("Grog");
 
-        party.selectClass(bot.userId(), CharacterClass.TANK);
+        party.selectClass(bot.userId(), CharacterClass.PALADIN);
 
         PartyMember updated = party.members().stream()
                 .filter(member -> member.userId().equals(bot.userId()))
                 .findFirst()
                 .orElseThrow();
-        assertThat(updated.characterClass()).isEqualTo(CharacterClass.TANK);
+        assertThat(updated.characterClass()).isEqualTo(CharacterClass.PALADIN);
     }
 
     @Test
@@ -415,7 +415,7 @@ class PartyTest {
     void isMembersWheelTurnFollowsTurnOrderSequentially() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
         party.addMember("player-2", "Player Two", "avatar2.png");
-        party.selectClass("leader-1", CharacterClass.WARRIOR);
+        party.selectClass("leader-1", CharacterClass.BERSERKER);
         party.selectClass("player-2", CharacterClass.HEALER);
         party.start("leader-1", List.of("player-2", "leader-1"));
 
@@ -431,7 +431,7 @@ class PartyTest {
     @Test
     void isMembersWheelTurnIsFalseForEveryoneOnceAllHaveSpun() {
         Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
-        party.selectClass("leader-1", CharacterClass.WARRIOR);
+        party.selectClass("leader-1", CharacterClass.BERSERKER);
         party.start("leader-1", List.of("leader-1"));
 
         party.recordWheelSpin("leader-1", WheelEffect.FULL_HEAL);

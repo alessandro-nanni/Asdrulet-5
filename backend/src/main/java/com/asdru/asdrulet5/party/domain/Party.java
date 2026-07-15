@@ -10,15 +10,24 @@ import lombok.experimental.Accessors;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
+/**
+ * Aggregate root for one party's game state. Owns the member roster,
+ * turn order/status, shared loadout mutations, and coins directly; the
+ * MYSTERY wheel and LOOT room state machines (identical in shape — see
+ * {@link RoomTurnProgress}) and the shared storage grid / shop stock (see
+ * {@link SharedStorage} / {@link ShopStock}) are delegated to small
+ * single-purpose collaborators so this class stays about coordinating them,
+ * not reimplementing each one inline. Every public method is
+ * {@code @Synchronized} — that's the one lock those collaborators rely on,
+ * since none of them lock on their own.
+ */
 public class Party {
 
     /**
@@ -40,7 +49,7 @@ public class Party {
 
     private final Map<String, PartyMember> members = new LinkedHashMap<>();
     private final AtomicInteger fakeMemberSequence = new AtomicInteger();
-    private final List<String> storage = new ArrayList<>(Collections.nCopies(STORAGE_SIZE, null));
+    private final SharedStorage storage = new SharedStorage(STORAGE_SIZE);
     private List<String> turnOrder = List.of();
 
     /** Shared coin pool the whole party spends from — see the shop below. */
@@ -48,41 +57,13 @@ public class Party {
     @Accessors(fluent = true)
     private int coins = 0;
 
-    /**
-     * Items currently for sale in the MERCHANT room the party has entered —
-     * rolled fresh each time one is entered (see {@link #rollShopStock}) and
-     * consumed as members buy from it, same shared-pool spirit as coins.
-     */
-    private List<String> shopStock = List.of();
+    private final ShopStock shopStock = new ShopStock();
 
-    /**
-     * Bookkeeping for the MYSTERY room currently entered (if any): who has
-     * spun already, what they landed on (drawn from one shared pool of
-     * WheelEffects — see {@link #claimedWheelEffects} — so nobody can land
-     * on an effect someone else already claimed), and who has acknowledged
-     * having seen their own result (see {@link #recordWheelAcknowledgement}).
-     * Reset every time a new room is entered — see
-     * {@link #resetWheelSpins()} — so it's always scoped to whichever room
-     * is currently entered, never a stale earlier visit.
-     */
-    private final Set<String> wheelSpunMemberIds = new LinkedHashSet<>();
-    private final Map<String, WheelEffect> wheelResults = new LinkedHashMap<>();
-    private final Set<String> wheelAcknowledgedMemberIds = new LinkedHashSet<>();
-    private final Set<WheelEffect> claimedWheelEffects = new LinkedHashSet<>();
+    /** Bookkeeping for the MYSTERY room currently entered (if any) — see {@link RoomTurnProgress}. */
+    private final RoomTurnProgress<WheelEffect> wheelProgress = new RoomTurnProgress<>();
 
-    /**
-     * Bookkeeping for the LOOT room currently entered (if any) — same shape
-     * as the MYSTERY wheel's own bookkeeping above (one turn-ordered pass
-     * through the party, each member's own result recorded once, room clears
-     * once everyone's both looted and acknowledged), just without a shared
-     * pool to draw from: unlike WheelEffect, a LootResult is rolled fresh
-     * per member rather than drawn from a fixed exhaustible set, so there's
-     * no claimed-results counterpart to {@link #claimedWheelEffects} here.
-     * Reset every time a new room is entered — see {@link #resetLootClaims()}.
-     */
-    private final Set<String> lootedMemberIds = new LinkedHashSet<>();
-    private final Map<String, LootResult> lootResults = new LinkedHashMap<>();
-    private final Set<String> lootAcknowledgedMemberIds = new LinkedHashSet<>();
+    /** Bookkeeping for the LOOT room currently entered (if any) — see {@link RoomTurnProgress}. */
+    private final RoomTurnProgress<LootResult> lootProgress = new RoomTurnProgress<>();
 
     @Getter
     @Accessors(fluent = true)
@@ -180,16 +161,12 @@ public class Party {
      */
     @Synchronized
     public void seedStorage(List<String> itemIds) {
-        for (int i = 0; i < itemIds.size() && i < STORAGE_SIZE; i++) {
-            storage.set(i, itemIds.get(i));
-        }
+        storage.seed(itemIds);
     }
 
     @Synchronized
     public List<String> storage() {
-        // Not List.copyOf: cells are legitimately null (empty), and
-        // List.copyOf/List.of both reject null elements.
-        return Collections.unmodifiableList(new ArrayList<>(storage));
+        return storage.list();
     }
 
     /**
@@ -204,10 +181,10 @@ public class Party {
     @Synchronized
     public void equipFromStorage(String userId, int storageIndex, Function<String, ItemSlot> slotResolver) {
         PartyMember member = requireMember(userId);
-        if (storageIndex < 0 || storageIndex >= STORAGE_SIZE) {
+        if (storageIndex < 0 || storageIndex >= storage.size()) {
             throw new InvalidStorageIndexException(code, storageIndex);
         }
-        String itemId = storage.get(storageIndex);
+        String itemId = storage.at(storageIndex);
         if (itemId == null) {
             throw new EmptyStorageSlotException(code, storageIndex);
         }
@@ -248,39 +225,35 @@ public class Party {
     /** Called whenever a room is entered, so wheel bookkeeping never leaks from one room visit into the next. */
     @Synchronized
     public void resetWheelSpins() {
-        wheelSpunMemberIds.clear();
-        wheelResults.clear();
-        wheelAcknowledgedMemberIds.clear();
-        claimedWheelEffects.clear();
+        wheelProgress.reset();
     }
 
     @Synchronized
     public boolean hasSpunWheel(String userId) {
-        return wheelSpunMemberIds.contains(userId);
+        return wheelProgress.hasActed(userId);
     }
 
     @Synchronized
     public void recordWheelSpin(String userId, WheelEffect effect) {
-        wheelSpunMemberIds.add(userId);
-        wheelResults.put(userId, effect);
-        claimedWheelEffects.add(effect);
+        wheelProgress.recordResult(userId, effect);
     }
 
     @Synchronized
     public boolean allMembersHaveSpunWheel() {
-        return wheelSpunMemberIds.containsAll(members.keySet());
+        return wheelProgress.allMembersHaveActed(members.keySet());
     }
 
     @Synchronized
     public Map<String, WheelEffect> wheelResults() {
-        return Map.copyOf(wheelResults);
+        return wheelProgress.results();
     }
 
     /** The WheelEffects nobody in the party has landed on yet this room visit — what a spin draws from. */
     @Synchronized
     public List<WheelEffect> remainingWheelEffects() {
+        Set<WheelEffect> claimed = Set.copyOf(wheelProgress.results().values());
         return Arrays.stream(WheelEffect.values())
-                .filter(effect -> !claimedWheelEffects.contains(effect))
+                .filter(effect -> !claimed.contains(effect))
                 .toList();
     }
 
@@ -291,12 +264,7 @@ public class Party {
      */
     @Synchronized
     public boolean isMembersWheelTurn(String userId) {
-        for (String candidate : turnOrder) {
-            if (!wheelSpunMemberIds.contains(candidate)) {
-                return candidate.equals(userId);
-            }
-        }
-        return false;
+        return wheelProgress.isMembersTurn(userId, turnOrder);
     }
 
     /**
@@ -306,41 +274,38 @@ public class Party {
      */
     @Synchronized
     public void recordWheelAcknowledgement(String userId) {
-        wheelAcknowledgedMemberIds.add(userId);
+        wheelProgress.recordAcknowledgement(userId);
     }
 
     @Synchronized
     public boolean allMembersHaveAcknowledgedWheel() {
-        return wheelAcknowledgedMemberIds.containsAll(members.keySet());
+        return wheelProgress.allMembersHaveAcknowledged(members.keySet());
     }
 
     /** Called whenever a room is entered, so loot bookkeeping never leaks from one room visit into the next. */
     @Synchronized
     public void resetLootClaims() {
-        lootedMemberIds.clear();
-        lootResults.clear();
-        lootAcknowledgedMemberIds.clear();
+        lootProgress.reset();
     }
 
     @Synchronized
     public boolean hasLooted(String userId) {
-        return lootedMemberIds.contains(userId);
+        return lootProgress.hasActed(userId);
     }
 
     @Synchronized
     public void recordLoot(String userId, LootResult result) {
-        lootedMemberIds.add(userId);
-        lootResults.put(userId, result);
+        lootProgress.recordResult(userId, result);
     }
 
     @Synchronized
     public boolean allMembersHaveLooted() {
-        return lootedMemberIds.containsAll(members.keySet());
+        return lootProgress.allMembersHaveActed(members.keySet());
     }
 
     @Synchronized
     public Map<String, LootResult> lootResults() {
-        return Map.copyOf(lootResults);
+        return lootProgress.results();
     }
 
     /**
@@ -350,12 +315,7 @@ public class Party {
      */
     @Synchronized
     public boolean isMembersLootTurn(String userId) {
-        for (String candidate : turnOrder) {
-            if (!lootedMemberIds.contains(candidate)) {
-                return candidate.equals(userId);
-            }
-        }
-        return false;
+        return lootProgress.isMembersTurn(userId, turnOrder);
     }
 
     /**
@@ -365,12 +325,12 @@ public class Party {
      */
     @Synchronized
     public void recordLootAcknowledgement(String userId) {
-        lootAcknowledgedMemberIds.add(userId);
+        lootProgress.recordAcknowledgement(userId);
     }
 
     @Synchronized
     public boolean allMembersHaveAcknowledgedLoot() {
-        return lootAcknowledgedMemberIds.containsAll(members.keySet());
+        return lootProgress.allMembersHaveAcknowledged(members.keySet());
     }
 
     @Synchronized
@@ -403,10 +363,7 @@ public class Party {
     /** Drops itemId into the first empty storage cell; a no-op if the grid is already full. */
     @Synchronized
     public void addItemToStorage(String itemId) {
-        int emptyIndex = storage.indexOf(null);
-        if (emptyIndex >= 0) {
-            storage.set(emptyIndex, itemId);
-        }
+        storage.addFirstEmpty(itemId);
     }
 
     /**
@@ -436,18 +393,18 @@ public class Party {
     /** Called whenever a MERCHANT room is entered, replacing whatever was left over from a prior visit. */
     @Synchronized
     public void rollShopStock(List<String> itemIds) {
-        shopStock = List.copyOf(itemIds);
+        shopStock.roll(itemIds);
     }
 
     @Synchronized
     public List<String> shopStock() {
-        return shopStock;
+        return shopStock.list();
     }
 
     /**
      * Spends coins on an item currently for sale, atomically: validates the
      * item is actually in stock and the party can afford it, then removes it
-     * from {@link #shopStock} and drops it into shared storage — same
+     * from the shop's stock and drops it into shared storage — same
      * destination a LOOT pickup would use, so a bought item is equippable by
      * anyone, not just whoever paid for it.
      */
@@ -459,9 +416,7 @@ public class Party {
         if (coins < price) {
             throw new InsufficientCoinsException(code, price, coins);
         }
-        List<String> updated = new ArrayList<>(shopStock);
-        updated.remove(itemId);
-        shopStock = updated;
+        shopStock.remove(itemId);
         coins -= price;
         addItemToStorage(itemId);
     }

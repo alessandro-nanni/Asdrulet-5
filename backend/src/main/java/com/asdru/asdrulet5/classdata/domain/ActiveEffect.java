@@ -97,6 +97,53 @@ public abstract class ActiveEffect {
     }
 
     /**
+     * Passive percentage damage contribution while this effect is active
+     * (e.g. 5 = +5%) — summed alongside equipment's own damage percent by
+     * {@code EffectTarget.damagePercentBonus()}. 0 by default.
+     */
+    public int damagePercentBonus() {
+        return 0;
+    }
+
+    /**
+     * Whether this effect stops its holder from acting on their own turn at
+     * all (e.g. Frozen) — checked by the combat turn engine, which skips
+     * straight past a prevented holder for both a human player and the CPU
+     * enemy. False by default.
+     */
+    public boolean preventsAction() {
+        return false;
+    }
+
+    /**
+     * Whether this effect counts as harmful to its holder — used by effects
+     * like the Healer's ultimate that clear "all negative effects." False by
+     * default (buffs); override true for debuffs (Frozen, Taunt, damage over
+     * time, Golden Touch, ...).
+     */
+    public boolean isNegative() {
+        return false;
+    }
+
+    /**
+     * If non-null, the id of the only combatant this effect's holder is
+     * allowed to choose as a SINGLE_ENEMY target — see Taunt. Null (no
+     * restriction) by default.
+     */
+    public String forcedTargetId() {
+        return null;
+    }
+
+    /**
+     * Called on the holder right after they take {@code amount} damage from
+     * attacker — mirrors {@code ItemPassive.onDamageTaken}, just for a
+     * temporary effect instead of equipment (see Thorns, Golden Touch). No-op
+     * by default.
+     */
+    public void onDamageTaken(EffectTarget holder, EffectTarget attacker, int amount) {
+    }
+
+    /**
      * Ticks this effect against its holder and counts down its duration.
      * Called once per turn by the combat turn engine, which owns removing
      * expired effects. Not for use outside that engine.
@@ -134,6 +181,11 @@ public abstract class ActiveEffect {
             public void onTick(EffectTarget holder) {
                 holder.applyDamage(powerPerTurn);
             }
+
+            @Override
+            public boolean isNegative() {
+                return true;
+            }
         };
     }
 
@@ -147,9 +199,86 @@ public abstract class ActiveEffect {
         };
     }
 
+    /** Cannot act on their own turn at all — see {@link #preventsAction()}. Neither buffs nor damages on its own. */
+    public static ActiveEffect frozen(String name, String icon, int durationTurns) {
+        return new ActiveEffect(name, "Frozen solid — cannot act for " + turnsLabel(durationTurns) + ".", icon, durationTurns) {
+            @Override
+            public boolean preventsAction() {
+                return true;
+            }
+
+            @Override
+            public boolean isNegative() {
+                return true;
+            }
+        };
+    }
+
+    /** Percentage damage buff — e.g. power 5 means +5% damage. */
+    public static ActiveEffect strength(String name, String icon, int power, int durationTurns) {
+        requirePositive(power, "power");
+        return new ActiveEffect(name, "+" + power + "% damage for " + turnsLabel(durationTurns) + ".", icon, durationTurns) {
+            @Override
+            public int damagePercentBonus() {
+                return power;
+            }
+        };
+    }
+
+    /**
+     * Restricts the holder's own SINGLE_ENEMY ability choices to whoever
+     * applied this — see {@link #forcedTargetId()}. tauntedById is the
+     * taunter's combatant id (typically the caster's own {@code actor.id()}
+     * at the moment this is applied).
+     */
+    public static ActiveEffect taunt(String name, String icon, int durationTurns, String tauntedById) {
+        requireNonBlank(tauntedById, "tauntedById");
+        return new ActiveEffect(name, "Can only target " + tauntedById + " for " + turnsLabel(durationTurns) + ".", icon, durationTurns) {
+            @Override
+            public String forcedTargetId() {
+                return tauntedById;
+            }
+
+            @Override
+            public boolean isNegative() {
+                return true;
+            }
+        };
+    }
+
+    /** 10% of damage taken is dealt back to whoever dealt it. */
+    public static ActiveEffect thorns(String name, String icon, int durationTurns) {
+        return new ActiveEffect(name, "Reflects 10% of damage taken back at the attacker for "
+                + turnsLabel(durationTurns) + ".", icon, durationTurns) {
+            @Override
+            public void onDamageTaken(EffectTarget holder, EffectTarget attacker, int amount) {
+                attacker.applyDamage(Math.max(1, amount / 10));
+            }
+        };
+    }
+
+    /** Whoever lands a hit on the holder heals for 10% of the damage they just dealt. */
+    public static ActiveEffect goldenTouch(String name, String icon, int durationTurns) {
+        return new ActiveEffect(name, "Whoever hits this target heals for 10% of the damage dealt, for "
+                + turnsLabel(durationTurns) + ".", icon, durationTurns) {
+            @Override
+            public void onDamageTaken(EffectTarget holder, EffectTarget attacker, int amount) {
+                attacker.applyHeal(Math.max(1, amount / 10));
+            }
+
+            @Override
+            public boolean isNegative() {
+                return true;
+            }
+        };
+    }
+
+    private static String turnsLabel(int durationTurns) {
+        return durationTurns == 1 ? "1 turn" : durationTurns + " turns";
+    }
+
     private static String statChangeDescription(String stat, int power, int durationTurns) {
-        String turns = durationTurns == 1 ? "1 turn" : durationTurns + " turns";
-        return "+" + power + " " + stat + " for " + turns + ".";
+        return "+" + power + " " + stat + " for " + turnsLabel(durationTurns) + ".";
     }
 
     private static void requirePositive(int value, String field) {

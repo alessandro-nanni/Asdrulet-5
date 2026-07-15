@@ -64,7 +64,7 @@ class CombatServiceTest {
 
     @Test
     void startCombatCreatesOneCombatantPerMemberPlusOneEnemyAndBroadcasts() {
-        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR), member("p2", CharacterClass.HEALER));
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
 
         CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1", "p2"));
 
@@ -83,11 +83,11 @@ class CombatServiceTest {
 
     @Test
     void partyCombatantsForReturnsOnlyTheNonEnemyCombatantsInTheirCurrentState() {
-        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR), member("p2", CharacterClass.HEALER));
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
         combatService.startCombat("ABC123", members, List.of("p1", "p2"));
         String enemyId = combatService.getState("ABC123").combatants().stream()
                 .filter(CombatantDto::enemy).findFirst().orElseThrow().id();
-        combatService.useAbility("ABC123", "p1", "warrior.cleave", enemyId);
+        combatService.useAbility("ABC123", "p1", "berserker.reckless-strike", enemyId);
 
         List<Combatant> partyCombatants = combatService.partyCombatantsFor("ABC123");
 
@@ -97,13 +97,13 @@ class CombatServiceTest {
 
     @Test
     void useAbilityAppliesEffectAndBroadcasts() {
-        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR), member("p2", CharacterClass.HEALER));
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
         CombatStateDto started = combatService.startCombat("ABC123", members, List.of("p1", "p2"));
         String enemyId = started.combatants().stream().filter(CombatantDto::enemy).findFirst().orElseThrow().id();
         int enemyHealthBefore = started.combatants().stream()
                 .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
 
-        CombatStateDto updated = combatService.useAbility("ABC123", "p1", "warrior.cleave", enemyId);
+        CombatStateDto updated = combatService.useAbility("ABC123", "p1", "berserker.reckless-strike", enemyId);
 
         int enemyHealthAfter = updated.combatants().stream()
                 .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
@@ -113,69 +113,78 @@ class CombatServiceTest {
 
     @Test
     void startCombatAppliesEquippedItemPassiveBonusesToStats() {
-        // Warrior base stats: 120 health, 10 defense (see WarriorClassDefinition).
+        // Mage base stats: 70 health, 2 defense (see MageClassDefinition).
         Loadout loadout = Loadout.empty()
-                .withItem(ItemSlot.WEAPON, "flame-edge")      // +20% damage
-                .withItem(ItemSlot.CHESTPLATE, "plate-armor"); // +20 health, +6 defense
-        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR, loadout));
+                .withItem(ItemSlot.TRINKET, "satellite-dish")   // +6 defense
+                .withItem(ItemSlot.CHESTPLATE, "leather-tunic"); // +4 defense
+        List<PartyMember> members = List.of(member("p1", CharacterClass.MAGE, loadout));
 
         CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
 
-        CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
-        assertThat(warrior.maxHealth()).isEqualTo(140);
-        assertThat(warrior.defense()).isEqualTo(16);
+        CombatantDto mage = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(mage.maxHealth()).isEqualTo(70);
+        assertThat(mage.defense()).isEqualTo(12);
+    }
 
+    @Test
+    void scytheIncreasesDamageByThirteenPercentForEachDeadAlly() {
+        Loadout loadout = Loadout.empty().withItem(ItemSlot.WEAPON, "scythe");
+        PartyMember alive = member("p1", CharacterClass.MAGE, loadout);
+        PartyMember dead = memberWithHealth("p2", CharacterClass.BERSERKER, 0);
+        List<PartyMember> members = List.of(alive, dead);
+
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1", "p2"));
         String enemyId = dto.combatants().stream().filter(CombatantDto::enemy).findFirst().orElseThrow().id();
         int enemyHealthBefore = dto.combatants().stream()
                 .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
 
-        CombatStateDto updated = combatService.useAbility("ABC123", "p1", "warrior.cleave", enemyId);
+        CombatStateDto updated = combatService.useAbility("ABC123", "p1", "mage.arcane-blast", enemyId);
 
         int enemyHealthAfter = updated.combatants().stream()
                 .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
-        // Cleave's 22 power scaled by flame-edge's +20% = round(22 * 1.2) = 26,
-        // mitigated by the goblin's 8 defense: round(26 * (1 - 8/33)) = 20.
-        assertThat(enemyHealthBefore - enemyHealthAfter).isEqualTo(20);
+        // Arcane Blast's 9 power scaled by Scythe's +13% (one dead ally) = round(9 * 1.13) = 10,
+        // mitigated by the goblin's 8 defense: round(10 * (1 - 8/33)) = 8.
+        assertThat(enemyHealthBefore - enemyHealthAfter).isEqualTo(8);
     }
 
     @Test
     void startCombatHonorsAMemberSCarriedOverCurrentHealth() {
         // A MYSTERY wheel's "halve current health" persists on the member
         // until the next fight actually starts — see PartyMember's own doc.
-        List<PartyMember> members = List.of(memberWithHealth("p1", CharacterClass.WARRIOR, 30));
+        List<PartyMember> members = List.of(memberWithHealth("p1", CharacterClass.BERSERKER, 30));
 
         CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
 
-        CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
-        assertThat(warrior.maxHealth()).isEqualTo(120);
-        assertThat(warrior.currentHealth()).isEqualTo(30);
+        CombatantDto berserker = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(berserker.maxHealth()).isEqualTo(80);
+        assertThat(berserker.currentHealth()).isEqualTo(30);
     }
 
     @Test
     void startCombatWithNoCarriedOverHealthStartsAtMax() {
-        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR));
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER));
 
         CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
 
-        CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
-        assertThat(warrior.currentHealth()).isEqualTo(warrior.maxHealth());
+        CombatantDto berserker = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(berserker.currentHealth()).isEqualTo(berserker.maxHealth());
     }
 
     @Test
     void startCombatSeedsAPendingPoisonAsAnActiveEffect() {
-        List<PartyMember> members = List.of(memberWithPoison("p1", CharacterClass.WARRIOR, 6, 4));
+        List<PartyMember> members = List.of(memberWithPoison("p1", CharacterClass.BERSERKER, 6, 4));
 
         CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
 
-        CombatantDto warrior = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
-        assertThat(warrior.activeEffects()).hasSize(1);
-        assertThat(warrior.activeEffects().getFirst().name()).isEqualTo("Poison");
-        assertThat(warrior.activeEffects().getFirst().remainingTurns()).isEqualTo(4);
+        CombatantDto berserker = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(berserker.activeEffects()).hasSize(1);
+        assertThat(berserker.activeEffects().getFirst().name()).isEqualTo("Poison");
+        assertThat(berserker.activeEffects().getFirst().remainingTurns()).isEqualTo(4);
     }
 
     @Test
     void endTurnAdvancesToNextCombatant() {
-        List<PartyMember> members = List.of(member("p1", CharacterClass.WARRIOR), member("p2", CharacterClass.HEALER));
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
         combatService.startCombat("ABC123", members, List.of("p1", "p2"));
 
         CombatStateDto updated = combatService.endTurn("ABC123", "p1");
@@ -189,7 +198,7 @@ class CombatServiceTest {
                 "test.strike", "Strike", "A basic attack.", "20 damage", TargetType.SINGLE_ENEMY, 10,
                 AbilityEffect.damage(20));
         Combatant p1 = new Combatant(
-                "p1", "p1", false, CharacterClass.WARRIOR, 100, 100, 5, 0, 40, List.of(strike), null, null, null,
+                "p1", "p1", false, CharacterClass.BERSERKER, 100, 100, 5, 0, 40, List.of(strike), null, null, null,
                 null, List.of());
         Combatant weakEnemy = new Combatant(
                 "enemy-1", "enemy-1", true, null, 1, 0, 0, 0, 0, List.of(), "Claw", "A swipe.", "5 damage",

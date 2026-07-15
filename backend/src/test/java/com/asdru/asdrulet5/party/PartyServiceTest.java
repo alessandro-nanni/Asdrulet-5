@@ -132,7 +132,7 @@ class PartyServiceTest {
     void leaderStartsGameSuccessfully() {
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         assertThat(created.status()).isEqualTo(PartyStatus.LOBBY);
 
@@ -233,7 +233,7 @@ class PartyServiceTest {
     }
 
     private static Combatant playerCombatant(String userId, int maxHealth) {
-        return new Combatant(userId, userId, false, CharacterClass.WARRIOR,
+        return new Combatant(userId, userId, false, CharacterClass.BERSERKER,
                 maxHealth, 100, 5, 0, 40, List.of(), null, null, null, null, List.of());
     }
 
@@ -287,20 +287,20 @@ class PartyServiceTest {
     void equipItemFillsTheMatchingSlot() {
         PartyStateDto created = partyService.createParty(leader);
 
-        PartyStateDto updated = partyService.equipItem(created.code(), "leader-1", "rusted-sword");
+        PartyStateDto updated = partyService.equipItem(created.code(), "leader-1", "scythe");
 
-        assertThat(updated.members().getFirst().loadout().weaponItemId()).isEqualTo("rusted-sword");
+        assertThat(updated.members().getFirst().loadout().weaponItemId()).isEqualTo("scythe");
         assertThat(updated.members().getFirst().loadout().chestplateItemId()).isNull();
     }
 
     @Test
     void equipItemReplacesWhateverWasInThatSlotBefore() {
         PartyStateDto created = partyService.createParty(leader);
-        partyService.equipItem(created.code(), "leader-1", "rusted-sword");
+        partyService.equipItem(created.code(), "leader-1", "scythe");
 
-        PartyStateDto updated = partyService.equipItem(created.code(), "leader-1", "flame-edge");
+        PartyStateDto updated = partyService.equipItem(created.code(), "leader-1", "torch");
 
-        assertThat(updated.members().getFirst().loadout().weaponItemId()).isEqualTo("flame-edge");
+        assertThat(updated.members().getFirst().loadout().weaponItemId()).isEqualTo("torch");
     }
 
     @Test
@@ -323,20 +323,20 @@ class PartyServiceTest {
     void equipFromStorageEquipsItemAndSwapsPreviousBackIntoTheSameCell() {
         PartyStateDto created = partyService.createParty(leader);
         Party party = partyRepository.findByCode(created.code()).orElseThrow();
-        party.seedStorage(List.of("rusted-sword", "flame-edge"));
+        party.seedStorage(List.of("scythe", "torch"));
         int swordIndex = 0;
         int flameIndex = 1;
 
         PartyStateDto afterFirstEquip = partyService.equipFromStorage(created.code(), "leader-1", swordIndex);
-        assertThat(afterFirstEquip.members().getFirst().loadout().weaponItemId()).isEqualTo("rusted-sword");
+        assertThat(afterFirstEquip.members().getFirst().loadout().weaponItemId()).isEqualTo("scythe");
         assertThat(afterFirstEquip.storage().get(swordIndex)).isNull();
 
         PartyStateDto afterSecondEquip = partyService.equipFromStorage(created.code(), "leader-1", flameIndex);
 
-        assertThat(afterSecondEquip.members().getFirst().loadout().weaponItemId()).isEqualTo("flame-edge");
-        // The previously-equipped rusted sword goes back into the cell the
+        assertThat(afterSecondEquip.members().getFirst().loadout().weaponItemId()).isEqualTo("torch");
+        // The previously-equipped scythe goes back into the cell the
         // new item just vacated, so nothing is lost or duplicated.
-        assertThat(afterSecondEquip.storage().get(flameIndex)).isEqualTo("rusted-sword");
+        assertThat(afterSecondEquip.storage().get(flameIndex)).isEqualTo("scythe");
     }
 
     @Test
@@ -386,7 +386,7 @@ class PartyServiceTest {
     @Test
     void spinWheelTwiceInTheSameRoomThrows() {
         PartyStateDto created = partyService.createParty(leader);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
 
@@ -400,7 +400,7 @@ class PartyServiceTest {
     void spinWheelOutOfTurnOrderThrows() {
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
@@ -413,7 +413,7 @@ class PartyServiceTest {
     void spinWheelInTurnOrderSucceedsForEachMemberInSequence() {
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         // Deliberately not join order, to prove this is genuinely turnOrder-driven.
         partyService.startGame(created.code(), "leader-1", List.of("player-2", "leader-1"));
@@ -434,9 +434,9 @@ class PartyServiceTest {
         AuthenticatedUser member4 = new AuthenticatedUser("player-4", "Player Four", "p4.png");
         partyService.joinParty(created.code(), member3);
         partyService.joinParty(created.code(), member4);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
-        partyService.selectClass(created.code(), "player-3", CharacterClass.TANK);
+        partyService.selectClass(created.code(), "player-3", CharacterClass.PALADIN);
         partyService.selectClass(created.code(), "player-4", CharacterClass.MAGE);
         List<String> order = List.of("leader-1", "player-2", "player-3", "player-4");
         partyService.startGame(created.code(), "leader-1", order);
@@ -458,7 +458,7 @@ class PartyServiceTest {
         // the room on its own.
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
@@ -489,7 +489,7 @@ class PartyServiceTest {
     void acknowledgeClearsTheRoomOnlyOnceEveryMemberHasAcknowledged() {
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
@@ -506,7 +506,7 @@ class PartyServiceTest {
     @Test
     void acknowledgeSoloClearsImmediately() {
         PartyStateDto created = partyService.createParty(leader);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
         partyService.spinWheel(created.code(), "leader-1");
@@ -530,7 +530,7 @@ class PartyServiceTest {
             PartyStateDto created = partyService.createParty(
                     new AuthenticatedUser("solo-" + i, "Solo", "avatar.png"));
             when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
-            partyService.selectClass(created.code(), "solo-" + i, CharacterClass.WARRIOR);
+            partyService.selectClass(created.code(), "solo-" + i, CharacterClass.BERSERKER);
             partyService.startGame(created.code(), "solo-" + i, List.of("solo-" + i));
 
             PartyStateDto updated = partyService.spinWheel(created.code(), "solo-" + i);
@@ -572,12 +572,12 @@ class PartyServiceTest {
             Party party = partyRepository.findByCode(created.code()).orElseThrow();
             List<String> full = new java.util.ArrayList<>();
             for (int cell = 0; cell < Party.STORAGE_SIZE; cell++) {
-                full.add("rusted-sword");
+                full.add("scythe");
             }
             party.seedStorage(full);
             when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.MYSTERY);
             String userId = "solo-" + i;
-            partyService.selectClass(created.code(), userId, CharacterClass.WARRIOR);
+            partyService.selectClass(created.code(), userId, CharacterClass.BERSERKER);
             partyService.startGame(created.code(), userId, List.of(userId));
 
             assertThatCode(() -> partyService.spinWheel(created.code(), userId)).doesNotThrowAnyException();
@@ -603,7 +603,7 @@ class PartyServiceTest {
     @Test
     void lootChestTwiceInTheSameRoomThrows() {
         PartyStateDto created = partyService.createParty(leader);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
 
@@ -617,7 +617,7 @@ class PartyServiceTest {
     void lootChestOutOfTurnOrderThrows() {
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
@@ -630,7 +630,7 @@ class PartyServiceTest {
     void lootChestInTurnOrderSucceedsForEachMemberInSequence() {
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         // Deliberately not join order, to prove this is genuinely turnOrder-driven.
         partyService.startGame(created.code(), "leader-1", List.of("player-2", "leader-1"));
@@ -650,7 +650,7 @@ class PartyServiceTest {
         // the room on its own.
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
@@ -681,7 +681,7 @@ class PartyServiceTest {
     void acknowledgeLootClearsTheRoomOnlyOnceEveryMemberHasAcknowledged() {
         PartyStateDto created = partyService.createParty(leader);
         partyService.joinParty(created.code(), member);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.selectClass(created.code(), "player-2", CharacterClass.HEALER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1", "player-2"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
@@ -698,7 +698,7 @@ class PartyServiceTest {
     @Test
     void acknowledgeLootSoloClearsImmediately() {
         PartyStateDto created = partyService.createParty(leader);
-        partyService.selectClass(created.code(), "leader-1", CharacterClass.WARRIOR);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
         partyService.startGame(created.code(), "leader-1", List.of("leader-1"));
         when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
         partyService.lootChest(created.code(), "leader-1");
@@ -725,7 +725,7 @@ class PartyServiceTest {
                     new AuthenticatedUser("loot-" + i, "Looter", "avatar.png"));
             when(dungeonService.enteredRoomType(created.code())).thenReturn(RoomType.LOOT);
             String userId = "loot-" + i;
-            partyService.selectClass(created.code(), userId, CharacterClass.WARRIOR);
+            partyService.selectClass(created.code(), userId, CharacterClass.BERSERKER);
             partyService.startGame(created.code(), userId, List.of(userId));
 
             PartyStateDto updated = partyService.lootChest(created.code(), userId);

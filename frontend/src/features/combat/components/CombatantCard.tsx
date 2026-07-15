@@ -1,11 +1,16 @@
 import type { ComponentType, CSSProperties } from 'react'
 import { useState } from 'react'
 import goblinPortrait from '../../../assets/enemies/goblin.png'
+import { FrozenIcon } from '../../../shared/ui/FrozenIcon'
+import { GoldenTouchIcon } from '../../../shared/ui/GoldenTouchIcon'
 import { HeartIcon } from '../../../shared/ui/HeartIcon'
 import { PoisonIcon } from '../../../shared/ui/PoisonIcon'
 import { ShieldIcon } from '../../../shared/ui/ShieldIcon'
 import { SparkleIcon } from '../../../shared/ui/SparkleIcon'
+import { StrengthIcon } from '../../../shared/ui/StrengthIcon'
 import { SwordIcon } from '../../../shared/ui/SwordIcon'
+import { TauntIcon } from '../../../shared/ui/TauntIcon'
+import { ThornsIcon } from '../../../shared/ui/ThornsIcon'
 import { MemberAvatar } from '../../party/components/MemberAvatar'
 import type { PartyMember } from '../../party/types'
 import type { ActiveEffect, Combatant } from '../types'
@@ -28,6 +33,11 @@ const EFFECT_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   sword: SwordIcon,
   heal: HeartIcon,
   poison: PoisonIcon,
+  frozen: FrozenIcon,
+  strength: StrengthIcon,
+  taunt: TauntIcon,
+  thorns: ThornsIcon,
+  goldenTouch: GoldenTouchIcon,
 }
 
 interface Props {

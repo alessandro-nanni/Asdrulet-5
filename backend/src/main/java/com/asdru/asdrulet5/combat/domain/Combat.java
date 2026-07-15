@@ -12,6 +12,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 public class Combat {
 
@@ -53,6 +55,10 @@ public class Combat {
             this.combatants.put(combatant.id(), combatant);
         }
         this.turnSequence = List.copyOf(turnSequence);
+        // Attached only once every combatant exists, and to a live view of
+        // the map's values — so Combatant.deadAllyCount() always reflects
+        // whoever's actually died since, without needing to be re-attached.
+        this.combatants.values().forEach(combatant -> combatant.attachRoster(this.combatants.values()));
     }
 
     @Synchronized
@@ -94,13 +100,36 @@ public class Combat {
         };
 
         List<Combatant> targets = resolveTargets(actor, ability.targetType(), targetId);
+        applyEffectToTargets(actor, effect, targets);
+        // Twitching Talisman et al.: a basic ability (never an ultimate) has
+        // a chance to immediately resolve again against the same targets,
+        // free of a second stamina cost.
+        if (ability instanceof BasicAbility && triggersFollowUp(actor)) {
+            applyEffectToTargets(actor, effect, targets);
+        }
+        checkWinLoss();
+        lastEvents = drainAllEvents();
+    }
+
+    private void applyEffectToTargets(Combatant actor, AbilityEffect effect, List<Combatant> targets) {
         for (Combatant target : targets) {
             int healthBefore = target.currentHealth();
             effect.apply(actor, target);
             resolveDamageHooks(actor, target, healthBefore);
         }
-        checkWinLoss();
-        lastEvents = drainAllEvents();
+        effect.applyToTeam(actor, aliveAllies(actor));
+    }
+
+    private boolean triggersFollowUp(Combatant actor) {
+        return actor.passives().stream().anyMatch(ItemPassive::triggersFollowUpAbility);
+    }
+
+    /** actor's own living side, actor included — see {@link AbilityEffect#applyToTeam}. */
+    private List<EffectTarget> aliveAllies(Combatant actor) {
+        return combatants.values().stream()
+                .filter(c -> c.enemy() == actor.enemy() && c.alive())
+                .map(EffectTarget.class::cast)
+                .toList();
     }
 
     /**
@@ -119,6 +148,10 @@ public class Combat {
         }
         actor.passives().forEach(passive -> passive.onDamageDealt(actor, target, damageDealt));
         target.passives().forEach(passive -> passive.onDamageTaken(target, actor, damageDealt));
+        // activeEffects() is already a defensive copy (see Combatant), so
+        // this is safe even though the reflected hit below can itself
+        // trigger further mutation of the real underlying list.
+        target.activeEffects().forEach(effect -> effect.onDamageTaken(target, actor, damageDealt));
         if (!target.alive()) {
             actor.passives().forEach(passive -> passive.onKill(actor, target));
             target.passives().forEach(passive -> passive.onDeath(target));
@@ -147,7 +180,10 @@ public class Combat {
         return switch (targetType) {
             case SELF -> List.of(actor);
             case SINGLE_ALLY -> List.of(requireAliveTarget(targetId, actor.enemy()));
-            case SINGLE_ENEMY -> List.of(requireAliveTarget(targetId, !actor.enemy()));
+            // Area effects still hit every enemy regardless of Taunt (see
+            // ActiveEffect.forcedTargetId's own doc) — only a single-enemy
+            // pick has to be validated against it.
+            case SINGLE_ENEMY -> List.of(requireAliveTarget(requireUntauntedOrForcedTarget(actor, targetId), !actor.enemy()));
             case ALL_ALLIES -> combatants.values().stream()
                     .filter(c -> c.enemy() == actor.enemy() && c.alive())
                     .toList();
@@ -155,6 +191,23 @@ public class Combat {
                     .filter(c -> c.enemy() != actor.enemy() && c.alive())
                     .toList();
         };
+    }
+
+    /** Taunted actors may only choose the combatant that taunted them as a SINGLE_ENEMY target — see Taunt. */
+    private String requireUntauntedOrForcedTarget(Combatant actor, String targetId) {
+        String forcedId = forcedTargetId(actor);
+        if (forcedId != null && !forcedId.equals(targetId)) {
+            throw new InvalidTargetException(actor.id() + " is taunted and must target " + forcedId);
+        }
+        return targetId;
+    }
+
+    private String forcedTargetId(Combatant actor) {
+        return actor.activeEffects().stream()
+                .map(ActiveEffect::forcedTargetId)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private Combatant requireAliveTarget(String targetId, boolean expectedEnemyFlag) {
@@ -165,11 +218,19 @@ public class Combat {
         return target;
     }
 
+    /**
+     * Picks the lowest-health living ally as usual, unless enemyActor is
+     * taunted — then whoever taunted them is the only valid choice, as long
+     * as that taunter is still alive (a dead taunter can no longer be
+     * attacked, so the normal lowest-health pick takes back over).
+     */
     private void resolveEnemyTurn(Combatant enemyActor) {
-        Combatant target = combatants.values().stream()
-                .filter(c -> !c.enemy() && c.alive())
-                .min(Comparator.comparingInt(Combatant::currentHealth).thenComparing(Combatant::id))
-                .orElse(null);
+        Combatant target = tauntedTarget(enemyActor)
+                .filter(Combatant::alive)
+                .orElseGet(() -> combatants.values().stream()
+                        .filter(c -> !c.enemy() && c.alive())
+                        .min(Comparator.comparingInt(Combatant::currentHealth).thenComparing(Combatant::id))
+                        .orElse(null));
         if (target == null) {
             return;
         }
@@ -179,6 +240,11 @@ public class Combat {
         checkWinLoss();
     }
 
+    private Optional<Combatant> tauntedTarget(Combatant actor) {
+        String forcedId = forcedTargetId(actor);
+        return forcedId == null ? Optional.empty() : Optional.ofNullable(combatants.get(forcedId));
+    }
+
     private void advanceTurn() {
         for (int i = 0; i < turnSequence.size() * 2; i++) {
             currentTurnIndex = (currentTurnIndex + 1) % turnSequence.size();
@@ -186,10 +252,21 @@ public class Combat {
             if (!next.alive()) {
                 continue;
             }
+            // Checked before ticking: an effect due to expire on exactly this
+            // turn (e.g. the final turn of a 2-turn Frozen) must still
+            // prevent this turn's action — tickActiveEffects() below would
+            // otherwise remove it first and this combatant would wrongly act.
+            boolean prevented = isPrevented(next);
             next.tickActiveEffects();
             next.passives().forEach(passive -> passive.onStartTurn(next));
+            if (prevented) {
+                // Frozen (or similar): still ticks down on this combatant's
+                // own turn, but neither a human player nor the enemy AI gets
+                // to act — move straight on to whoever's next.
+                continue;
+            }
             if (!next.enemy()) {
-                next.regenerateStamina(STAMINA_REGEN_PER_TURN);
+                next.restoreStamina(STAMINA_REGEN_PER_TURN);
                 return;
             }
             resolveEnemyTurn(next);
@@ -198,6 +275,10 @@ public class Combat {
             }
         }
         throw new IllegalStateException("Unable to find next combatant to act");
+    }
+
+    private boolean isPrevented(Combatant combatant) {
+        return combatant.activeEffects().stream().anyMatch(ActiveEffect::preventsAction);
     }
 
     private void checkWinLoss() {

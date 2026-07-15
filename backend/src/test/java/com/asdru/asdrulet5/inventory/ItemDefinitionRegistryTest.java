@@ -20,7 +20,12 @@ class ItemDefinitionRegistryTest {
 
     @Test
     void getReturnsTheMatchingDefinition() {
-        assertThat(registry.get("rusted-sword").slot()).isEqualTo(ItemSlot.WEAPON);
+        assertThat(registry.get("scythe").slot()).isEqualTo(ItemSlot.WEAPON);
+    }
+
+    @Test
+    void everyItemIsLootOnlyNotPurchasable() {
+        assertThat(registry.all()).allMatch(item -> !item.purchasable());
     }
 
     @Test

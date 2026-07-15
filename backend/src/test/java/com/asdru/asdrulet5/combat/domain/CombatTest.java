@@ -50,12 +50,42 @@ class CombatTest {
             TargetType.SINGLE_ENEMY, 10,
             AbilityEffect.damageOverTime("Poisoned", "Takes damage each turn.", "poison", 5, 2));
 
+    private static final BasicAbility FREEZE_ALLY = new BasicAbility(
+            "test.freeze-ally", "Freeze Ally", "Freezes an ally.", "Frozen for 2 turns",
+            TargetType.SINGLE_ALLY, 10,
+            AbilityEffect.applyEffect(() -> ActiveEffect.frozen("Frozen", "frozen", 2)));
+
+    private static final BasicAbility FREEZE_ENEMY = new BasicAbility(
+            "test.freeze-enemy", "Freeze Enemy", "Freezes an enemy.", "Frozen for 1 turn",
+            TargetType.SINGLE_ENEMY, 10,
+            AbilityEffect.applyEffect(() -> ActiveEffect.frozen("Frozen", "frozen", 1)));
+
+    private static final BasicAbility TAUNT_ENEMY = new BasicAbility(
+            "test.taunt-enemy", "Taunt Enemy", "Taunts an enemy.", "1 damage + Taunt for 3 turns",
+            TargetType.SINGLE_ENEMY, 10,
+            AbilityEffect.damageAndApplyEffect(1, actor -> ActiveEffect.taunt("Taunt", "taunt", 3, actor.id())));
+
+    private static final BasicAbility GAIN_THORNS = new BasicAbility(
+            "test.gain-thorns", "Gain Thorns", "Gains thorns.", "Thorns for 2 turns",
+            TargetType.SELF, 10,
+            AbilityEffect.applyEffect(() -> ActiveEffect.thorns("Thorns", "thorns", 2)));
+
+    private static final BasicAbility MARK_GOLDEN = new BasicAbility(
+            "test.mark-golden", "Mark Golden", "Marks an enemy with Golden Touch.", "Golden Touch for 2 turns",
+            TargetType.SINGLE_ENEMY, 10,
+            AbilityEffect.applyEffect(() -> ActiveEffect.goldenTouch("Golden Touch", "goldenTouch", 2)));
+
+    private static final BasicAbility GAIN_STRENGTH = new BasicAbility(
+            "test.gain-strength", "Gain Strength", "Grants strength.", "+10% damage for 2 turns",
+            TargetType.SELF, 10,
+            AbilityEffect.applyEffect(() -> ActiveEffect.strength("Strength", "strength", 10, 2)));
+
     private static Combatant player(String id, List<Ability> abilities) {
         return player(id, abilities, List.of());
     }
 
     private static Combatant player(String id, List<Ability> abilities, List<ItemPassive> passives) {
-        return new Combatant(id, id, false, CharacterClass.WARRIOR, 100, 100, 5, 0, 40, abilities, null, null, null, null, passives);
+        return new Combatant(id, id, false, CharacterClass.BERSERKER, 100, 100, 5, 0, 40, abilities, null, null, null, null, passives);
     }
 
     private static Combatant enemy(String id, int maxHealth, int defense, int attackPower) {
@@ -517,6 +547,97 @@ class CombatTest {
     }
 
     @Test
+    void deadAllyCountReflectsOnlyDeadCombatantsOnTheSameSide() {
+        ItemPassive scaleWithDeadAllies = new ItemPassive() {
+            @Override
+            public int damagePercentBonus(EffectTarget wearer) {
+                return wearer.deadAllyCount() * 13;
+            }
+        };
+        Combatant p1 = player("p1", List.of(STRIKE), List.of(scaleWithDeadAllies));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 0, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        // No dead allies yet: round(20 * 25/25) = 20 (0 defense, no mitigation).
+        combat.useAbility("p1", "test.strike", "enemy");
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 20);
+
+        p2.applyDamage(1000);
+        assertThat(p2.alive()).isFalse();
+
+        // One dead ally: +13% = round(20 * 1.13) = 23.
+        combat.useAbility("p1", "test.strike", "enemy");
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 20 - 23);
+    }
+
+    @Test
+    void onStartTurnCanDrainTheWearersOwnStamina() {
+        ItemPassive drain = new ItemPassive() {
+            @Override
+            public void onStartTurn(EffectTarget wearer) {
+                wearer.drainStamina(10);
+            }
+        };
+        Combatant p1 = player("p1", List.of(EXPENSIVE_STRIKE), List.of(drain));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.expensive-strike", "enemy");
+        assertThat(findCombatant(combat, "p1").currentStamina()).isEqualTo(10);
+
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+        // p1's own turn starts again: onStartTurn drains 10 first (10 -> 0),
+        // then the usual +40 regen applies on top (0 -> 40) — without the
+        // drain this would otherwise land on 50 (see the stamina-regen test above).
+        assertThat(findCombatant(combat, "p1").currentStamina()).isEqualTo(40);
+    }
+
+    @Test
+    void triggersFollowUpAbilityRepeatsTheSameBasicAbilityAgainstTheSameTargets() {
+        ItemPassive alwaysFollowUp = new ItemPassive() {
+            @Override
+            public boolean triggersFollowUpAbility() {
+                return true;
+            }
+        };
+        Combatant p1 = player("p1", List.of(STRIKE), List.of(alwaysFollowUp));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 0, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.strike", "enemy");
+
+        // 0 defense: each strike lands for its full 20 power; the follow-up
+        // fires a second, independent application against the same target.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 40);
+        // Stamina is spent only once, for the original cast.
+        assertThat(findCombatant(combat, "p1").currentStamina()).isEqualTo(100 - 30);
+    }
+
+    @Test
+    void triggersFollowUpAbilityNeverFiresForAnUltimate() {
+        ItemPassive alwaysFollowUp = new ItemPassive() {
+            @Override
+            public boolean triggersFollowUpAbility() {
+                return true;
+            }
+        };
+        Combatant p1 = player("p1", List.of(STRIKE, ULTIMATE_STRIKE), List.of(alwaysFollowUp));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 0, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+        p1.addUltimateCharge(40);
+
+        combat.useAbility("p1", "test.ultimate-strike", "enemy");
+
+        // Only the ultimate's own single 50-power hit lands — no follow-up.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 50);
+    }
+
+    @Test
     void onStartTurnAndOnEndTurnFireForTheActingCombatantOnly() {
         List<String> log = new ArrayList<>();
         ItemPassive tracker = new ItemPassive() {
@@ -544,5 +665,192 @@ class CombatTest {
         combat.endTurn("p2");
         // Enemy's turn auto-resolves (no tracker on it), then the cursor wraps back to p1.
         assertThat(log).containsExactly("end", "start");
+    }
+
+    @Test
+    void frozenSkipsExactlyItsDurationInTurnsThenActsNormallyAgain() {
+        Combatant p1 = player("p1", List.of(FREEZE_ALLY, STRIKE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.freeze-ally", "p2");
+
+        combat.endTurn("p1");
+        // p2's turn is skipped entirely (frozen), enemy acts automatically, cursor wraps to p1.
+        assertThat(combat.currentTurnCombatantId()).isEqualTo("p1");
+        assertThat(findCombatant(combat, "p2").activeEffects()).hasSize(1);
+        assertThat(findCombatant(combat, "p2").activeEffects().getFirst().remainingTurns()).isEqualTo(1);
+
+        combat.endTurn("p1");
+        // Second (final) frozen turn: still skipped, and now expires.
+        assertThat(combat.currentTurnCombatantId()).isEqualTo("p1");
+        assertThat(findCombatant(combat, "p2").activeEffects()).isEmpty();
+
+        combat.endTurn("p1");
+        // No longer frozen — p2 gets their turn normally this time.
+        assertThat(combat.currentTurnCombatantId()).isEqualTo("p2");
+    }
+
+    @Test
+    void frozenEnemyDoesNotAttackOnItsTurn() {
+        Combatant p1 = player("p1", List.of(FREEZE_ENEMY));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 50);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.freeze-enemy", "enemy");
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+
+        // The enemy's one turn was skipped entirely — no attack landed on anyone.
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100);
+        assertThat(findCombatant(combat, "p2").currentHealth()).isEqualTo(100);
+        assertThat(combat.currentTurnCombatantId()).isEqualTo("p1");
+    }
+
+    @Test
+    void tauntedEnemyOnlyAttacksWhoeverAppliedIt() {
+        Combatant p1 = player("p1", List.of(TAUNT_ENEMY));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 50);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+        // p2 is put well below p1's health, so an untaunted enemy would
+        // normally prefer attacking p2 instead (lowest health wins).
+        p2.applyDamage(60);
+
+        combat.useAbility("p1", "test.taunt-enemy", "enemy");
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+
+        // Taunt overrides the lowest-health pick — the enemy must attack p1.
+        assertThat(findCombatant(combat, "p2").currentHealth()).isEqualTo(40);
+        assertThat(findCombatant(combat, "p1").currentHealth()).isLessThan(100);
+    }
+
+    @Test
+    void tauntStopsRedirectingOnceTheTaunterDies() {
+        Combatant p1 = player("p1", List.of(TAUNT_ENEMY));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 50);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+        p1.applyDamage(99); // p1 at 1 HP — the enemy's next hit will kill them
+
+        combat.useAbility("p1", "test.taunt-enemy", "enemy");
+        combat.endTurn("p1"); // -> p2's turn
+        combat.endTurn("p2"); // -> enemy's turn: taunted onto p1, kills them; p1 skipped (dead) -> back to p2
+        assertThat(findCombatant(combat, "p1").alive()).isFalse();
+
+        // p1 (the taunter) is dead — the enemy's next turn falls back to
+        // attacking whoever's alive, since its forced target no longer is.
+        combat.endTurn("p2"); // -> enemy's turn again
+        assertThat(findCombatant(combat, "p2").currentHealth()).isLessThan(100);
+    }
+
+    @Test
+    void thornsReflectsTenPercentOfDamageTakenBackAtTheAttacker() {
+        Combatant p1 = player("p1", List.of(GAIN_THORNS));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 50);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.gain-thorns", "p1");
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+
+        // Enemy attacks p1 (lowest health tiebreak): round(50 * 25/30) = 42
+        // damage against defense 5; Thorns reflects 10% of that (4) back.
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 42);
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 4);
+    }
+
+    @Test
+    void goldenTouchHealsWhoeverHitsTheMarkedTarget() {
+        Combatant p1 = player("p1", List.of(MARK_GOLDEN, STRIKE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+        p1.applyDamage(30); // so the heal is visible instead of clamped at max
+
+        combat.useAbility("p1", "test.mark-golden", "enemy");
+        combat.useAbility("p1", "test.strike", "enemy");
+
+        // Strike: round(20 * 25/30) = 17 damage to the enemy; Golden Touch
+        // heals the attacker (p1) for 10% of that (1) back.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 17);
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 30 + 1);
+    }
+
+    @Test
+    void strengthIncreasesOutgoingDamageByAPercentage() {
+        Combatant p1 = player("p1", List.of(GAIN_STRENGTH, STRIKE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.gain-strength", "p1");
+        combat.useAbility("p1", "test.strike", "enemy");
+
+        // Strike's 20 power scaled by Strength's +10% = round(20 * 1.1) = 22,
+        // mitigated by 5 defense: round(22 * 25/30) = 18.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 18);
+    }
+
+    /**
+     * The crit roll is randomized (see AbilityEffect.critDamage's use of
+     * ThreadLocalRandom), so this drives enough independent hits to observe
+     * both a normal and a doubled hit rather than asserting on one specific
+     * roll — a 50% chance missed 200 times in a row is astronomically
+     * unlikely, so this isn't flaky in practice.
+     */
+    @Test
+    void critDamageSometimesDoublesThePowerBeforeMitigation() {
+        AbilityEffect critEffect = AbilityEffect.critDamage(10, 0.5);
+        BasicAbility critStrike = new BasicAbility(
+                "test.crit-strike", "Crit Strike", "A strike with a chance to crit.",
+                "10 damage, 50% chance to double", TargetType.SINGLE_ENEMY, 0, critEffect);
+
+        boolean sawNormalHit = false;
+        boolean sawCritHit = false;
+        for (int i = 0; i < 200 && !(sawNormalHit && sawCritHit); i++) {
+            Combatant p1 = player("p1-" + i, List.of(critStrike));
+            Combatant enemy = enemy("enemy-" + i, 200, 0, 1);
+            Combat combat = new Combat("C" + i, List.of(p1, enemy), List.of(p1.id(), enemy.id()));
+
+            combat.useAbility(p1.id(), "test.crit-strike", enemy.id());
+
+            // No defense, so mitigation is 0%: a normal hit deals exactly 10, a crit exactly 20.
+            int damageDealt = 200 - findCombatant(combat, enemy.id()).currentHealth();
+            if (damageDealt == 10) {
+                sawNormalHit = true;
+            }
+            if (damageDealt == 20) {
+                sawCritHit = true;
+            }
+        }
+        assertThat(sawNormalHit).as("saw a non-crit hit").isTrue();
+        assertThat(sawCritHit).as("saw a crit hit").isTrue();
+    }
+
+    @Test
+    void abilityWithTeamEffectRestoresAlliesStaminaAndDamagesItsPrimaryTarget() {
+        AbilityEffect surge = AbilityEffect.damageWithTeamStaminaBoost(20, 15);
+        UltimateAbility surgeAbility = new UltimateAbility(
+                "test.surge", "Surge", "Damages an enemy and restores the team's stamina.",
+                "20 damage, +15 stamina to all allies", TargetType.SINGLE_ENEMY, 40, surge);
+        Combatant p1 = player("p1", List.of(surgeAbility));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+        p1.addUltimateCharge(40);
+        p2.spendStamina(50);
+
+        combat.useAbility("p1", "test.surge", "enemy");
+
+        // round(20 * 25/30) = 17 damage to the enemy.
+        assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 17);
+        // The team stamina boost reaches every living ally, including the actor.
+        assertThat(findCombatant(combat, "p2").currentStamina()).isEqualTo(100 - 50 + 15);
+        assertThat(findCombatant(combat, "p1").currentStamina()).isEqualTo(100);
     }
 }

@@ -1,4 +1,4 @@
-export type CharacterClass = 'HEALER' | 'TANK' | 'WARRIOR' | 'MAGE'
+export type CharacterClass = 'HEALER' | 'PALADIN' | 'BERSERKER' | 'MAGE'
 
 export type PartyStatus = 'LOBBY' | 'DUNGEON' | 'IN_PROGRESS'
 
