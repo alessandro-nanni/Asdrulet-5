@@ -1,4 +1,4 @@
-import {useEffect, useRef} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {MemberAvatar} from '../../party/components/MemberAvatar'
 import type {PartyMember} from '../../party/types'
 import roomStart from '../../../assets/dungeon/room-start.png'
@@ -13,9 +13,13 @@ interface Props {
     dungeon: DungeonState
     members: PartyMember[]
     isLeader: boolean
-    isEntering?: boolean
     onSelectNode?: (nodeId: string) => void
 }
+
+// Must match the CSS animation's own duration (see .dungeon-party-marker.is-entering
+// in index.css) — this is how long the "is-entering" class stays on before the
+// marker reverts to its resting state.
+const SWIRL_DURATION_MS = 650
 
 // Fixed, non-normalized spacing: every node is exactly LAYER_GAP apart from
 // its neighboring layer (vertically, since the graph flows top-to-bottom)
@@ -201,7 +205,7 @@ function layout(nodes: DungeonNode[]): { points: Map<string, Point>; width: numb
     return {points, width, height}
 }
 
-export function DungeonMap({dungeon, members, isLeader, isEntering, onSelectNode}: Props) {
+export function DungeonMap({dungeon, members, isLeader, onSelectNode}: Props) {
     const {points, width, height} = layout(dungeon.nodes)
     const containerRef = useRef<HTMLDivElement>(null)
     const panState = useRef<{
@@ -213,6 +217,23 @@ export function DungeonMap({dungeon, members, isLeader, isEntering, onSelectNode
     } | null>(
         null,
     )
+
+    // enteredNodeId is part of the broadcast dungeon state, so every client
+    // (not just whoever clicked Enter) sees it flip from null to a node id at
+    // the same moment — that transition, not any per-client "I clicked
+    // Enter" flag, is what the swirl is keyed off so everyone in the party
+    // sees the animation together.
+    const [isEntering, setIsEntering] = useState(false)
+    const prevEnteredNodeId = useRef(dungeon.enteredNodeId)
+    useEffect(() => {
+        if (dungeon.enteredNodeId != null && dungeon.enteredNodeId !== prevEnteredNodeId.current) {
+            setIsEntering(true)
+            const timer = setTimeout(() => setIsEntering(false), SWIRL_DURATION_MS)
+            prevEnteredNodeId.current = dungeon.enteredNodeId
+            return () => clearTimeout(timer)
+        }
+        prevEnteredNodeId.current = dungeon.enteredNodeId
+    }, [dungeon.enteredNodeId])
 
     const availableSet = new Set(dungeon.availableNodeIds)
     const clearedSet = new Set(dungeon.clearedNodeIds)

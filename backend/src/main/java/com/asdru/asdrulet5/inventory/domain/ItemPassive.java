@@ -22,6 +22,11 @@ public interface ItemPassive extends CombatantPassive {
         return 0;
     }
 
+    default int bonusDamagePercent() {
+        return 0;
+    }
+
+
     /**
      * Extra {@link #damagePercent()}-shaped bonus granted only while this
      * wearer has more current health than their party's leader — checked

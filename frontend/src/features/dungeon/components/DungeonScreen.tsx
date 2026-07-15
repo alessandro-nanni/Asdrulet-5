@@ -128,7 +128,6 @@ export function DungeonScreen({
                 dungeon={dungeon}
                 members={members}
                 isLeader={isLeader}
-                isEntering={isEntering}
                 onSelectNode={isLeader ? handleSelectNode : undefined}
             />
             <button

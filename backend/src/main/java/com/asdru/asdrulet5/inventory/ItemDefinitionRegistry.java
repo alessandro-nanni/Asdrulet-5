@@ -134,6 +134,17 @@ public class ItemDefinitionRegistry {
                 }, 40);
     }
 
+    private static ItemDefinition berserkerBreastplate() {
+        return new ItemDefinition("berserker-breastplate", "Berserker Breastplate", ItemSlot.CHESTPLATE,
+                "As long as you have more health than your party's leader: +5% damage and +7% max health.",
+                new ItemPassive() {
+                   @Override
+                    public int bonusDamagePercent() {
+                       return 0;
+                   }
+                }, 40);
+    }
+
     public List<ItemDefinition> all() {
         return List.copyOf(DEFINITIONS.values());
     }
