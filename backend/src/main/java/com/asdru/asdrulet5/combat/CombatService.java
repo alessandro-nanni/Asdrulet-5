@@ -10,6 +10,7 @@ import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
 import com.asdru.asdrulet5.combat.web.CombatMapper;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.enemydata.EnemyDefinitionRegistry;
+import com.asdru.asdrulet5.enemydata.EnemyEncounterRegistry;
 import com.asdru.asdrulet5.enemydata.domain.EnemyDefinition;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
 import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
@@ -21,24 +22,43 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class CombatService {
 
-    private static final String ENEMY_ID = "enemy-1";
+    /**
+     * The dungeon doesn't have distinct floors yet — every encounter table
+     * currently sits on {@code EnemyEncounterRegistry}'s floor 1, so this is
+     * the only floor ever drawn from. Kept as its own constant (rather than
+     * a bare literal at each call site) so swapping this for the party's
+     * actual depth, once floors exist, is a one-line change here.
+     */
+    private static final int CURRENT_FLOOR = 1;
 
     private final CombatRepository combatRepository;
     private final ClassDefinitionRegistry classDefinitionRegistry;
     private final EnemyDefinitionRegistry enemyDefinitionRegistry;
+    private final EnemyEncounterRegistry enemyEncounterRegistry;
     private final ItemDefinitionRegistry itemDefinitionRegistry;
     private final SimpMessagingTemplate messagingTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final SecureRandom random = new SecureRandom();
 
-    public CombatStateDto startCombat(String code, List<PartyMember> members, List<String> turnOrder) {
+    /**
+     * isBossFight spawns exactly one {@code EnemyDefinitionRegistry.DEFAULT_ENEMY_ID}
+     * (unchanged from before this ever had a notion of multiple enemies);
+     * otherwise 2-3 enemies are drawn from {@link EnemyEncounterRegistry}'s
+     * current-floor table, which may repeat the same enemy more than once.
+     */
+    public CombatStateDto startCombat(String code, List<PartyMember> members, List<String> turnOrder, boolean isBossFight) {
         List<Combatant> combatants = new ArrayList<>();
         int leaderCurrentHealth = leaderCurrentHealth(members);
         for (String userId : turnOrder) {
@@ -48,10 +68,11 @@ public class CombatService {
                     .orElseThrow(() -> new IllegalStateException("Turn order references unknown member " + userId));
             combatants.add(toCombatant(member, leaderCurrentHealth));
         }
-        combatants.add(toEnemyCombatant());
+        List<Combatant> enemyCombatants = toEnemyCombatants(isBossFight);
+        combatants.addAll(enemyCombatants);
 
         List<String> turnSequence = new ArrayList<>(turnOrder);
-        turnSequence.add(ENEMY_ID);
+        enemyCombatants.forEach(enemy -> turnSequence.add(enemy.id()));
 
         Combat combat = new Combat(code, combatants, turnSequence);
         combatRepository.save(combat);
@@ -143,7 +164,7 @@ public class CombatService {
         int damagePercentBonus = sumBonus(passives, ItemPassive::damagePercent)
                 + (healthierThanLeader ? sumBonus(passives, ItemPassive::damagePercentIfHealthierThanLeader) : 0);
         Combatant combatant = new Combatant(
-                member.userId(), member.displayName(), false, member.characterClass(),
+                member.userId(), member.displayName(), false, member.characterClass(), null,
                 Math.max(1, baseMaxHealth + maxHealthBonus),
                 Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)),
                 Math.max(0, definition.stats().defense() + sumBonus(passives, ItemPassive::bonusDefense)),
@@ -177,13 +198,36 @@ public class CombatService {
         return passives.stream().mapToInt(bonus).sum();
     }
 
-    private Combatant toEnemyCombatant() {
-        EnemyDefinition definition = enemyDefinitionRegistry.get(EnemyDefinitionRegistry.DEFAULT_ENEMY_ID);
-        return new Combatant(
-                ENEMY_ID, definition.displayName(), true, null,
-                definition.stats().maxHealth(), definition.stats().maxStamina(), definition.stats().defense(),
-                0, 0, List.of(), definition.attackName(), definition.attackDescription(),
-                definition.attackEffectSummary(), definition.attackEffect(), List.of());
+    /**
+     * A boss fight is exactly one {@code DEFAULT_ENEMY_ID}, same as before
+     * this ever had a notion of multiple enemies. A regular fight rolls
+     * {@link EnemyEncounterRegistry}'s current-floor table, which can repeat
+     * the same enemy — when it does, each repeat gets a " 1"/" 2"/... suffix
+     * on its display name so e.g. two Cave Rats are distinguishable in the
+     * UI (their combatant ids, "enemy-1"/"enemy-2"/..., already keep them
+     * distinct to the engine either way).
+     */
+    private List<Combatant> toEnemyCombatants(boolean isBossFight) {
+        List<String> enemyDefinitionIds = isBossFight
+                ? List.of(EnemyDefinitionRegistry.DEFAULT_ENEMY_ID)
+                : enemyEncounterRegistry.forFloor(CURRENT_FLOOR).roll(random);
+        Map<String, Long> occurrences = enemyDefinitionIds.stream()
+                .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
+        Map<String, Integer> seenSoFar = new HashMap<>();
+        List<Combatant> enemies = new ArrayList<>();
+        for (int i = 0; i < enemyDefinitionIds.size(); i++) {
+            String definitionId = enemyDefinitionIds.get(i);
+            EnemyDefinition definition = enemyDefinitionRegistry.get(definitionId);
+            String displayName = occurrences.get(definitionId) > 1
+                    ? definition.displayName() + " " + seenSoFar.merge(definitionId, 1, Integer::sum)
+                    : definition.displayName();
+            enemies.add(new Combatant(
+                    "enemy-" + (i + 1), displayName, true, null, definitionId,
+                    definition.stats().maxHealth(), definition.stats().maxStamina(), definition.stats().defense(),
+                    0, 0, List.of(), definition.attackName(), definition.attackDescription(),
+                    definition.attackEffectSummary(), definition.attackEffect(), List.of()));
+        }
+        return enemies;
     }
 
     private Combat getOrThrow(String code) {

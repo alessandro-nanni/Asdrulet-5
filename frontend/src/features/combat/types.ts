@@ -14,6 +14,12 @@ export interface Combatant {
   displayName: string
   enemy: boolean
   characterClass: CharacterClass | null
+  // Which EnemyDefinition this enemy combatant was built from (e.g.
+  // "cave-rat") — null for party members. Unlike id (this fight's own
+  // "enemy-1"/"enemy-2"/...) or displayName (may carry a disambiguating
+  // suffix), this is the stable per-species key to look up a portrait by —
+  // see enemyPortraits.ts, mirroring how items are keyed by itemId.
+  enemyDefinitionId: string | null
   maxHealth: number
   currentHealth: number
   maxStamina: number

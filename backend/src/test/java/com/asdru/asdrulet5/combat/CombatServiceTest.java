@@ -12,6 +12,7 @@ import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatantDto;
 import com.asdru.asdrulet5.enemydata.EnemyDefinitionRegistry;
+import com.asdru.asdrulet5.enemydata.EnemyEncounterRegistry;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
 import com.asdru.asdrulet5.inventory.domain.ItemSlot;
 import com.asdru.asdrulet5.inventory.domain.Loadout;
@@ -59,20 +60,65 @@ class CombatServiceTest {
         messagingTemplate = mock(SimpMessagingTemplate.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(false),
-                new EnemyDefinitionRegistry(), new ItemDefinitionRegistry(), messagingTemplate, eventPublisher);
+                new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
+                messagingTemplate, eventPublisher);
     }
 
     @Test
-    void startCombatCreatesOneCombatantPerMemberPlusOneEnemyAndBroadcasts() {
+    void startCombatCreatesOneCombatantPerMemberPlusOneBossAndBroadcasts() {
         List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
 
-        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1", "p2"));
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1", "p2"), true);
 
         assertThat(dto.combatants()).hasSize(3);
         assertThat(dto.combatants().stream().filter(CombatantDto::enemy)).hasSize(1);
         assertThat(dto.status()).isEqualTo(CombatStatus.IN_PROGRESS);
         assertThat(dto.currentTurnCombatantId()).isEqualTo("p1");
         verify(messagingTemplate, times(1)).convertAndSend("/topic/party/ABC123/combat", dto);
+    }
+
+    @Test
+    void startCombatForARegularFightSpawnsTwoOrThreeEnemiesFromThePool() {
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
+
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1", "p2"), false);
+
+        List<CombatantDto> enemies = dto.combatants().stream().filter(CombatantDto::enemy).toList();
+        assertThat(enemies.size()).isBetween(2, 3);
+        assertThat(enemies).extracting(CombatantDto::id).doesNotHaveDuplicates();
+        // enemyDefinitionId (unlike id/displayName) is the stable per-species
+        // key the frontend uses to look up a portrait — every regular-fight
+        // enemy should carry a real, non-boss id.
+        assertThat(enemies).extracting(CombatantDto::enemyDefinitionId)
+                .allSatisfy(id -> assertThat(id).isNotBlank());
+        assertThat(enemies).extracting(CombatantDto::enemyDefinitionId)
+                .doesNotContain(EnemyDefinitionRegistry.DEFAULT_ENEMY_ID);
+        // Every enemy turn is appended to the sequence, so the party still goes first.
+        assertThat(dto.currentTurnCombatantId()).isEqualTo("p1");
+    }
+
+    @Test
+    void startCombatForABossFightAlwaysSpawnsExactlyOneGoblinMarauder() {
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER));
+
+        for (int i = 0; i < 20; i++) {
+            CombatStateDto dto = combatService.startCombat("BOSS" + i, members, List.of("p1"), true);
+
+            List<CombatantDto> enemies = dto.combatants().stream().filter(CombatantDto::enemy).toList();
+            assertThat(enemies).hasSize(1);
+            assertThat(enemies.getFirst().displayName()).isEqualTo("Goblin Marauder");
+            assertThat(enemies.getFirst().enemyDefinitionId()).isEqualTo(EnemyDefinitionRegistry.DEFAULT_ENEMY_ID);
+        }
+    }
+
+    @Test
+    void partyMemberCombatantsHaveNoEnemyDefinitionId() {
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER));
+
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"), true);
+
+        CombatantDto p1 = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(p1.enemyDefinitionId()).isNull();
     }
 
     @Test
@@ -84,7 +130,7 @@ class CombatServiceTest {
     @Test
     void partyCombatantsForReturnsOnlyTheNonEnemyCombatantsInTheirCurrentState() {
         List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
-        combatService.startCombat("ABC123", members, List.of("p1", "p2"));
+        combatService.startCombat("ABC123", members, List.of("p1", "p2"), true);
         String enemyId = combatService.getState("ABC123").combatants().stream()
                 .filter(CombatantDto::enemy).findFirst().orElseThrow().id();
         combatService.useAbility("ABC123", "p1", "berserker.reckless-strike", enemyId);
@@ -98,7 +144,7 @@ class CombatServiceTest {
     @Test
     void useAbilityAppliesEffectAndBroadcasts() {
         List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
-        CombatStateDto started = combatService.startCombat("ABC123", members, List.of("p1", "p2"));
+        CombatStateDto started = combatService.startCombat("ABC123", members, List.of("p1", "p2"), true);
         String enemyId = started.combatants().stream().filter(CombatantDto::enemy).findFirst().orElseThrow().id();
         int enemyHealthBefore = started.combatants().stream()
                 .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
@@ -119,7 +165,7 @@ class CombatServiceTest {
                 .withItem(ItemSlot.CHESTPLATE, "leather-tunic"); // +4 defense
         List<PartyMember> members = List.of(member("p1", CharacterClass.MAGE, loadout));
 
-        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"), true);
 
         CombatantDto mage = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
         assertThat(mage.maxHealth()).isEqualTo(70);
@@ -133,7 +179,7 @@ class CombatServiceTest {
         PartyMember dead = memberWithHealth("p2", CharacterClass.BERSERKER, 0);
         List<PartyMember> members = List.of(alive, dead);
 
-        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1", "p2"));
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1", "p2"), true);
         String enemyId = dto.combatants().stream().filter(CombatantDto::enemy).findFirst().orElseThrow().id();
         int enemyHealthBefore = dto.combatants().stream()
                 .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
@@ -153,7 +199,7 @@ class CombatServiceTest {
         // until the next fight actually starts — see PartyMember's own doc.
         List<PartyMember> members = List.of(memberWithHealth("p1", CharacterClass.BERSERKER, 30));
 
-        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"), true);
 
         CombatantDto berserker = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
         assertThat(berserker.maxHealth()).isEqualTo(80);
@@ -164,7 +210,7 @@ class CombatServiceTest {
     void startCombatWithNoCarriedOverHealthStartsAtMax() {
         List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER));
 
-        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"), true);
 
         CombatantDto berserker = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
         assertThat(berserker.currentHealth()).isEqualTo(berserker.maxHealth());
@@ -174,7 +220,7 @@ class CombatServiceTest {
     void startCombatSeedsAPendingPoisonAsAnActiveEffect() {
         List<PartyMember> members = List.of(memberWithPoison("p1", CharacterClass.BERSERKER, 6, 4));
 
-        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"));
+        CombatStateDto dto = combatService.startCombat("ABC123", members, List.of("p1"), true);
 
         CombatantDto berserker = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
         assertThat(berserker.activeEffects()).hasSize(1);
@@ -185,7 +231,7 @@ class CombatServiceTest {
     @Test
     void endTurnAdvancesToNextCombatant() {
         List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
-        combatService.startCombat("ABC123", members, List.of("p1", "p2"));
+        combatService.startCombat("ABC123", members, List.of("p1", "p2"), true);
 
         CombatStateDto updated = combatService.endTurn("ABC123", "p1");
 
@@ -198,16 +244,17 @@ class CombatServiceTest {
                 "test.strike", "Strike", "A basic attack.", "20 damage", TargetType.SINGLE_ENEMY, 10,
                 AbilityEffect.damage(20));
         Combatant p1 = new Combatant(
-                "p1", "p1", false, CharacterClass.BERSERKER, 100, 100, 5, 0, 40, List.of(strike), null, null, null,
+                "p1", "p1", false, CharacterClass.BERSERKER, null, 100, 100, 5, 0, 40, List.of(strike), null, null, null,
                 null, List.of());
         Combatant weakEnemy = new Combatant(
-                "enemy-1", "enemy-1", true, null, 1, 0, 0, 0, 0, List.of(), "Claw", "A swipe.", "5 damage",
+                "enemy-1", "enemy-1", true, null, "test-enemy", 1, 0, 0, 0, 0, List.of(), "Claw", "A swipe.", "5 damage",
                 AbilityEffect.damage(5), List.of());
         Combat combat = new Combat("VICT123", List.of(p1, weakEnemy), List.of("p1", "enemy-1"));
         CombatRepository repository = new InMemoryCombatRepository();
         repository.save(combat);
         CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
-                new EnemyDefinitionRegistry(), new ItemDefinitionRegistry(), messagingTemplate, eventPublisher);
+                new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
+                messagingTemplate, eventPublisher);
 
         CombatStateDto updated = service.useAbility("VICT123", "p1", "test.strike", "enemy-1");
 

@@ -13,7 +13,15 @@ import java.util.stream.Stream;
 
 /**
  * Static catalog of enemy definitions. To add a new enemy: add a factory
- * method here and add it to {@link #buildDefinitions()}.
+ * method here and add it to {@link #buildDefinitions()} — then give it an
+ * entry in {@code EnemyEncounterRegistry} to actually make it spawnable
+ * anywhere (this registry just describes what an enemy is, the same way
+ * {@code ItemDefinitionRegistry} does for items).
+ *
+ * <p>{@link #DEFAULT_ENEMY_ID} (Goblin Marauder) is reserved for boss
+ * encounters — see {@code EnemyEncounterRegistry}'s own doc — the other
+ * enemies here are the regular floor-1 pool, individually weaker since 2-3
+ * of them show up together instead of one at a time.
  */
 @Component
 public class EnemyDefinitionRegistry {
@@ -23,7 +31,7 @@ public class EnemyDefinitionRegistry {
     private static final Map<String, EnemyDefinition> DEFINITIONS = buildDefinitions();
 
     private static Map<String, EnemyDefinition> buildDefinitions() {
-        return Stream.of(goblinMarauder())
+        return Stream.of(goblinMarauder(), caveRat(), goblinSkirmisher(), banditThug())
                 .collect(Collectors.toMap(EnemyDefinition::id, Function.identity()));
     }
 
@@ -36,6 +44,42 @@ public class EnemyDefinitionRegistry {
                 "Swings a notched blade at whoever's closest.",
                 "15 damage",
                 AbilityEffect.damage(15)
+        );
+    }
+
+    private static EnemyDefinition caveRat() {
+        return new EnemyDefinition(
+                "cave-rat",
+                "Cave Rat",
+                new Stats(60, 1, 0),
+                "Gnawing Bite",
+                "Latches on and gnaws with needle-sharp teeth.",
+                "8 damage",
+                AbilityEffect.damage(8)
+        );
+    }
+
+    private static EnemyDefinition goblinSkirmisher() {
+        return new EnemyDefinition(
+                "goblin-skirmisher",
+                "Goblin Skirmisher",
+                new Stats(90, 4, 0),
+                "Jagged Dagger",
+                "Darts in for a quick stab, then dances back.",
+                "10 damage",
+                AbilityEffect.damage(10)
+        );
+    }
+
+    private static EnemyDefinition banditThug() {
+        return new EnemyDefinition(
+                "bandit-thug",
+                "Bandit Thug",
+                new Stats(110, 6, 0),
+                "Club Swing",
+                "A clumsy but heavy overhead swing.",
+                "12 damage",
+                AbilityEffect.damage(12)
         );
     }
 

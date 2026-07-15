@@ -105,7 +105,7 @@ public class PartyService {
                     .filter(member -> !member.pendingEffects().isEmpty())
                     .forEach(member -> party.clearPendingEffects(member.userId()));
             PartyStateDto dto = broadcast(party);
-            combatService.startCombat(party.code(), membersForCombat, party.turnOrder());
+            combatService.startCombat(party.code(), membersForCombat, party.turnOrder(), enteredRoomType == RoomType.BOSS);
             return dto;
         }
         if (enteredRoomType == RoomType.MYSTERY) {

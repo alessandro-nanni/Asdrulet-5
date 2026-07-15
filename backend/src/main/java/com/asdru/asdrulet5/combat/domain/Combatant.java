@@ -34,6 +34,8 @@ public final class Combatant implements EffectTarget {
     private final String displayName;
     private final boolean enemy;
     private final CharacterClass characterClass;
+    /** Which {@code EnemyDefinition} this enemy combatant was built from (e.g. "cave-rat") — null for party members. Lets the frontend key a per-species portrait the same way it keys item icons by itemId, since {@link #id} is just this fight's own "enemy-1"/"enemy-2"/... and {@link #displayName} may carry a disambiguating suffix (see CombatService). */
+    private final String enemyDefinitionId;
     private final int maxHealth;
     private final int maxStamina;
     private final int baseDefense;
@@ -53,7 +55,7 @@ public final class Combatant implements EffectTarget {
     /** Every combatant in this fight (both sides), attached by {@link Combat}'s constructor once the whole roster exists — see {@link #deadAllyCount()}. Empty (not null) until then, so a bare Combatant built outside a Combat just reports zero dead allies. */
     private Collection<Combatant> roster = List.of();
 
-    public Combatant(String id, String displayName, boolean enemy, CharacterClass characterClass,
+    public Combatant(String id, String displayName, boolean enemy, CharacterClass characterClass, String enemyDefinitionId,
                      int maxHealth, int maxStamina, int baseDefense, int equipmentDamagePercentBonus, int ultimateChargeThreshold,
                      List<Ability> abilities, String attackName, String attackDescription,
                      String attackEffectSummary, AbilityEffect attackEffect, List<ItemPassive> passives) {
@@ -61,6 +63,7 @@ public final class Combatant implements EffectTarget {
         this.displayName = displayName;
         this.enemy = enemy;
         this.characterClass = characterClass;
+        this.enemyDefinitionId = enemyDefinitionId;
         this.maxHealth = maxHealth;
         this.currentHealth = maxHealth;
         this.maxStamina = maxStamina;

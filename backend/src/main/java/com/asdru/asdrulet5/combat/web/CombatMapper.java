@@ -29,6 +29,7 @@ public class CombatMapper {
                 combatant.displayName(),
                 combatant.enemy(),
                 combatant.characterClass(),
+                combatant.enemyDefinitionId(),
                 combatant.maxHealth(),
                 combatant.currentHealth(),
                 combatant.maxStamina(),

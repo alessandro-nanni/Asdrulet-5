@@ -9,6 +9,8 @@ public record CombatantDto(
         String displayName,
         boolean enemy,
         CharacterClass characterClass,
+        /** Which EnemyDefinition this enemy combatant was built from (e.g. "cave-rat") — null for party members. Lets the client key a per-species portrait, the same way item ids key item icons. */
+        String enemyDefinitionId,
         int maxHealth,
         int currentHealth,
         int maxStamina,

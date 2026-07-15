@@ -1,6 +1,6 @@
 import type { ComponentType, CSSProperties } from 'react'
 import { useState } from 'react'
-import goblinPortrait from '../../../assets/enemies/goblin.png'
+import { DEFAULT_ENEMY_PORTRAIT, ENEMY_PORTRAITS } from '../enemyPortraits'
 import { FrozenIcon } from '../../../shared/ui/FrozenIcon'
 import { GoldenTouchIcon } from '../../../shared/ui/GoldenTouchIcon'
 import { HeartIcon } from '../../../shared/ui/HeartIcon'
@@ -123,7 +123,11 @@ export function CombatantCard({
         <MemberAvatar member={member} />
       ) : (
         <div className="enemy-portrait" aria-hidden="true">
-          <img src={goblinPortrait} alt="" className="enemy-portrait-img" />
+          <img
+            src={(combatant.enemyDefinitionId && ENEMY_PORTRAITS[combatant.enemyDefinitionId]) || DEFAULT_ENEMY_PORTRAIT}
+            alt=""
+            className="enemy-portrait-img"
+          />
         </div>
       )}
       <div className="combatant-bar combatant-bar-health">

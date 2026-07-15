@@ -3,6 +3,8 @@ package com.asdru.asdrulet5.enemydata;
 import com.asdru.asdrulet5.enemydata.domain.EnemyDefinition;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -22,6 +24,15 @@ class EnemyDefinitionRegistryTest {
         assertThat(definition.stats().maxHealth()).isPositive();
         assertThat(definition.attackEffectSummary()).isNotBlank();
         assertThat(definition.attackEffect()).isNotNull();
+    }
+
+    @Test
+    void regularFloorOnePoolEnemiesAreRegistered() {
+        for (String enemyId : List.of("cave-rat", "goblin-skirmisher", "bandit-thug")) {
+            EnemyDefinition definition = registry.get(enemyId);
+            assertThat(definition.stats().maxHealth()).isPositive();
+            assertThat(definition.attackEffect()).isNotNull();
+        }
     }
 
     @Test
