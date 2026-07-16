@@ -50,4 +50,14 @@ public interface EffectTarget {
      * How many of this combatant's own allies (same side, self excluded) are no longer alive — see Scythe.
      */
     int deadAllyCount();
+
+    /**
+     * Whether this combatant currently has more health than their party's
+     * leader — see Mantle of the Usurper. False by default (and always, for
+     * an enemy): only combat.domain.PlayerCombatant has a notion of "party"
+     * to compare itself against.
+     */
+    default boolean healthierThanLeader() {
+        return false;
+    }
 }

@@ -1,6 +1,7 @@
 package com.asdru.asdrulet5.inventory.domain;
 
 import com.asdru.asdrulet5.classdata.domain.CombatantPassive;
+import com.asdru.asdrulet5.classdata.domain.EffectTarget;
 
 /**
  * What an equipped item does, beyond what any combatant's passive can do
@@ -26,21 +27,20 @@ public interface ItemPassive extends CombatantPassive {
         return 0;
     }
 
-
     /**
-     * Extra {@link #damagePercent()}-shaped bonus granted only while this
-     * wearer has more current health than their party's leader — checked
-     * once, when the fight starts (see CombatService), not re-evaluated
-     * turn to turn. See Mantle of the Usurper. 0 by default.
+     * A {@link #bonusMaxHealth()}-shaped bonus, but a percentage of base max
+     * health, checked once against wearer — same shape as
+     * {@link #damagePercentBonus}, so a condition like Mantle of the
+     * Usurper's "healthier than your leader" (see
+     * {@link EffectTarget#healthierThanLeader()}) reads identically whether
+     * it's boosting damage or max health. Unlike damagePercentBonus though,
+     * this is resolved only once, right when the fight starts (see
+     * CombatService), not re-evaluated turn to turn — a wearer's max health
+     * is fixed for the whole fight once their Combatant is built, so it
+     * can't be re-evaluated later even though the condition itself could
+     * change. 0 by default.
      */
-    default int damagePercentIfHealthierThanLeader() {
-        return 0;
-    }
-
-    /**
-     * Same condition as {@link #damagePercentIfHealthierThanLeader()}, but a percentage of base max health instead.
-     */
-    default int bonusMaxHealthPercentIfHealthierThanLeader() {
+    default int bonusMaxHealthPercent(EffectTarget wearer) {
         return 0;
     }
 }

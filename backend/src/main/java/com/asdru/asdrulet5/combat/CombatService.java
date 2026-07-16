@@ -15,6 +15,7 @@ import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
 import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.domain.ItemPassive;
 import com.asdru.asdrulet5.inventory.domain.Loadout;
+import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -57,25 +58,62 @@ public class CombatService {
      * otherwise 2-3 enemies are drawn from {@link EnemyEncounterRegistry}'s
      * current-floor table, which may repeat the same enemy more than once.
      */
-    public CombatStateDto startCombat(String code, List<PartyMember> members, List<String> turnOrder, boolean isBossFight) {
+    public CombatStateDto startCombat(Party party, List<PartyMember> members, List<String> turnOrder, boolean isBossFight) {
         List<Combatant> combatants = new ArrayList<>();
-        int leaderCurrentHealth = leaderCurrentHealth(members);
+        List<PreparedPlayerCombatant> playerCombatants = new ArrayList<>();
         for (String userId : turnOrder) {
             PartyMember member = members.stream()
                     .filter(candidate -> candidate.userId().equals(userId))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Turn order references unknown member " + userId));
-            combatants.add(toCombatant(member, leaderCurrentHealth));
+            PreparedPlayerCombatant prepared = toCombatant(member, party);
+            playerCombatants.add(prepared);
+            combatants.add(prepared.combatant());
         }
+        resolveLeaderRelativeMaxHealthBonuses(playerCombatants);
+
         List<Combatant> enemyCombatants = toEnemyCombatants(isBossFight);
         combatants.addAll(enemyCombatants);
 
         List<String> turnSequence = new ArrayList<>(turnOrder);
         enemyCombatants.forEach(enemy -> turnSequence.add(enemy.combatantId()));
 
-        Combat combat = new Combat(code, combatants, turnSequence);
+        Combat combat = new Combat(party.code(), combatants, turnSequence);
         combatRepository.save(combat);
         return broadcast(combat);
+    }
+
+    /**
+     * Wires every player combatant's roster in early — before the enemies
+     * even exist, let alone the {@link Combat} they'll all eventually share
+     * ({@link Combat}'s own constructor will attach the complete roster
+     * again once it's built, superseding this one) — so each one's own
+     * {@code wearer.healthierThanLeader()} can already see every other
+     * member's starting health, then applies whatever leader-relative max
+     * health bonus that unlocks (see Mantle of the Usurper). A damage-percent
+     * equivalent needs no such step: it's resolved live, per hit, straight
+     * off {@link ItemPassive#damagePercentBonus} once the fight is already
+     * running — only max health is stuck being a fight-start-only
+     * resolution, since it's baked into Stats when the Combatant is built.
+     */
+    private void resolveLeaderRelativeMaxHealthBonuses(List<PreparedPlayerCombatant> playerCombatants) {
+        List<Combatant> roster = playerCombatants.stream().<Combatant>map(PreparedPlayerCombatant::combatant).toList();
+        playerCombatants.forEach(prepared -> prepared.combatant().attachRoster(roster));
+        for (PreparedPlayerCombatant prepared : playerCombatants) {
+            PlayerCombatant combatant = prepared.combatant();
+            int percent = prepared.passives().stream().mapToInt(passive -> passive.bonusMaxHealthPercent(combatant)).sum();
+            combatant.increaseMaxHealth(combatant.maxHealth() * percent / 100);
+        }
+    }
+
+    /**
+     * A player combatant alongside the resolved {@link ItemPassive}s that
+     * built it — kept together only long enough for
+     * {@link #resolveLeaderRelativeMaxHealthBonuses} to re-consult those same
+     * passives without having to re-derive them from the Combatant's own,
+     * type-erased {@code CombatantPassive} list.
+     */
+    private record PreparedPlayerCombatant(PlayerCombatant combatant, List<ItemPassive> passives) {
     }
 
     public CombatStateDto useAbility(String code, String actorId, String abilityId, String targetId) {
@@ -120,33 +158,13 @@ public class CombatService {
     }
 
     /**
-     * The party leader's own starting health for this fight — the baseline
-     * Mantle of the Usurper compares every other member against, evaluated
-     * once here rather than continuously during the fight (see
-     * ItemPassive.damagePercentIfHealthierThanLeader's own doc). 0 if
-     * there's somehow no leader in the roster.
+     * Builds a fresh PlayerCombatant with its flat item bonuses only — any
+     * leader-relative bonus (see Mantle of the Usurper) is deliberately left
+     * unresolved here and applied afterward, once every player combatant in
+     * this fight exists and has its starting health set, by
+     * {@link #resolveLeaderRelativeMaxHealthBonuses}.
      */
-    private int leaderCurrentHealth(List<PartyMember> members) {
-        return members.stream()
-                .filter(PartyMember::leader)
-                .findFirst()
-                .map(this::effectiveStartingHealth)
-                .orElse(0);
-    }
-
-    /**
-     * A member's health entering the fight: whatever carried over, or their full effective max if nothing did.
-     */
-    private int effectiveStartingHealth(PartyMember member) {
-        if (member.currentHealth() != null) {
-            return member.currentHealth();
-        }
-        ClassDefinition definition = classDefinitionRegistry.get(member.characterClass());
-        List<ItemPassive> passives = resolvePassives(member.loadout());
-        return Math.max(1, definition.stats().maxHealth() + sumBonus(passives, ItemPassive::bonusMaxHealth));
-    }
-
-    private Combatant toCombatant(PartyMember member, int leaderCurrentHealth) {
+    private PreparedPlayerCombatant toCombatant(PartyMember member, Party party) {
         ClassDefinition definition = classDefinitionRegistry.get(member.characterClass());
         int ultimateChargeThreshold = definition.abilities().stream()
                 .filter(UltimateAbility.class::isInstance)
@@ -155,33 +173,26 @@ public class CombatService {
                 .orElseThrow()
                 .chargeThreshold();
         List<ItemPassive> passives = resolvePassives(member.loadout());
-        // Evaluated once against this member's own starting health (not the
-        // max health this very bonus would produce) to avoid a circular
-        // definition — see ItemPassive.bonusMaxHealthPercentIfHealthierThanLeader.
-        boolean healthierThanLeader = effectiveStartingHealth(member) > leaderCurrentHealth;
         int baseMaxHealth = definition.stats().maxHealth();
-        int maxHealthBonus = sumBonus(passives, ItemPassive::bonusMaxHealth)
-                + (healthierThanLeader ? baseMaxHealth * sumBonus(passives, ItemPassive::bonusMaxHealthPercentIfHealthierThanLeader) / 100 : 0);
-        // Only the party-leader-relative slice needs to be resolved here —
-        // a passive's own flat/dynamic damagePercent contribution is now
-        // summed live by Combatant.damagePercentBonus() itself.
-        int bonusDamagePercent = healthierThanLeader ? sumBonus(passives, ItemPassive::damagePercentIfHealthierThanLeader) : 0;
         Stats stats = new Stats(
-                Math.max(1, baseMaxHealth + maxHealthBonus),
+                Math.max(1, baseMaxHealth + sumBonus(passives, ItemPassive::bonusMaxHealth)),
                 Math.max(0, definition.stats().defense() + sumBonus(passives, ItemPassive::bonusDefense)),
                 Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)));
-        Combatant combatant = new PlayerCombatant(
+        PlayerCombatant combatant = new PlayerCombatant(
                 member.userId(), member.displayName(), member.characterClass(), stats,
-                bonusDamagePercent, ultimateChargeThreshold, definition.abilities(), passives);
+                ultimateChargeThreshold, definition.abilities(), passives, party);
         // Both carried over from whatever the member's last room left them
         // with — a wheel/loot roll, or the ending state of their last fight
         // (see PartyService.syncMembersAfterCombat) — so a fresh Combatant
-        // always starts from where the party actually left off.
+        // always starts from where the party actually left off. Set before
+        // any leader-relative max health bonus, deliberately: that bonus
+        // still needs to compare against this member's own pre-bonus
+        // starting health, exactly as if it were never carried over.
         if (member.currentHealth() != null) {
             combatant.setStartingHealth(member.currentHealth());
         }
         member.pendingEffects().forEach(combatant::addActiveEffect);
-        return combatant;
+        return new PreparedPlayerCombatant(combatant, passives);
     }
 
     private List<ItemPassive> resolvePassives(Loadout loadout) {

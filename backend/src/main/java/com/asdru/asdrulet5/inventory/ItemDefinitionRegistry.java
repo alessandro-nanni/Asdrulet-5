@@ -123,13 +123,13 @@ public class ItemDefinitionRegistry {
                 "As long as you have more health than your party's leader: +5% damage and +7% max health.",
                 new ItemPassive() {
                     @Override
-                    public int damagePercentIfHealthierThanLeader() {
-                        return 5;
+                    public int damagePercentBonus(EffectTarget wearer) {
+                        return wearer.healthierThanLeader() ? 5 : 0;
                     }
 
                     @Override
-                    public int bonusMaxHealthPercentIfHealthierThanLeader() {
-                        return 7;
+                    public int bonusMaxHealthPercent(EffectTarget wearer) {
+                        return wearer.healthierThanLeader() ? 7 : 0;
                     }
                 }, 40);
     }

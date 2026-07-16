@@ -39,7 +39,7 @@ public abstract class Combatant implements EffectTarget {
 
     private final String combatantId;
     private final String displayName;
-    private final Stats stats;
+    private Stats stats;
     private final int ultimateChargeThreshold;
     private final List<ActiveEffect> activeEffects = new ArrayList<>();
     private final List<CombatEvent> events = new ArrayList<>();
@@ -109,6 +109,28 @@ public abstract class Combatant implements EffectTarget {
         this.currentHealth = Math.max(0, Math.min(stats.maxHealth(), health));
     }
 
+    /**
+     * Bumps max health by a flat amount, resolved once at fight start by
+     * whatever needed to ask something about the wider fight first — a
+     * leader-relative item bonus can only be answered once every player
+     * combatant already exists and has its starting health set (see
+     * ItemPassive.bonusMaxHealthPercent and CombatService), which is after
+     * this combatant's own construction, not during it. Whoever was already
+     * sitting at exactly full health grows right along with the new max;
+     * anyone below full keeps their same raw current health, same as a
+     * max-health item would behave if equipped before the fight instead.
+     */
+    public void increaseMaxHealth(int amount) {
+        if (amount == 0) {
+            return;
+        }
+        boolean wasFull = currentHealth == stats.maxHealth();
+        stats = new Stats(stats.maxHealth() + amount, stats.defense(), stats.maxStamina());
+        if (wasFull) {
+            currentHealth = stats.maxHealth();
+        }
+    }
+
     public List<ActiveEffect> activeEffects() {
         return List.copyOf(activeEffects);
     }
@@ -126,11 +148,10 @@ public abstract class Combatant implements EffectTarget {
     /**
      * Summed fresh from {@link #passives} on every call rather than
      * precomputed once at construction — a passive's own contribution can
-     * depend on live combat state (Scythe) or randomness (Lucky Charm), and
-     * even the flat {@link CombatantPassive#damagePercent()} case is cheap
-     * enough to just re-sum. Subclasses that need to add a fight-start-only,
-     * externally-computed extra (see PlayerCombatant's party-leader-relative
-     * bonus) do so by overriding and adding to {@code super.damagePercentBonus()}.
+     * depend on live combat state (Scythe, or PlayerCombatant.healthierThanLeader())
+     * or randomness (Lucky Charm), and even the flat
+     * {@link CombatantPassive#damagePercent()} case is cheap enough to just
+     * re-sum.
      */
     @Override
     public int damagePercentBonus() {
@@ -140,9 +161,15 @@ public abstract class Combatant implements EffectTarget {
     }
 
     /**
-     * Called once by {@link Combat}'s constructor, after every combatant in the fight has been created — see {@link #roster}.
+     * Called by {@link Combat}'s constructor once every combatant in the
+     * fight (including enemies) has been created — see {@link #roster}.
+     * Also called earlier, player-combatants-only, by CombatService itself
+     * while it's still resolving leader-relative item bonuses (see
+     * PlayerCombatant.healthierThanLeader()), before enemies even exist yet
+     * — Combat's own later call simply replaces that roster with the
+     * complete one, so calling this more than once is harmless.
      */
-    void attachRoster(Collection<Combatant> roster) {
+    public void attachRoster(Collection<Combatant> roster) {
         this.roster = roster;
     }
 

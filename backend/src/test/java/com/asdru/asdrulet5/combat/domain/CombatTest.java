@@ -7,6 +7,7 @@ import com.asdru.asdrulet5.combat.exception.NotYourTurnException;
 import com.asdru.asdrulet5.enemydata.domain.EnemyPassive;
 import com.asdru.asdrulet5.inventory.domain.ItemPassive;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
+import com.asdru.asdrulet5.party.domain.Party;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -85,8 +86,12 @@ class CombatTest {
         return player(id, abilities, List.of());
     }
 
+    // None of these tests exercise anything party-leader-relative, so every
+    // player combatant across the whole file can just share one bare Party.
+    private static final Party TEST_PARTY = new Party("ABC123", "leader", "Leader", null);
+
     private static Combatant player(String id, List<Ability> abilities, List<ItemPassive> passives) {
-        return new PlayerCombatant(id, id, CharacterClass.BERSERKER, new Stats(100, 5, 100), 0, 40, abilities, passives);
+        return new PlayerCombatant(id, id, CharacterClass.BERSERKER, new Stats(100, 5, 100), 40, abilities, passives, TEST_PARTY);
     }
 
     private static Combatant enemy(String id, int maxHealth, int defense, int attackPower) {

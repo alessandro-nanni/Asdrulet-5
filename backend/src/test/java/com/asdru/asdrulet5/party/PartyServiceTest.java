@@ -49,7 +49,7 @@ class PartyServiceTest {
 
     private static Combatant playerCombatant(String userId, int maxHealth) {
         return new PlayerCombatant(userId, userId, CharacterClass.BERSERKER,
-                new Stats(maxHealth, 5, 100), 0, 40, List.of(), List.of());
+                new Stats(maxHealth, 5, 100), 40, List.of(), List.of(), null);
     }
 
     @BeforeEach
@@ -210,7 +210,7 @@ class PartyServiceTest {
 
         assertThat(updated.status()).isEqualTo(PartyStatus.IN_PROGRESS);
         // false: a regular FIGHT room draws from the enemy pool, not the boss.
-        verify(combatService, times(1)).startCombat(eq(created.code()), any(), any(), eq(false));
+        verify(combatService, times(1)).startCombat(argThat(party -> party.code().equals(created.code())), any(), any(), eq(false));
     }
 
     @Test
@@ -221,7 +221,7 @@ class PartyServiceTest {
         PartyStateDto updated = partyService.enterRoom(created.code(), "leader-1");
 
         assertThat(updated.status()).isEqualTo(PartyStatus.IN_PROGRESS);
-        verify(combatService, times(1)).startCombat(eq(created.code()), any(), any(), eq(true));
+        verify(combatService, times(1)).startCombat(argThat(party -> party.code().equals(created.code())), any(), any(), eq(true));
     }
 
     @Test
