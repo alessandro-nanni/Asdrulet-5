@@ -1,5 +1,6 @@
 package com.asdru.asdrulet5.enemydata;
 
+import com.asdru.asdrulet5.enemydata.domain.EncounterSize;
 import com.asdru.asdrulet5.enemydata.domain.EncounterTable;
 import com.asdru.asdrulet5.enemydata.domain.EnemyPoolEntry;
 import org.junit.jupiter.api.Test;
@@ -14,12 +15,22 @@ class EnemyEncounterRegistryTest {
     private final EnemyDefinitionRegistry enemyDefinitionRegistry = new EnemyDefinitionRegistry();
 
     @Test
-    void floorOneTableDrawsBetweenTwoAndThreeEnemies() {
+    void floorOneTableDrawsBetweenTwoAndThreeEnemiesForASoloParty() {
         EncounterTable floor1 = enemyEncounterRegistry.forFloor(1);
         Random random = new Random(1);
 
         for (int i = 0; i < 50; i++) {
-            assertThat(floor1.roll(random).size()).isBetween(2, 3);
+            assertThat(floor1.roll(random, EncounterSize.BASELINE_PARTY_SIZE).size()).isBetween(2, 3);
+        }
+    }
+
+    @Test
+    void floorOneTableDrawsMoreEnemiesForABiggerParty() {
+        EncounterTable floor1 = enemyEncounterRegistry.forFloor(1);
+        Random random = new Random(1);
+
+        for (int i = 0; i < 50; i++) {
+            assertThat(floor1.roll(random, 4).size()).isBetween(5, 6);
         }
     }
 
@@ -39,6 +50,6 @@ class EnemyEncounterRegistryTest {
 
     @Test
     void tableIsEmptyForAFloorThatDoesntExistYet() {
-        assertThat(enemyEncounterRegistry.forFloor(2).roll(new Random(1))).isEmpty();
+        assertThat(enemyEncounterRegistry.forFloor(2).roll(new Random(1), EncounterSize.BASELINE_PARTY_SIZE)).isEmpty();
     }
 }

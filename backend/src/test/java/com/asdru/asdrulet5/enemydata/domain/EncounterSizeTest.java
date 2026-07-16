@@ -45,4 +45,26 @@ class EncounterSizeTest {
     void maxBelowMinThrows() {
         assertThatThrownBy(() -> new EncounterSize(3, 1)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void scaledForPartySizeIsUnchangedAtBaseline() {
+        EncounterSize size = new EncounterSize(2, 3);
+
+        assertThat(size.scaledForPartySize(EncounterSize.BASELINE_PARTY_SIZE)).isEqualTo(new EncounterSize(2, 3));
+    }
+
+    @Test
+    void scaledForPartySizeAddsOneEnemyPerExtraPlayer() {
+        EncounterSize size = new EncounterSize(2, 3);
+
+        assertThat(size.scaledForPartySize(2)).isEqualTo(new EncounterSize(3, 4));
+        assertThat(size.scaledForPartySize(4)).isEqualTo(new EncounterSize(5, 6));
+    }
+
+    @Test
+    void scaledForPartySizeBelowBaselineNeverShrinksBelowBaseline() {
+        EncounterSize size = new EncounterSize(2, 3);
+
+        assertThat(size.scaledForPartySize(0)).isEqualTo(new EncounterSize(2, 3));
+    }
 }

@@ -322,12 +322,38 @@ public class Combat {
         // through (see resolveTurnAction) — an enemy's turn is really just
         // "use one of my own abilities," no different in kind from a
         // player's, so there's no reason for this to be a separate,
-        // hand-rolled sequence. Always its first ability for now — see
-        // EnemyDefinitionRegistry's own doc on enemies eventually having more
-        // than one and needing real move selection.
-        Ability ability = enemyActor.abilities().getFirst();
+        // hand-rolled sequence.
+        Ability ability = chooseEnemyAbility(enemyActor);
         resolveTurnAction(enemyActor, ability, List.of(target));
         checkWinLoss();
+    }
+
+    /**
+     * An enemy's own move selection: whichever of its abilities comes first
+     * in its own declared list that it can actually afford right now (an
+     * UltimateAbility needs its charge threshold met, a BasicAbility needs
+     * enough stamina) — falling back to its last-declared ability if nothing
+     * earlier is affordable. Enemies regenerate stamina on their own turn
+     * exactly like a player does (see {@link #resolveNextEntry}), so this is
+     * deliberately how {@code EnemyDefinitionRegistry} gives an enemy a
+     * tiered move set: order abilities strongest/most expensive first and a
+     * guaranteed-affordable (typically 0-cost) attack last, and an enemy
+     * naturally alternates between its bigger hits and its bread-and-butter
+     * attack as its stamina rises and falls, rather than picking one and
+     * sticking with it for the whole fight.
+     */
+    private Ability chooseEnemyAbility(Combatant enemyActor) {
+        return enemyActor.abilities().stream()
+                .filter(ability -> canAffordEnemyAbility(enemyActor, ability))
+                .findFirst()
+                .orElseGet(() -> enemyActor.abilities().getLast());
+    }
+
+    private boolean canAffordEnemyAbility(Combatant actor, Ability ability) {
+        return switch (ability) {
+            case BasicAbility basic -> actor.hasStamina(basic.staminaCost());
+            case UltimateAbility ignored -> actor.ultimateReady();
+        };
     }
 
     private Optional<Combatant> tauntedTarget(Combatant actor) {
@@ -377,8 +403,10 @@ public class Combat {
                 // to act — move straight on to whoever's next.
                 continue;
             }
+            // Same partial regen for everyone, ally or enemy — see
+            // STAMINA_REGEN_PER_TURN's own doc.
+            next.restoreStamina(STAMINA_REGEN_PER_TURN + next.staminaRegenBonus());
             if (!next.enemy()) {
-                next.restoreStamina(STAMINA_REGEN_PER_TURN + next.staminaRegenBonus());
                 return StepOutcome.ALLY_TURN;
             }
             resolveEnemyTurn(next);

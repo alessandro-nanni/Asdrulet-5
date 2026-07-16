@@ -89,13 +89,16 @@ class CombatServiceTest {
     }
 
     @Test
-    void startCombatForARegularFightSpawnsTwoOrThreeEnemiesFromThePool() {
+    void startCombatForARegularFightSpawnsThreeOrFourEnemiesFromThePoolForATwoMemberParty() {
+        // Baseline (solo) is 2-3 — 2 members means 1 player beyond that
+        // baseline, so +1 enemy on both ends of the range (see
+        // EncounterSize.scaledForPartySize).
         List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
 
         CombatStateDto dto = combatService.startCombat(party("ABC123"), members, List.of("p1", "p2"), false);
 
         List<CombatantDto> enemies = dto.combatants().stream().filter(CombatantDto::enemy).toList();
-        assertThat(enemies.size()).isBetween(2, 3);
+        assertThat(enemies.size()).isBetween(3, 4);
         assertThat(enemies).extracting(CombatantDto::id).doesNotHaveDuplicates();
         // enemyDefinitionId (unlike id/displayName) is the stable per-species
         // key the frontend uses to look up a portrait — every regular-fight
@@ -106,6 +109,74 @@ class CombatServiceTest {
                 .doesNotContain(EnemyDefinitionRegistry.DEFAULT_ENEMY_ID);
         // Every enemy turn is appended to the sequence, so the party still goes first.
         assertThat(dto.currentTurnCombatantId()).isEqualTo("p1");
+    }
+
+    @Test
+    void startCombatForARegularFightSpawnsMoreEnemiesForABiggerParty() {
+        List<PartyMember> soloMembers = List.of(member("p1", CharacterClass.BERSERKER));
+        List<PartyMember> fullMembers = List.of(
+                member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER),
+                member("p3", CharacterClass.PALADIN), member("p4", CharacterClass.MAGE));
+
+        CombatStateDto solo = combatService.startCombat(party("SOLO"), soloMembers, List.of("p1"), false);
+        CombatStateDto full = combatService.startCombat(party("FULL"), fullMembers,
+                List.of("p1", "p2", "p3", "p4"), false);
+
+        int soloEnemyCount = (int) solo.combatants().stream().filter(CombatantDto::enemy).count();
+        int fullEnemyCount = (int) full.combatants().stream().filter(CombatantDto::enemy).count();
+        assertThat(soloEnemyCount).isBetween(2, 3);
+        assertThat(fullEnemyCount).isBetween(5, 6);
+    }
+
+    @Test
+    void startCombatScalesRegularEnemyStatsForABiggerParty() {
+        // Enemies aren't all the same species (3 base health values in the
+        // pool — see EnemyDefinitionRegistry), so this compares each spawned
+        // enemy against its own definition's base stats rather than across
+        // species, which a min/max comparison could get wrong just from
+        // which species happened to roll.
+        EnemyDefinitionRegistry definitions = new EnemyDefinitionRegistry();
+        List<PartyMember> fullMembers = List.of(
+                member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER),
+                member("p3", CharacterClass.PALADIN), member("p4", CharacterClass.MAGE));
+
+        CombatStateDto full = combatService.startCombat(party("FULL"), fullMembers,
+                List.of("p1", "p2", "p3", "p4"), false);
+
+        List<CombatantDto> enemies = full.combatants().stream().filter(CombatantDto::enemy).toList();
+        assertThat(enemies).isNotEmpty();
+        for (CombatantDto enemyDto : enemies) {
+            Stats base = definitions.get(enemyDto.enemyDefinitionId()).stats();
+            // 3 extra players beyond baseline: +20% maxHealth, +10% defense each.
+            int expectedHealth = (int) Math.round(base.maxHealth() * (1 + 3 * 20 / 100.0));
+            int expectedDefense = (int) Math.round(base.defense() * (1 + 3 * 10 / 100.0));
+            assertThat(enemyDto.maxHealth()).as(enemyDto.enemyDefinitionId()).isEqualTo(expectedHealth);
+            assertThat(enemyDto.defense()).as(enemyDto.enemyDefinitionId()).isEqualTo(expectedDefense);
+        }
+    }
+
+    @Test
+    void startCombatScalesBossStatsForABiggerPartyButStillSpawnsExactlyOne() {
+        List<PartyMember> soloMembers = List.of(member("p1", CharacterClass.BERSERKER));
+        List<PartyMember> fullMembers = List.of(
+                member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER),
+                member("p3", CharacterClass.PALADIN), member("p4", CharacterClass.MAGE));
+
+        CombatStateDto solo = combatService.startCombat(party("SOLO"), soloMembers, List.of("p1"), true);
+        CombatStateDto full = combatService.startCombat(party("FULL"), fullMembers,
+                List.of("p1", "p2", "p3", "p4"), true);
+
+        List<CombatantDto> soloBoss = solo.combatants().stream().filter(CombatantDto::enemy).toList();
+        List<CombatantDto> fullBoss = full.combatants().stream().filter(CombatantDto::enemy).toList();
+        assertThat(soloBoss).hasSize(1);
+        assertThat(fullBoss).hasSize(1);
+        // Unscaled (solo) base stats: 220 health, 8 defense (see EnemyDefinitionRegistry.goblinMarauder).
+        assertThat(soloBoss.getFirst().maxHealth()).isEqualTo(220);
+        assertThat(soloBoss.getFirst().defense()).isEqualTo(8);
+        // 3 extra players beyond baseline: +35% health each = round(220 * 2.05) = 451;
+        // +15% defense each = round(8 * 1.45) = 12.
+        assertThat(fullBoss.getFirst().maxHealth()).isEqualTo(451);
+        assertThat(fullBoss.getFirst().defense()).isEqualTo(12);
     }
 
     @Test
@@ -253,8 +324,10 @@ class CombatServiceTest {
         int enemyHealthAfter = updated.combatants().stream()
                 .filter(c -> c.id().equals(enemyId)).findFirst().orElseThrow().currentHealth();
         // Arcane Blast's 9 power scaled by Scythe's +13% (one dead ally) = round(9 * 1.13) = 10,
-        // mitigated by the goblin's 8 defense: round(10 * (1 - 8/33)) = 8.
-        assertThat(enemyHealthBefore - enemyHealthAfter).isEqualTo(8);
+        // mitigated by the goblin's defense — 8 base, bumped 15% for the one
+        // extra player beyond baseline in this 2-member party: round(8 * 1.15) = 9,
+        // so mitigation is round(10 * (1 - 9/34)) = 7.
+        assertThat(enemyHealthBefore - enemyHealthAfter).isEqualTo(7);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.asdru.asdrulet5.enemydata;
 
+import com.asdru.asdrulet5.classdata.domain.BasicAbility;
 import com.asdru.asdrulet5.enemydata.domain.EnemyDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +35,30 @@ class EnemyDefinitionRegistryTest {
             assertThat(definition.stats().maxHealth()).isPositive();
             assertThat(definition.abilities()).isNotEmpty();
         }
+    }
+
+    /**
+     * Every enemy needs more than one move for {@code Combat.chooseEnemyAbility}'s
+     * affordability-gated preference order to have anything real to choose
+     * between, and a guaranteed-affordable (0-stamina-cost) last move so it's
+     * never left with nothing it can do once its stamina budget runs dry.
+     */
+    @Test
+    void everyEnemyHasMultipleAbilitiesEndingInAZeroCostFallback() {
+        for (EnemyDefinition definition : registry.all()) {
+            assertThat(definition.abilities()).as(definition.id()).hasSizeGreaterThan(1);
+            assertThat(definition.abilities().getLast()).as(definition.id())
+                    .isInstanceOfSatisfying(BasicAbility.class,
+                            fallback -> assertThat(fallback.staminaCost()).isZero());
+        }
+    }
+
+    @Test
+    void bossHasADeeperMoveSetThanARegularEnemy() {
+        EnemyDefinition boss = registry.get(EnemyDefinitionRegistry.DEFAULT_ENEMY_ID);
+        EnemyDefinition regular = registry.get("cave-rat");
+
+        assertThat(boss.abilities().size()).isGreaterThan(regular.abilities().size());
     }
 
     @Test

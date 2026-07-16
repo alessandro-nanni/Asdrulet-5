@@ -10,6 +10,7 @@ import com.asdru.asdrulet5.combat.web.CombatMapper;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
 import com.asdru.asdrulet5.enemydata.EnemyDefinitionRegistry;
 import com.asdru.asdrulet5.enemydata.EnemyEncounterRegistry;
+import com.asdru.asdrulet5.enemydata.domain.EncounterSize;
 import com.asdru.asdrulet5.enemydata.domain.EnemyDefinition;
 import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
 import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
@@ -43,6 +44,24 @@ public class CombatService {
      */
     private static final int CURRENT_FLOOR = 1;
 
+    /**
+     * Percentage bump to a regular enemy's maxHealth/defense for every
+     * player beyond {@link EncounterSize#BASELINE_PARTY_SIZE} (solo) — see
+     * {@link #scaledStats}. A bigger party doesn't just face more enemies
+     * (see {@link EncounterSize#scaledForPartySize}), each one is tougher
+     * too, so a lone straggler among them doesn't trivialize the fight.
+     */
+    private static final double REGULAR_ENEMY_HEALTH_PERCENT_PER_EXTRA_PLAYER = 20;
+    private static final double REGULAR_ENEMY_DEFENSE_PERCENT_PER_EXTRA_PLAYER = 10;
+    /**
+     * Same idea as the regular-enemy constants above, but steeper — a boss
+     * always stays exactly 1 (see {@link #toEnemyCombatants}), so it alone
+     * has to keep pace with the whole party's added output instead of
+     * splitting that extra difficulty across a bigger enemy roster.
+     */
+    private static final double BOSS_HEALTH_PERCENT_PER_EXTRA_PLAYER = 35;
+    private static final double BOSS_DEFENSE_PERCENT_PER_EXTRA_PLAYER = 15;
+
     private final CombatRepository combatRepository;
     private final ClassDefinitionRegistry classDefinitionRegistry;
     private final EnemyDefinitionRegistry enemyDefinitionRegistry;
@@ -54,10 +73,16 @@ public class CombatService {
     private final SecureRandom random = new SecureRandom();
 
     /**
-     * isBossFight spawns exactly one {@code EnemyDefinitionRegistry.DEFAULT_ENEMY_ID}
-     * (unchanged from before this ever had a notion of multiple enemies);
-     * otherwise 2-3 enemies are drawn from {@link EnemyEncounterRegistry}'s
-     * current-floor table, which may repeat the same enemy more than once.
+     * isBossFight spawns exactly one {@code EnemyDefinitionRegistry.DEFAULT_ENEMY_ID},
+     * regardless of party size; otherwise enemies are drawn from
+     * {@link EnemyEncounterRegistry}'s current-floor table (2-3 at
+     * {@link EncounterSize#BASELINE_PARTY_SIZE}, more for a bigger party —
+     * see {@link EncounterSize#scaledForPartySize}), which may repeat the
+     * same enemy more than once. Either way, every spawned enemy's own
+     * maxHealth/defense is also bumped for a bigger party (see
+     * {@link #scaledStats}) — a boss steeper than a regular enemy, since it
+     * alone has to keep pace with the whole party instead of splitting that
+     * extra difficulty across a bigger roster.
      */
     public CombatStateDto startCombat(Party party, List<PartyMember> members, List<String> turnOrder, boolean isBossFight) {
         List<Combatant> combatants = new ArrayList<>();
@@ -73,7 +98,7 @@ public class CombatService {
         }
         resolveLeaderRelativeMaxHealthBonuses(playerCombatants);
 
-        List<Combatant> enemyCombatants = toEnemyCombatants(isBossFight);
+        List<Combatant> enemyCombatants = toEnemyCombatants(isBossFight, members.size());
         combatants.addAll(enemyCombatants);
 
         List<String> turnSequence = new ArrayList<>(turnOrder);
@@ -260,18 +285,20 @@ public class CombatService {
     }
 
     /**
-     * A boss fight is exactly one {@code DEFAULT_ENEMY_ID}, same as before
-     * this ever had a notion of multiple enemies. A regular fight rolls
-     * {@link EnemyEncounterRegistry}'s current-floor table, which can repeat
-     * the same enemy — when it does, each repeat gets a " 1"/" 2"/... suffix
-     * on its display name so e.g. two Cave Rats are distinguishable in the
-     * UI (their combatant ids, "enemy-1"/"enemy-2"/..., already keep them
-     * distinct to the engine either way).
+     * A boss fight is exactly one {@code DEFAULT_ENEMY_ID} — always exactly
+     * 1, regardless of partySize (see {@link #scaledStats} for how a boss
+     * keeps pace with a bigger party instead). A regular fight rolls
+     * {@link EnemyEncounterRegistry}'s current-floor table (itself scaled
+     * for partySize), which can repeat the same enemy — when it does, each
+     * repeat gets a " 1"/" 2"/... suffix on its display name so e.g. two
+     * Cave Rats are distinguishable in the UI (their combatant ids,
+     * "enemy-1"/"enemy-2"/..., already keep them distinct to the engine
+     * either way).
      */
-    private List<Combatant> toEnemyCombatants(boolean isBossFight) {
+    private List<Combatant> toEnemyCombatants(boolean isBossFight, int partySize) {
         List<String> enemyDefinitionIds = isBossFight
                 ? List.of(EnemyDefinitionRegistry.DEFAULT_ENEMY_ID)
-                : enemyEncounterRegistry.forFloor(CURRENT_FLOOR).roll(random);
+                : enemyEncounterRegistry.forFloor(CURRENT_FLOOR).roll(random, partySize);
         Map<String, Long> occurrences = enemyDefinitionIds.stream()
                 .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
         Map<String, Integer> seenSoFar = new HashMap<>();
@@ -283,10 +310,27 @@ public class CombatService {
                     ? definition.displayName() + " " + seenSoFar.merge(definitionId, 1, Integer::sum)
                     : definition.displayName();
             enemies.add(new EnemyCombatant(
-                    "enemy-" + (i + 1), displayName, definitionId, definition.stats(),
+                    "enemy-" + (i + 1), displayName, definitionId, scaledStats(definition.stats(), partySize, isBossFight),
                     0, definition.abilities(), definition.passives()));
         }
         return enemies;
+    }
+
+    /**
+     * Bumps maxHealth/defense by a percentage per player beyond
+     * {@link EncounterSize#BASELINE_PARTY_SIZE} — a different (steeper)
+     * pair of percentages for a boss than a regular enemy, see the constants
+     * above. maxStamina is left untouched: it's already each enemy's own
+     * fixed "how many big hits can I afford before falling back to my basic
+     * attack" budget (see EnemyDefinitionRegistry), unrelated to party size.
+     */
+    private Stats scaledStats(Stats base, int partySize, boolean isBossFight) {
+        int extraPlayers = Math.max(0, partySize - EncounterSize.BASELINE_PARTY_SIZE);
+        double healthPercent = isBossFight ? BOSS_HEALTH_PERCENT_PER_EXTRA_PLAYER : REGULAR_ENEMY_HEALTH_PERCENT_PER_EXTRA_PLAYER;
+        double defensePercent = isBossFight ? BOSS_DEFENSE_PERCENT_PER_EXTRA_PLAYER : REGULAR_ENEMY_DEFENSE_PERCENT_PER_EXTRA_PLAYER;
+        int scaledHealth = (int) Math.round(base.maxHealth() * (1 + extraPlayers * healthPercent / 100.0));
+        int scaledDefense = (int) Math.round(base.defense() * (1 + extraPlayers * defensePercent / 100.0));
+        return new Stats(scaledHealth, scaledDefense, base.maxStamina());
     }
 
     private Combat getOrThrow(String code) {

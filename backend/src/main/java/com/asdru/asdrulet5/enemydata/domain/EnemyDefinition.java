@@ -9,10 +9,11 @@ import java.util.Objects;
 /**
  * {@code abilities} reuses the exact same {@link Ability} shape a
  * ClassDefinition's moves do — an enemy attacking is mechanically no
- * different from a player using a basic ability, just always the first one
- * in the list for now (see {@code Combat.resolveEnemyTurn}). Every enemy
- * currently declares exactly one, but the list shape means a boss with a
- * real move set doesn't need a different representation later.
+ * different from a player using a basic ability. Which one an enemy picks
+ * on its turn is decided by {@code Combat.chooseEnemyAbility}: whichever
+ * comes first in this list that it can currently afford, so authors should
+ * order a definition's own abilities strongest/most expensive first and a
+ * guaranteed-affordable fallback last (see {@code EnemyDefinitionRegistry}).
  */
 public record EnemyDefinition(
         String id,

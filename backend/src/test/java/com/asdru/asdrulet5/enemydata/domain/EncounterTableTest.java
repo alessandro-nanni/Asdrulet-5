@@ -19,7 +19,7 @@ class EncounterTableTest {
                 List.of(entry("a", 10), entry("b", 10)),
                 EncounterSize.fixed(1));
 
-        assertThat(table.roll(new Random(1))).hasSize(1);
+        assertThat(table.roll(new Random(1), EncounterSize.BASELINE_PARTY_SIZE)).hasSize(1);
     }
 
     @Test
@@ -30,7 +30,19 @@ class EncounterTableTest {
         Random random = new Random(1);
 
         for (int i = 0; i < 50; i++) {
-            assertThat(table.roll(random).size()).isBetween(2, 3);
+            assertThat(table.roll(random, EncounterSize.BASELINE_PARTY_SIZE).size()).isBetween(2, 3);
+        }
+    }
+
+    @Test
+    void rollScalesTheRangedSizeForABiggerParty() {
+        EncounterTable table = new EncounterTable(
+                List.of(entry("a", 10), entry("b", 10)),
+                new EncounterSize(2, 3));
+        Random random = new Random(1);
+
+        for (int i = 0; i < 50; i++) {
+            assertThat(table.roll(random, 4).size()).isBetween(5, 6);
         }
     }
 
@@ -38,13 +50,13 @@ class EncounterTableTest {
     void rollCanRepeatTheSameEnemy() {
         EncounterTable table = new EncounterTable(List.of(entry("only", 10)), EncounterSize.fixed(3));
 
-        assertThat(table.roll(new Random(1))).containsExactly("only", "only", "only");
+        assertThat(table.roll(new Random(1), EncounterSize.BASELINE_PARTY_SIZE)).containsExactly("only", "only", "only");
     }
 
     @Test
     void rollOnAnEmptyTableReturnsEmpty() {
         EncounterTable table = new EncounterTable(List.of(), EncounterSize.fixed(3));
 
-        assertThat(table.roll(new Random(1))).isEmpty();
+        assertThat(table.roll(new Random(1), EncounterSize.BASELINE_PARTY_SIZE)).isEmpty();
     }
 }

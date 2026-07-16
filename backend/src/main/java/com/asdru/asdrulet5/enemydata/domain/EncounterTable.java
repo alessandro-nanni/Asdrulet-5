@@ -15,10 +15,13 @@ public record EncounterTable(List<EnemyPoolEntry> entries, EncounterSize size) {
     }
 
     /**
-     * Rolls this table once: draws {@link #size}'s count of enemies (with replacement — see {@link EnemyPool}) and returns their enemy ids.
+     * Rolls this table once: draws {@link #size}'s count of enemies — scaled
+     * for partySize (see {@link EncounterSize#scaledForPartySize}), so a
+     * bigger party faces proportionally more of them — with replacement
+     * (see {@link EnemyPool}), and returns their enemy ids.
      */
-    public List<String> roll(Random random) {
-        int count = size.roll(random);
+    public List<String> roll(Random random, int partySize) {
+        int count = size.scaledForPartySize(partySize).roll(random);
         return EnemyPool.pickRandom(entries, count, random).stream().map(EnemyPoolEntry::enemyId).toList();
     }
 }

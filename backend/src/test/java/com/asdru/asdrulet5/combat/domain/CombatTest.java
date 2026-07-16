@@ -444,6 +444,67 @@ class CombatTest {
         assertThat(combat.status()).isEqualTo(CombatStatus.PARTY_LOST);
     }
 
+    /**
+     * See {@code EnemyDefinitionRegistry}'s own doc: an enemy with more than
+     * one ability opens with whichever it can afford furthest up its own
+     * declared list (its "biggest" move), and falls back to a weaker,
+     * always-affordable attack whenever its stamina — regenerated on its own
+     * turn exactly like a player's (see {@link #enemyStaminaPartiallyRegeneratesOnItsOwnNextTurn})
+     * — isn't yet enough to afford the stronger one again.
+     */
+    @Test
+    void enemyPrefersItsStrongerAbilityWhenAffordableThenFallsBackUntilStaminaRegeneratesEnough() {
+        BasicAbility heavySmash = new BasicAbility(
+                "test-enemy.heavy-smash", "Heavy Smash", "A costly haymaker.", "30 damage",
+                TargetType.SINGLE_ENEMY, 50, AbilityEffect.damage(30));
+        BasicAbility jab = new BasicAbility(
+                "test-enemy.jab", "Jab", "A free, weaker hit.", "5 damage",
+                TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(5));
+        Combatant tieredEnemy = new EnemyCombatant(
+                "enemy", "enemy", "test-enemy", new Stats(200, 0, 50), 0, List.of(heavySmash, jab), List.of());
+        Combatant p1 = player("p1", List.of(STRIKE));
+        Combat combat = new Combat("ABC123", List.of(p1, tieredEnemy), List.of("p1", "enemy"));
+
+        // Enemy's first turn: 50 stamina affords Heavy Smash — round(30 * 25/30) = 25
+        // damage against p1's own 5 defense. Stamina drops to 0.
+        combat.endTurn("p1");
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 25);
+
+        // Enemy's second turn: only STAMINA_REGEN_PER_TURN (40) came back —
+        // not enough for Heavy Smash (50) — falls back to the free Jab:
+        // round(5 * 25/30) = 4 damage. Stamina stays at 40 (Jab costs nothing).
+        combat.endTurn("p1");
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 25 - 4);
+
+        // Enemy's third turn: another 40 regen on top of the banked 40 caps
+        // at its own 50 maxStamina — enough for Heavy Smash again.
+        combat.endTurn("p1");
+        assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 25 - 4 - 25);
+    }
+
+    @Test
+    void enemyStaminaPartiallyRegeneratesOnItsOwnNextTurn() {
+        BasicAbility heavySmash = new BasicAbility(
+                "test-enemy.heavy-smash", "Heavy Smash", "A costly haymaker.", "30 damage",
+                TargetType.SINGLE_ENEMY, 90, AbilityEffect.damage(30));
+        BasicAbility jab = new BasicAbility(
+                "test-enemy.jab", "Jab", "A free, weaker hit.", "5 damage",
+                TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(5));
+        Combatant tieredEnemy = new EnemyCombatant(
+                "enemy", "enemy", "test-enemy", new Stats(200, 0, 90), 0, List.of(heavySmash, jab), List.of());
+        Combatant p1 = player("p1", List.of(STRIKE));
+        Combat combat = new Combat("ABC123", List.of(p1, tieredEnemy), List.of("p1", "enemy"));
+
+        // Spends its full 90 stamina on Heavy Smash, same as a player would.
+        combat.endTurn("p1");
+        assertThat(tieredEnemy.currentStamina()).isEqualTo(0);
+
+        // One partial regen on its own next turn — same STAMINA_REGEN_PER_TURN
+        // a player gets, not a full refill.
+        combat.endTurn("p1");
+        assertThat(tieredEnemy.currentStamina()).isEqualTo(Combat.STAMINA_REGEN_PER_TURN);
+    }
+
     @Test
     void allEnemiesTargetTypeHitsEveryAliveEnemy() {
         BasicAbility cleave = new BasicAbility(
