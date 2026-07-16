@@ -75,6 +75,13 @@ public class PartyController {
         return partyService.equipFromStorage(code.toUpperCase(), memberId, request.storageIndex());
     }
 
+    @PostMapping("/{code}/{memberId}/inventory/consume")
+    public PartyStateDto consumeItem(@PathVariable String code,
+                                     @PathVariable String memberId,
+                                     @Valid @RequestBody ConsumeItemRequest request) {
+        return partyService.consumeItem(code.toUpperCase(), memberId, request.storageIndex());
+    }
+
     @PostMapping("/{code}/{memberId}/wheel/spin")
     public PartyStateDto spinWheel(@PathVariable String code, @PathVariable String memberId) {
         return partyService.spinWheel(code.toUpperCase(), memberId);

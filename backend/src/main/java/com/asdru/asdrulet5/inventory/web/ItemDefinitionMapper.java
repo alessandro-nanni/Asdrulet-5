@@ -16,7 +16,8 @@ public class ItemDefinitionMapper {
                 definition.slot(),
                 definition.description(),
                 toDto(definition.passive()),
-                definition.price()
+                definition.price(),
+                definition.healAmount()
         );
     }
 

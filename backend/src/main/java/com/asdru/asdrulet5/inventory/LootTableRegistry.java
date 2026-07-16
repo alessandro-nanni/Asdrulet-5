@@ -46,17 +46,16 @@ public class LootTableRegistry {
                 new LootTableEntry("scythe", 15),
                 new LootTableEntry("torch", 20),
                 new LootTableEntry("lucky-charm", 8),
-                new LootTableEntry("satellite-dish", 20),
+                new LootTableEntry("satellite-dish", 14),
                 new LootTableEntry("twitching-talisman", 12),
-                new LootTableEntry("leather-tunic", 25),
-                new LootTableEntry("mantle-of-the-usurper", 10)
+                new LootTableEntry("leather-tunic", 20),
+                new LootTableEntry("mantle-of-the-usurper", 10),
+                new LootTableEntry("berserker-breastplate", 16)
         );
         return new FloorLootTables(
                 new LootTable(entries, new LootAmount(1, 3)),
                 new LootTable(entries, LootAmount.fixed(1)),
-                // Empty for now — no item is purchasable yet; add an entry
-                // here to make one available in the shop.
-                new LootTable(List.of(), LootAmount.fixed(8)));
+                new LootTable(List.of(new LootTableEntry("healing-potion", 1)), LootAmount.fixed(8)));
     }
 
     /**

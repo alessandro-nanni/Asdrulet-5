@@ -8,6 +8,7 @@ public record ItemDefinitionDto(
         ItemSlot slot,
         String description,
         PassiveEffectDto passiveEffect,
-        int price
+        int price,
+        int healAmount
 ) {
 }

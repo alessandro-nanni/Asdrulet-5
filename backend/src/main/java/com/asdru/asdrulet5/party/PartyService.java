@@ -11,6 +11,7 @@ import com.asdru.asdrulet5.inventory.ItemDefinitionRegistry;
 import com.asdru.asdrulet5.inventory.LootTableRegistry;
 import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.domain.ItemSlot;
+import com.asdru.asdrulet5.inventory.domain.Loadout;
 import com.asdru.asdrulet5.inventory.domain.LootTable;
 import com.asdru.asdrulet5.party.dev.FakeNameGenerator;
 import com.asdru.asdrulet5.party.domain.*;
@@ -238,10 +239,7 @@ public class PartyService {
         if (result.coins() > 0) {
             party.addCoins(result.coins());
         }
-        for (String itemId : result.itemIds()) {
-            ItemSlot slot = itemDefinitionRegistry.get(itemId).slot();
-            party.giveAndEquipItem(userId, slot, itemId);
-        }
+        result.itemIds().forEach(itemId -> giveItem(party, userId, itemId));
         party.recordLoot(userId, result);
         return broadcast(party);
     }
@@ -287,6 +285,22 @@ public class PartyService {
         return 10 + random.nextInt(16);
     }
 
+    /**
+     * A member's max health as actually adjusted by their own gear (class
+     * base stats plus every equipped item's {@code bonusMaxHealth()}) — used
+     * both by the MYSTERY wheel (see {@link #wheelContextFor}) and by
+     * {@link #consumeItem} to clamp a healing potion's effect the same way a
+     * FULL_HEAL wheel result would.
+     */
+    private int effectiveMaxHealth(PartyMember member) {
+        int base = classDefinitionRegistry.get(member.characterClass()).stats().maxHealth();
+        int bonus = member.loadout().equippedItemIds().stream()
+                .map(itemDefinitionRegistry::get)
+                .mapToInt(definition -> definition.passive().bonusMaxHealth())
+                .sum();
+        return Math.max(1, base + bonus);
+    }
+
     private WheelContext wheelContextFor(Party party) {
         return new WheelContext() {
             @Override
@@ -296,12 +310,7 @@ public class PartyService {
 
             @Override
             public int effectiveMaxHealth(PartyMember member) {
-                int base = classDefinitionRegistry.get(member.characterClass()).stats().maxHealth();
-                int bonus = member.loadout().equippedItemIds().stream()
-                        .map(itemDefinitionRegistry::get)
-                        .mapToInt(definition -> definition.passive().bonusMaxHealth())
-                        .sum();
-                return Math.max(1, base + bonus);
+                return PartyService.this.effectiveMaxHealth(member);
             }
 
             @Override
@@ -310,12 +319,27 @@ public class PartyService {
                 // normally a single item — looping rather than assuming
                 // exactly one still degrades gracefully if a future floor's
                 // wheel table is ever left empty.
-                for (String itemId : rollUnplaced(party, lootTableRegistry.forFloor(CURRENT_FLOOR).wheelTable())) {
-                    ItemSlot slot = itemDefinitionRegistry.get(itemId).slot();
-                    party.giveAndEquipItem(member.userId(), slot, itemId);
-                }
+                rollUnplaced(party, lootTableRegistry.forFloor(CURRENT_FLOOR).wheelTable())
+                        .forEach(itemId -> giveItem(party, member.userId(), itemId));
             }
         };
+    }
+
+    /**
+     * Grants itemId to userId, the way a chest/wheel reward does — equipped
+     * directly (swapping whatever was already worn back into shared storage)
+     * for ordinary gear, same as {@link Party#giveAndEquipItem} always did.
+     * A {@link ItemSlot#CONSUMABLE} can't be equipped at all (see
+     * {@link Loadout#withItem}), so it goes straight into shared storage
+     * instead — same destination a shop purchase already uses.
+     */
+    private void giveItem(Party party, String userId, String itemId) {
+        ItemSlot slot = itemDefinitionRegistry.get(itemId).slot();
+        if (slot == ItemSlot.CONSUMABLE) {
+            party.addItemToStorage(itemId);
+        } else {
+            party.giveAndEquipItem(userId, slot, itemId);
+        }
     }
 
     /**
@@ -435,6 +459,13 @@ public class PartyService {
     public PartyStateDto equipFromStorage(String code, String userId, int storageIndex) {
         Party party = getOrThrow(code);
         party.equipFromStorage(userId, storageIndex, itemId -> itemDefinitionRegistry.get(itemId).slot());
+        return broadcast(party);
+    }
+
+    public PartyStateDto consumeItem(String code, String userId, int storageIndex) {
+        Party party = getOrThrow(code);
+        party.consumeItem(userId, storageIndex, itemDefinitionRegistry::get, this::effectiveMaxHealth,
+                dungeonService.currentLayer(code));
         return broadcast(party);
     }
 

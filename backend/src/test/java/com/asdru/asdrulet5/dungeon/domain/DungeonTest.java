@@ -110,6 +110,18 @@ class DungeonTest {
     }
 
     @Test
+    void currentLayerTracksHomeNodeDepthAsTheRunProgresses() {
+        Dungeon dungeon = new Dungeon("ABC123", "leader-1", threeNodeChain(), "n0");
+        assertThat(dungeon.currentLayer()).isZero();
+
+        dungeon.select("leader-1", "n1");
+        dungeon.enter("leader-1");
+        dungeon.clearEnteredNode();
+
+        assertThat(dungeon.currentLayer()).isEqualTo(1);
+    }
+
+    @Test
     void clearEnteredNodeWithoutAnythingEnteredThrows() {
         Dungeon dungeon = new Dungeon("ABC123", "leader-1", threeNodeChain(), "n0");
 

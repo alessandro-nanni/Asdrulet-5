@@ -1,6 +1,6 @@
 import {useMemo, useState} from 'react'
 import {Portal} from '../../../shared/ui/Portal'
-import {equipFromStorage} from '../../party/api'
+import {consumeItem, equipFromStorage} from '../../party/api'
 import {useItemDefinitions} from '../useItemDefinitions'
 import {ItemIcon} from './ItemIcon'
 import {ItemDetailCard} from './ItemDetailCard'
@@ -24,9 +24,13 @@ interface Selection {
     storageIndex: number | null
 }
 
-const SLOT_ORDER: ItemSlot[] = ['WEAPON', 'CHESTPLATE', 'TRINKET']
+// The equipped row only ever has a cell per equippable slot — CONSUMABLE
+// items never leave shared storage, so they're excluded here (see canConsumeSelected/canEquipSelected below).
+type EquippableSlot = Exclude<ItemSlot, 'CONSUMABLE'>
 
-const LOADOUT_FIELD: Record<ItemSlot, keyof Loadout> = {
+const SLOT_ORDER: EquippableSlot[] = ['WEAPON', 'CHESTPLATE', 'TRINKET']
+
+const LOADOUT_FIELD: Record<EquippableSlot, keyof Loadout> = {
     WEAPON: 'weaponItemId',
     CHESTPLATE: 'chestplateItemId',
     TRINKET: 'trinketItemId',
@@ -36,6 +40,7 @@ export function InventoryScreen({code, member, storage, onApplyUpdate, onClose}:
     const {definitions} = useItemDefinitions()
     const [selected, setSelected] = useState<Selection | null>(null)
     const [isEquipping, setIsEquipping] = useState(false)
+    const [isConsuming, setIsConsuming] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     const definitionsById = useMemo(
@@ -43,7 +48,9 @@ export function InventoryScreen({code, member, storage, onApplyUpdate, onClose}:
         [definitions],
     )
     const selectedDefinition = selected ? (definitionsById.get(selected.itemId) ?? null) : null
-    const canEquipSelected = selected != null && selected.storageIndex !== null
+    const selectedFromStorage = selected != null && selected.storageIndex !== null
+    const canConsumeSelected = selectedFromStorage && selectedDefinition?.slot === 'CONSUMABLE'
+    const canEquipSelected = selectedFromStorage && selectedDefinition?.slot !== 'CONSUMABLE'
 
     async function handleEquip() {
         if (!selected || selected.storageIndex === null || isEquipping) {
@@ -64,6 +71,23 @@ export function InventoryScreen({code, member, storage, onApplyUpdate, onClose}:
         }
     }
 
+    async function handleConsume() {
+        if (!selected || selected.storageIndex === null || isConsuming) {
+            return
+        }
+        setError(null)
+        setIsConsuming(true)
+        try {
+            onApplyUpdate(await consumeItem(code, member.userId, selected.storageIndex))
+            // The item is gone — nothing left to keep selected.
+            setSelected(null)
+        } catch {
+            setError('Could not consume that item. Try again.')
+        } finally {
+            setIsConsuming(false)
+        }
+    }
+
     return (
         <Portal>
             <div className="inventory-screen">
@@ -79,6 +103,9 @@ export function InventoryScreen({code, member, storage, onApplyUpdate, onClose}:
                     canEquip={canEquipSelected}
                     isEquipping={isEquipping}
                     onEquip={handleEquip}
+                    canConsume={canConsumeSelected}
+                    isConsuming={isConsuming}
+                    onConsume={handleConsume}
                     error={error}
                 />
 
@@ -150,12 +177,18 @@ function ItemDetailPanel({
                              canEquip,
                              isEquipping,
                              onEquip,
+                             canConsume,
+                             isConsuming,
+                             onConsume,
                              error,
                          }: {
     definition: ItemDefinition | null
     canEquip: boolean
     isEquipping: boolean
     onEquip: () => void
+    canConsume: boolean
+    isConsuming: boolean
+    onConsume: () => void
     error: string | null
 }) {
     return (
@@ -163,7 +196,12 @@ function ItemDetailPanel({
             {definition ? (
                 <>
                     <ItemDetailCard definition={definition}/>
-                    {canEquip ? (
+                    {canConsume ? (
+                        <button type="button" className="btn btn-primary btn-block" onClick={onConsume}
+                                disabled={isConsuming}>
+                            {isConsuming ? 'Consuming…' : 'Consume'}
+                        </button>
+                    ) : canEquip ? (
                         <button type="button" className="btn btn-primary btn-block" onClick={onEquip}
                                 disabled={isEquipping}>
                             {isEquipping ? 'Equipping…' : 'Equip'}

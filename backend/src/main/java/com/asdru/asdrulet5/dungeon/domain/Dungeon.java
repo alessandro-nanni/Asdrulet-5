@@ -90,6 +90,18 @@ public class Dungeon {
     }
 
     /**
+     * How deep into this run the party currently is — {@link DungeonNode#layer()}
+     * of {@link #homeNodeId}, 0 at the starting room and increasing by 1 with
+     * every room cleared. Used to scale things like a healing potion's
+     * effect with depth (see {@code Party.consumeItem}) — unrelated to
+     * {@code PartyService}'s own (currently static) loot-table floor concept.
+     */
+    @Synchronized
+    public int currentLayer() {
+        return nodesById.get(homeNodeId).layer();
+    }
+
+    /**
      * Moves the browse position to {@code targetNodeId} — either back to
      * {@link #homeNodeId} or to any of its next-room options — without
      * committing to anything. Blocked once a room has been entered (browsing

@@ -21,6 +21,7 @@ public record Loadout(String weaponItemId, String chestplateItemId, String trink
             case WEAPON -> new Loadout(itemId, chestplateItemId, trinketItemId);
             case CHESTPLATE -> new Loadout(weaponItemId, itemId, trinketItemId);
             case TRINKET -> new Loadout(weaponItemId, chestplateItemId, itemId);
+            case CONSUMABLE -> throw new IllegalArgumentException("Consumable items cannot be equipped: " + itemId);
         };
     }
 
@@ -29,6 +30,7 @@ public record Loadout(String weaponItemId, String chestplateItemId, String trink
             case WEAPON -> weaponItemId;
             case CHESTPLATE -> chestplateItemId;
             case TRINKET -> trinketItemId;
+            case CONSUMABLE -> throw new IllegalArgumentException("Consumable items are never equipped");
         };
     }
 

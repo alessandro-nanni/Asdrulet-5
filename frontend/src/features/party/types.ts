@@ -48,7 +48,7 @@ export interface PartyState {
     members: PartyMember[]
     turnOrder: string[]
     status: PartyStatus
-    // 12 cells (3 columns x 4 rows), each either an item id or null.
+    // 30 cells (3 columns x 10 rows), each either an item id or null.
     storage: (string | null)[]
     // Keyed by userId — only ever holds entries for the MYSTERY room currently
     // entered, reset the moment a new room is entered.

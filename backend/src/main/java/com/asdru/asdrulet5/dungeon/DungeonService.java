@@ -68,6 +68,14 @@ public class DungeonService {
         return DungeonMapper.toDto(getOrThrow(code));
     }
 
+    /**
+     * See {@link Dungeon#currentLayer()} — used by PartyService to scale a
+     * consumed healing potion's effect with dungeon depth.
+     */
+    public int currentLayer(String code) {
+        return getOrThrow(code).currentLayer();
+    }
+
     private Dungeon getOrThrow(String code) {
         return dungeonRepository.findByCode(code).orElseThrow(() -> new DungeonNotFoundException(code));
     }

@@ -37,9 +37,16 @@ public class ItemDefinitionRegistry {
 
     private static Map<String, ItemDefinition> buildDefinitions() {
         return Stream.of(
-                        scythe(), torch(),
-                        luckyCharm(), satelliteDish(), twitchingTalisman(),
-                        leatherTunic(), mantleOfTheUsurper())
+                        scythe(),
+                        torch(),
+                        luckyCharm(),
+                        satelliteDish(),
+                        twitchingTalisman(),
+                        leatherTunic(),
+                        mantleOfTheUsurper(),
+                        healingPotion(),
+                        berserkerBreastplate()
+                )
                 .collect(Collectors.toMap(ItemDefinition::id, Function.identity()));
     }
 
@@ -51,7 +58,7 @@ public class ItemDefinitionRegistry {
                     public int damagePercentBonus(EffectTarget wearer) {
                         return wearer.deadAllyCount() * 13;
                     }
-                }, 40);
+                }, 40, 0);
     }
 
     private static ItemDefinition torch() {
@@ -65,7 +72,7 @@ public class ItemDefinitionRegistry {
                                     "On Fire", "Burning — takes damage each turn.", "burn", 8, 2));
                         }
                     }
-                }, 35);
+                }, 35, 0);
     }
 
     private static ItemDefinition luckyCharm() {
@@ -76,7 +83,7 @@ public class ItemDefinitionRegistry {
                     public int damagePercentBonus(EffectTarget wearer) {
                         return ThreadLocalRandom.current().nextDouble() < 0.02 ? 200 : 0;
                     }
-                }, 30);
+                }, 30, 0);
     }
 
     private static ItemDefinition satelliteDish() {
@@ -92,7 +99,7 @@ public class ItemDefinitionRegistry {
                     public void onStartTurn(EffectTarget wearer) {
                         wearer.drainStamina(10);
                     }
-                }, 30);
+                }, 30, 0);
     }
 
     private static ItemDefinition twitchingTalisman() {
@@ -104,7 +111,7 @@ public class ItemDefinitionRegistry {
                     public boolean triggersFollowUpAbility() {
                         return ThreadLocalRandom.current().nextDouble() < 0.10;
                     }
-                }, 35);
+                }, 35, 0);
     }
 
     private static ItemDefinition leatherTunic() {
@@ -115,7 +122,7 @@ public class ItemDefinitionRegistry {
                     public int bonusDefense() {
                         return 4;
                     }
-                }, 20);
+                }, 20, 0);
     }
 
     private static ItemDefinition mantleOfTheUsurper() {
@@ -131,18 +138,37 @@ public class ItemDefinitionRegistry {
                     public int bonusMaxHealthPercent(EffectTarget wearer) {
                         return wearer.healthierThanLeader() ? 7 : 0;
                     }
-                }, 40);
+                }, 30, 0);
     }
 
     private static ItemDefinition berserkerBreastplate() {
         return new ItemDefinition("berserker-breastplate", "Berserker Breastplate", ItemSlot.CHESTPLATE,
-                "As long as you have more health than your party's leader: +5% damage and +7% max health.",
+                "When below 20% health, gain 15% damage",
                 new ItemPassive() {
-                   @Override
-                    public int bonusDamagePercent() {
-                       return 0;
-                   }
-                }, 40);
+                    @Override
+                    public int damagePercentBonus(EffectTarget wearer) {
+                        int amount = 0;
+
+                        double hpPercentage = (double) wearer.currentHealth() / wearer.maxHealth();
+                        if (hpPercentage < 0.20) {
+                            amount = 15;
+                        }
+                        return amount;
+                    }
+                }, 40, 0);
+    }
+
+    /**
+     * Consumed from the inventory screen rather than equipped — restores 40
+     * health on use, plus a bonus that grows with how deep into the dungeon
+     * run the party currently is. See {@code Party.consumeItem} (this 40 is
+     * just the base — the depth bonus isn't part of ItemDefinition at all).
+     */
+    private static ItemDefinition healingPotion() {
+        return new ItemDefinition("healing-potion", "Healing Potion", ItemSlot.CONSUMABLE,
+                "A swirling red brew. Drink it to restore health — the deeper you've delved, the more it heals.",
+                new ItemPassive() {
+                }, 15, 40);
     }
 
     public List<ItemDefinition> all() {

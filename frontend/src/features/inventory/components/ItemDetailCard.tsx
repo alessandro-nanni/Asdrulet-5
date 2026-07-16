@@ -21,6 +21,9 @@ export function ItemDetailCard({definition}: { definition: ItemDefinition }) {
             </div>
             <p className="ability-description">{definition.description}</p>
             <ul className="inventory-stat-list">
+                {definition.healAmount !== 0 && (
+                    <li className="is-positive">Heals +{definition.healAmount}</li>
+                )}
                 {(Object.keys(STAT_LABELS) as Array<keyof PassiveEffect>)
                     .filter((stat) => definition.passiveEffect[stat] !== 0)
                     .map((stat) => {

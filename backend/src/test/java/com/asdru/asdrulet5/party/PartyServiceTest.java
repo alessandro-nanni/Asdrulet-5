@@ -373,6 +373,83 @@ class PartyServiceTest {
     }
 
     @Test
+    void consumeItemHealsMemberAndRemovesItemFromStorage() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
+        Party party = partyRepository.findByCode(created.code()).orElseThrow();
+        party.seedStorage(List.of("healing-potion"));
+        party.setMemberHealth("leader-1", 1);
+
+        PartyStateDto updated = partyService.consumeItem(created.code(), "leader-1", 0);
+
+        // Berserker's max health is 80 — 1 + the potion's 40 heal is still
+        // short of full, so this stays a concrete number rather than null.
+        assertThat(updated.members().getFirst().currentHealth()).isEqualTo(41);
+        assertThat(updated.storage().get(0)).isNull();
+    }
+
+    @Test
+    void consumeItemHealsMoreTheDeeperTheDungeonRunIs() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
+        Party party = partyRepository.findByCode(created.code()).orElseThrow();
+        party.seedStorage(List.of("healing-potion"));
+        party.setMemberHealth("leader-1", 1);
+        when(dungeonService.currentLayer(created.code())).thenReturn(3);
+
+        PartyStateDto updated = partyService.consumeItem(created.code(), "leader-1", 0);
+
+        // The potion's base 40 heal, plus 8 per dungeon layer (3 layers deep
+        // here) — 1 + 40 + 24 = 65, still short of Berserker's 80 max.
+        assertThat(updated.members().getFirst().currentHealth()).isEqualTo(65);
+    }
+
+    @Test
+    void consumeItemClampsHealingAtMaxHealth() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
+        Party party = partyRepository.findByCode(created.code()).orElseThrow();
+        party.seedStorage(List.of("healing-potion"));
+        party.setMemberHealth("leader-1", 70);
+
+        PartyStateDto updated = partyService.consumeItem(created.code(), "leader-1", 0);
+
+        // 70 + 40 overshoots Berserker's 80 max — clamped, and represented
+        // as null per the "null means full health" convention.
+        assertThat(updated.members().getFirst().currentHealth()).isNull();
+    }
+
+    @Test
+    void consumeNonConsumableItemThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
+        Party party = partyRepository.findByCode(created.code()).orElseThrow();
+        party.seedStorage(List.of("scythe"));
+
+        assertThatThrownBy(() -> partyService.consumeItem(created.code(), "leader-1", 0))
+                .isInstanceOf(ItemNotConsumableException.class);
+    }
+
+    @Test
+    void consumeFromEmptyStorageCellThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
+        int emptyIndex = created.storage().indexOf(null);
+
+        assertThatThrownBy(() -> partyService.consumeItem(created.code(), "leader-1", emptyIndex))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.EmptyStorageSlotException.class);
+    }
+
+    @Test
+    void consumeFromOutOfRangeStorageIndexThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
+
+        assertThatThrownBy(() -> partyService.consumeItem(created.code(), "leader-1", Party.STORAGE_SIZE))
+                .isInstanceOf(com.asdru.asdrulet5.party.exception.InvalidStorageIndexException.class);
+    }
+
+    @Test
     void enterRoomInMysteryRoomDoesNotAutoClear() {
         PartyStateDto created = partyService.createParty(leader);
         when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.MYSTERY);
@@ -564,13 +641,15 @@ class PartyServiceTest {
                     assertThat(self.pendingEffects().getFirst().remainingTurns()).isEqualTo(4);
                 }
                 case GIVE_ITEM -> {
-                    // A personal reward equipped directly onto the spinner —
-                    // never the shared storage grid (see Party.giveAndEquipItem).
+                    // A personal reward: equippable gear lands directly on the
+                    // spinner's loadout (see Party.giveAndEquipItem); a
+                    // consumable can't be equipped, so it lands in shared
+                    // storage instead (see PartyService.giveItem).
                     boolean hasNewGear = self.loadout().weaponItemId() != null
                             || self.loadout().chestplateItemId() != null
                             || self.loadout().trinketItemId() != null;
-                    assertThat(hasNewGear).isTrue();
-                    assertThat(updated.storage()).allMatch(java.util.Objects::isNull);
+                    boolean hasNewStorageItem = updated.storage().stream().anyMatch(java.util.Objects::nonNull);
+                    assertThat(hasNewGear || hasNewStorageItem).isTrue();
                 }
                 case GIVE_COINS -> assertThat(updated.coins()).isEqualTo(30);
             }
@@ -753,10 +832,14 @@ class PartyServiceTest {
             }
             if (!result.itemIds().isEmpty()) {
                 PartyMemberDto self = updated.members().getFirst();
+                // Equippable gear lands directly on the finder's loadout; a
+                // consumable (e.g. a healing potion) can't be equipped, so it
+                // lands in shared storage instead — see PartyService.giveItem.
                 boolean hasNewGear = self.loadout().weaponItemId() != null
                         || self.loadout().chestplateItemId() != null
                         || self.loadout().trinketItemId() != null;
-                assertThat(hasNewGear).isTrue();
+                boolean hasNewStorageItem = updated.storage().stream().anyMatch(java.util.Objects::nonNull);
+                assertThat(hasNewGear || hasNewStorageItem).isTrue();
             }
             if (result.coins() > 0 && result.itemIds().isEmpty()) sawCoinsOnly = true;
             if (result.coins() == 0 && !result.itemIds().isEmpty()) sawItemOnly = true;

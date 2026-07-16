@@ -67,6 +67,11 @@ public class PartyExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
     }
 
+    @ExceptionHandler(ItemNotConsumableException.class)
+    public ResponseEntity<Map<String, String>> handleItemNotConsumable(ItemNotConsumableException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
     @ExceptionHandler(NotInMysteryRoomException.class)
     public ResponseEntity<Map<String, String>> handleNotInMysteryRoom(NotInMysteryRoomException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));

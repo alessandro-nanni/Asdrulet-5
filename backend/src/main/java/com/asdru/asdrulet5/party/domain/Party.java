@@ -1,6 +1,7 @@
 package com.asdru.asdrulet5.party.domain;
 
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
+import com.asdru.asdrulet5.inventory.domain.ItemDefinition;
 import com.asdru.asdrulet5.inventory.domain.ItemSlot;
 import com.asdru.asdrulet5.inventory.domain.Loadout;
 import com.asdru.asdrulet5.party.exception.*;
@@ -11,6 +12,7 @@ import lombok.experimental.Accessors;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.ToIntFunction;
 
 /**
  * Aggregate root for one party's game state. Owns the member roster,
@@ -32,9 +34,9 @@ public class Party {
     public static final int MAX_MEMBERS = 4;
 
     /**
-     * Shared party storage grid: 3 columns x 4 rows, rendered by the frontend.
+     * Shared party storage grid: 3 columns x 10 rows, rendered by the frontend.
      */
-    public static final int STORAGE_SIZE = 12;
+    public static final int STORAGE_SIZE = 30;
 
     @Getter
     @Accessors(fluent = true)
@@ -190,6 +192,56 @@ public class Party {
         String previousItemId = member.loadout().itemIdFor(slot);
         storage.set(storageIndex, previousItemId);
         members.put(userId, member.withLoadout(member.loadout().withItem(slot, itemId)));
+    }
+
+    /**
+     * Extra healing a consumed potion grants per layer of dungeon depth the
+     * party has reached (see {@link #consumeItem}'s dungeonLayer parameter)
+     * — a potion found right at the start is a modest top-up, one found deep
+     * into a run heals for meaningfully more, mirroring how the dungeon
+     * itself gets tougher with depth.
+     */
+    private static final int HEAL_BONUS_PER_DUNGEON_LAYER = 8;
+
+    /**
+     * Consumes whatever item sits in the given shared-storage cell — same
+     * bounds/empty-cell validation as {@link #equipFromStorage}, plus a check
+     * that the item is actually {@link ItemSlot#CONSUMABLE} (equippable gear
+     * has no "use" of its own). The item is removed from storage rather than
+     * moved anywhere, and its {@link ItemDefinition#healAmount()} — bumped by
+     * {@link #HEAL_BONUS_PER_DUNGEON_LAYER} for every layer of dungeonLayer —
+     * is applied to the consuming member, clamped to their own
+     * effectiveMaxHealth (same "null means full health" convention as
+     * {@link #setMemberHealth}). definitionLookup/effectiveMaxHealth are
+     * injected the same way equipFromStorage injects its own slotResolver,
+     * keeping ItemDefinitionRegistry/ClassDefinitionRegistry out of this
+     * package; dungeonLayer is likewise resolved by the caller (see
+     * {@code DungeonService.currentLayer}), since this package has no notion
+     * of the dungeon either.
+     */
+    @Synchronized
+    public void consumeItem(String userId, int storageIndex,
+                             Function<String, ItemDefinition> definitionLookup,
+                             ToIntFunction<PartyMember> effectiveMaxHealth,
+                             int dungeonLayer) {
+        PartyMember member = requireMember(userId);
+        if (storageIndex < 0 || storageIndex >= storage.size()) {
+            throw new InvalidStorageIndexException(code, storageIndex);
+        }
+        String itemId = storage.at(storageIndex);
+        if (itemId == null) {
+            throw new EmptyStorageSlotException(code, storageIndex);
+        }
+        ItemDefinition definition = definitionLookup.apply(itemId);
+        if (definition.slot() != ItemSlot.CONSUMABLE) {
+            throw new ItemNotConsumableException(code, itemId);
+        }
+        storage.set(storageIndex, null);
+        int maxHealth = effectiveMaxHealth.applyAsInt(member);
+        int currentHealth = member.currentHealth() == null ? maxHealth : member.currentHealth();
+        int healAmount = definition.healAmount() + Math.max(0, dungeonLayer) * HEAL_BONUS_PER_DUNGEON_LAYER;
+        int healedHealth = Math.min(maxHealth, currentHealth + healAmount);
+        members.put(userId, member.withCurrentHealth(healedHealth >= maxHealth ? null : healedHealth));
     }
 
     @Synchronized

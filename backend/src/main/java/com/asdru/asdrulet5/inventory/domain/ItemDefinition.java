@@ -16,7 +16,14 @@ public record ItemDefinition(
         ItemSlot slot,
         String description,
         ItemPassive passive,
-        int price
+        int price,
+        /**
+         * Health restored to whoever consumes this item (see
+         * {@code Party.consumeItem}) — 0 for every non-{@link ItemSlot#CONSUMABLE}
+         * item, since equippable gear's effects all live on {@link #passive}
+         * instead.
+         */
+        int healAmount
 ) {
     public ItemDefinition {
         requireNonBlank(id, "id");
@@ -26,6 +33,9 @@ public record ItemDefinition(
         Objects.requireNonNull(passive, "passive");
         if (price < 0) {
             throw new IllegalArgumentException("price must not be negative");
+        }
+        if (healAmount < 0) {
+            throw new IllegalArgumentException("healAmount must not be negative");
         }
     }
 

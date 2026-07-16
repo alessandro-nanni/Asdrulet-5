@@ -1,9 +1,10 @@
-export type ItemSlot = 'WEAPON' | 'CHESTPLATE' | 'TRINKET'
+export type ItemSlot = 'WEAPON' | 'CHESTPLATE' | 'TRINKET' | 'CONSUMABLE'
 
 export const SLOT_LABELS: Record<ItemSlot, string> = {
     WEAPON: 'Weapon',
     CHESTPLATE: 'Chestplate',
     TRINKET: 'Trinket',
+    CONSUMABLE: 'Consumable',
 }
 
 export interface PassiveEffect {
@@ -20,4 +21,6 @@ export interface ItemDefinition {
     description: string
     passiveEffect: PassiveEffect
     price: number
+    // Health restored on use — 0 for every non-CONSUMABLE item.
+    healAmount: number
 }

@@ -36,18 +36,17 @@ class LootTableRegistryTest {
     }
 
     @Test
-    void merchantTableIsEmptyUntilAnItemIsMadePurchasable() {
-        // No item is purchasable yet — see LootTableRegistry's own doc. An
-        // empty table always rolls nothing, never throws.
-        assertThat(lootTableRegistry.forFloor(1).merchantTable().roll(new Random(1))).isEmpty();
+    void merchantTableSellsTheHealingPotion() {
+        assertThat(lootTableRegistry.forFloor(1).merchantTable().roll(new Random(1))).containsExactly("healing-potion");
     }
 
     @Test
-    void everyWheelAndChestEntryReferencesARealItemDefinition() {
+    void everyWheelChestAndMerchantEntryReferencesARealItemDefinition() {
         FloorLootTables floor1 = lootTableRegistry.forFloor(1);
         List<LootTableEntry> all = new ArrayList<>();
         all.addAll(floor1.wheelTable().entries());
         all.addAll(floor1.chestTable().entries());
+        all.addAll(floor1.merchantTable().entries());
 
         for (LootTableEntry entry : all) {
             assertThat(itemDefinitionRegistry.get(entry.itemId())).isNotNull();
