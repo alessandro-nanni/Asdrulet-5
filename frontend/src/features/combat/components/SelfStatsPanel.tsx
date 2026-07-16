@@ -8,7 +8,6 @@ interface Props {
     stats: Stats
     isMyTurn: boolean
     hasSelectedAbility: boolean
-    hasActedThisTurn: boolean
     isSubmitting: boolean
     onEndTurn: () => void
     onCancel: () => void
@@ -19,7 +18,6 @@ export function SelfStatsPanel({
                                    stats,
                                    isMyTurn,
                                    hasSelectedAbility,
-                                   hasActedThisTurn,
                                    isSubmitting,
                                    onEndTurn,
                                    onCancel,
@@ -52,7 +50,7 @@ export function SelfStatsPanel({
                         disabled={isSubmitting}
                         onClick={hasSelectedAbility ? onCancel : onEndTurn}
                     >
-                        {hasSelectedAbility ? 'Cancel' : hasActedThisTurn ? 'End' : 'Skip'}
+                        {hasSelectedAbility ? 'Cancel' : self.actedThisTurn ? 'End' : 'Skip'}
                     </button>
                 )}
             </div>

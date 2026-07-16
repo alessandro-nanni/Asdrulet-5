@@ -49,6 +49,15 @@ public abstract class Combatant implements EffectTarget {
     private int currentStamina;
     private int ultimateCharge;
     /**
+     * Whether this combatant has already resolved an action (an ability or an
+     * enemy's auto-attack — see {@code Combat.resolveTurnAction}) since their
+     * current turn began. Reset by {@code Combat.advanceTurn} the moment a
+     * turn actually starts for them. Broadcast to every client so the
+     * lean-forward "engaged" visual reflects whoever's really acting for the
+     * whole party, not just whichever client happened to trigger it.
+     */
+    private boolean actedThisTurn = false;
+    /**
      * Every combatant in this fight (both sides), attached by {@link Combat}'s constructor once the whole roster exists — see {@link #deadAllyCount()}. Empty (not null) until then, so a bare Combatant built outside a Combat just reports zero dead allies.
      */
     private Collection<Combatant> roster = List.of();
@@ -215,6 +224,14 @@ public abstract class Combatant implements EffectTarget {
 
     void resetUltimateCharge() {
         ultimateCharge = 0;
+    }
+
+    void markActedThisTurn() {
+        actedThisTurn = true;
+    }
+
+    void resetActedThisTurn() {
+        actedThisTurn = false;
     }
 
     /**

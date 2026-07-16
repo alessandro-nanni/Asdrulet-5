@@ -89,6 +89,7 @@ public class Combat {
      * instead of each hand-rolling their own version.
      */
     private void resolveTurnAction(Combatant actor, Ability ability, List<Combatant> targets) {
+        actor.markActedThisTurn();
         AbilityEffect effect = resolveAbilityEffect(actor, ability);
         applyEffectToTargets(actor, effect, targets);
         // Twitching Talisman et al.: a basic ability (never an ultimate) has
@@ -281,6 +282,7 @@ public class Combat {
             // prevent this turn's action — tickActiveEffects() below would
             // otherwise remove it first and this combatant would wrongly act.
             boolean prevented = isPrevented(next);
+            next.resetActedThisTurn();
             next.tickActiveEffects();
             next.passives().forEach(passive -> passive.onStartTurn(next));
             if (prevented) {

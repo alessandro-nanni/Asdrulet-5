@@ -19,6 +19,7 @@ public record CombatantDto(
         int ultimateCharge,
         int ultimateChargeThreshold,
         boolean alive,
+        boolean actedThisTurn,
         List<ActiveEffectDto> activeEffects,
         String attackName,
         String attackDescription,

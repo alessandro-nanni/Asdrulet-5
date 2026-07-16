@@ -28,6 +28,7 @@ export interface Combatant {
     ultimateCharge: number
     ultimateChargeThreshold: number
     alive: boolean
+    actedThisTurn: boolean
     activeEffects: ActiveEffect[]
     attackName: string | null
     attackDescription: string | null

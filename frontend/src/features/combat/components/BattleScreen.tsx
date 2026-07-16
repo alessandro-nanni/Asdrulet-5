@@ -25,7 +25,6 @@ export function BattleScreen({code, members, actingAsId}: Props) {
     const {combat, error, applyUpdate} = useCombatState(code)
     const {definitions} = useClassDefinitions()
     const [selectedAbilityId, setSelectedAbilityId] = useState<string | null>(null)
-    const [hasActedThisTurn, setHasActedThisTurn] = useState(false)
     const [actionError, setActionError] = useState<string | null>(null)
     const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -37,7 +36,6 @@ export function BattleScreen({code, members, actingAsId}: Props) {
 
     useEffect(() => {
         setSelectedAbilityId(null)
-        setHasActedThisTurn(false)
     }, [combat?.currentTurnCombatantId])
 
     useEffect(() => {
@@ -197,7 +195,6 @@ export function BattleScreen({code, members, actingAsId}: Props) {
             // just applied.
             applyUpdate(await useAbility(code, actingAsId, abilityId, targetId))
             setSelectedAbilityId(null)
-            setHasActedThisTurn(true)
         } catch {
             setActionError('That action failed. Try again.')
         } finally {
@@ -223,11 +220,6 @@ export function BattleScreen({code, members, actingAsId}: Props) {
             // moments later but is a no-op then, since it's identical to what we
             // just applied.
             applyUpdate(await endTurn(code, actingAsId))
-            // Reset explicitly rather than relying only on the
-            // combat?.currentTurnCombatantId effect above: in a 1-ally party the
-            // turn sequence is [ally, enemy], so ending your turn can cycle
-            // straight back to your own id, which looks like no change at all.
-            setHasActedThisTurn(false)
             setSelectedAbilityId(null)
         } catch {
             setActionError('Could not end turn. Try again.')
@@ -245,7 +237,7 @@ export function BattleScreen({code, members, actingAsId}: Props) {
                             key={combatant.id}
                             combatant={combatant}
                             isCurrentTurn={combat.currentTurnCombatantId === combatant.id}
-                            isEngaged={combat.currentTurnCombatantId === combatant.id && hasActedThisTurn}
+                            isEngaged={combat.currentTurnCombatantId === combatant.id && combatant.actedThisTurn}
                             selectable={selectableIds?.has(combatant.id) ?? false}
                             isInvalidTarget={selectableIds != null && !selectableIds.has(combatant.id) && combatant.alive}
                             onSelect={() => handleFieldTargetClick(combatant.id)}
@@ -265,7 +257,7 @@ export function BattleScreen({code, members, actingAsId}: Props) {
                                 combatant={combatant}
                                 member={member}
                                 isCurrentTurn={combat.currentTurnCombatantId === combatant.id}
-                                isEngaged={combat.currentTurnCombatantId === combatant.id && hasActedThisTurn}
+                                isEngaged={combat.currentTurnCombatantId === combatant.id && combatant.actedThisTurn}
                                 selectable={selectableIds?.has(combatant.id) ?? false}
                                 isInvalidTarget={selectableIds != null && !selectableIds.has(combatant.id) && combatant.alive}
                                 onSelect={() => handleFieldTargetClick(combatant.id)}
@@ -291,7 +283,6 @@ export function BattleScreen({code, members, actingAsId}: Props) {
                         stats={selfDefinition.stats}
                         isMyTurn={isMyTurn}
                         hasSelectedAbility={selectedAbility != null}
-                        hasActedThisTurn={hasActedThisTurn}
                         isSubmitting={isSubmitting}
                         onEndTurn={handleEndTurn}
                         onCancel={() => setSelectedAbilityId(null)}

@@ -49,6 +49,7 @@ public class CombatMapper {
                 combatant.ultimateCharge(),
                 combatant.ultimateChargeThreshold(),
                 combatant.alive(),
+                combatant.actedThisTurn(),
                 combatant.activeEffects().stream().map(CombatMapper::toDto).toList(),
                 primaryAbility != null ? primaryAbility.name() : null,
                 primaryAbility != null ? primaryAbility.description() : null,
