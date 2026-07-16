@@ -791,11 +791,13 @@ p {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    /* Reserves room on the right for the floating inventory button, which
-       overlaps this row's vertical band (see .dungeon-inventory-btn) — without
-       this the coin pill, right-aligned by justify-content, would render
-       underneath it. */
-    padding-right: 56px;
+}
+
+.dungeon-topbar-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .dungeon-topbar-name {
@@ -830,25 +832,6 @@ p {
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--text-muted);
-}
-
-.dungeon-topbar-coins {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.25);
-    font-weight: 800;
-    font-size: 0.8rem;
-}
-
-.dungeon-topbar-coins-icon {
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-    color: #f4c542;
 }
 
 .dungeon-map {
@@ -904,19 +887,55 @@ p {
     pointer-events: none;
 }
 
-.dungeon-inventory-btn {
-    position: absolute;
-    top: calc(28px + env(safe-area-inset-top));
-    right: 28px;
-    width: 44px;
-    height: 44px;
-    background: rgba(10, 8, 20, 0.7);
-    z-index: 4;
+/* Coins+inventory and mana+skill-tree, each grouped in their own pill, side
+   by side at the top right of the topbar's name row (see .dungeon-topbar-actions). */
+.dungeon-currency-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 3px 3px 8px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--surface-border);
+    font-weight: 800;
+    font-size: 0.75rem;
 }
 
-.dungeon-inventory-icon {
+.dungeon-currency-pill-icon {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+}
+
+.dungeon-currency-pill:first-child .dungeon-currency-pill-icon {
+    color: #f4c542;
+}
+
+.dungeon-currency-pill:last-child .dungeon-currency-pill-icon {
+    color: #6bb6ff;
+}
+
+.dungeon-currency-pill-value {
+    min-width: 1em;
+}
+
+.dungeon-currency-pill-btn {
+    appearance: none;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 26px;
     height: 26px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+}
+
+.dungeon-currency-pill-btn-icon {
+    width: 15px;
+    height: 15px;
     object-fit: contain;
 }
 
@@ -2241,4 +2260,214 @@ p {
 
 .loot-member-row.is-current-turn {
     border-color: var(--accent);
+}
+
+/* Skill tree */
+
+.skilltree-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: rgba(10, 8, 20, 0.97);
+    padding: calc(20px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+    overflow: hidden;
+}
+
+.skilltree-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.skilltree-mana-banner {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.25);
+    font-weight: 800;
+    font-size: 0.85rem;
+    align-self: center;
+}
+
+.skilltree-mana-icon {
+    width: 16px;
+    height: 16px;
+    color: #6bb6ff;
+}
+
+.skilltree-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+/* Renders top-down: a root's own chip, then a row of its children directly
+   beneath it — recursing per branch, rather than a flat grid — so a class's
+   two specialization paths visibly fork under the same root instead of
+   being laid out as independent columns. Nodes themselves are small (see
+   .skill-node-chip) — tapping one shows its full detail in
+   .skilltree-detail-panel rather than inflating the tree layout itself,
+   which is what keeps this reading as a tree instead of a stack of cards.
+   position: relative anchors the .skilltree-connectors SVG overlay, which
+   draws the actual parent->child branch curves from each chip's measured
+   position (see SkillTreeScreen) instead of a flat CSS bar. */
+.skilltree-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    padding: 12px 12px 40px;
+    min-width: min-content;
+}
+
+.skilltree-connectors {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.skilltree-connectors path {
+    fill: none;
+    stroke: var(--surface-border);
+    stroke-width: 2;
+}
+
+.skill-node-branch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.skill-node-chip {
+    appearance: none;
+    cursor: pointer;
+    width: 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 4px;
+    border-radius: var(--radius-md);
+    border: 2px solid var(--surface-border);
+    background: var(--surface);
+    color: var(--text);
+    text-align: center;
+}
+
+.skill-node-chip.is-unlocked {
+    border-color: var(--class-healer);
+}
+
+.skill-node-chip.is-unlockable {
+    border-color: var(--accent);
+}
+
+.skill-node-chip.is-locked {
+    opacity: 0.5;
+}
+
+.skill-node-chip.is-selected {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.skill-node-chip-name {
+    font-size: 0.62rem;
+    font-weight: 800;
+    line-height: 1.15;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.skill-node-chip-cost {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.skill-node-chip-cost-icon {
+    width: 9px;
+    height: 9px;
+    flex-shrink: 0;
+    color: #6bb6ff;
+}
+
+/* Detail panel for whichever node was last tapped — same shape as
+   .inventory-detail-panel, shown fixed above the tree regardless of scroll. */
+.skilltree-detail-panel {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.skill-node-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.skill-node-name {
+    font-weight: 800;
+}
+
+.skill-node-cost {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.skill-node-cost-icon {
+    width: 12px;
+    height: 12px;
+    color: #6bb6ff;
+}
+
+.skill-node-description {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.skill-node-status {
+    margin: 0;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--class-healer);
+}
+
+/* Layout only — the actual connecting lines are drawn by the
+   .skilltree-connectors SVG overlay, positioned from each chip's real
+   measured location instead of a flat CSS bar. */
+.skill-node-children {
+    display: flex;
+    gap: 24px;
+    margin-top: 32px;
 }

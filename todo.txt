@@ -1,1 +1,0 @@
-skill tree. Make skills more data driven, so that they can be easily upgraded (change numbers/values)/changed/evolved and new ones can be added

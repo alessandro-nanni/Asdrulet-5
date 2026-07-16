@@ -8,6 +8,7 @@ import com.asdru.asdrulet5.party.domain.PartyMember;
 import com.asdru.asdrulet5.party.web.dto.*;
 import lombok.experimental.UtilityClass;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -40,7 +41,9 @@ public class PartyMapper {
                 member.bot(),
                 toDto(member.loadout()),
                 member.currentHealth(),
-                member.pendingEffects().stream().map(PartyMapper::toDto).toList()
+                member.pendingEffects().stream().map(PartyMapper::toDto).toList(),
+                member.mana(),
+                List.copyOf(member.unlockedSkillIds())
         );
     }
 

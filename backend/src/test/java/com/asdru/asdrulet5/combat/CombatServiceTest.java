@@ -1,7 +1,9 @@
 package com.asdru.asdrulet5.combat;
 
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
+import com.asdru.asdrulet5.classdata.SkillTreeRegistry;
 import com.asdru.asdrulet5.classdata.domain.*;
+import com.asdru.asdrulet5.classdata.web.dto.AbilityDto;
 import com.asdru.asdrulet5.combat.domain.*;
 import com.asdru.asdrulet5.combat.exception.CombatNotFoundException;
 import com.asdru.asdrulet5.combat.web.dto.CombatStateDto;
@@ -21,6 +23,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,7 +42,7 @@ class CombatServiceTest {
     }
 
     private static PartyMember member(String id, CharacterClass characterClass, Loadout loadout) {
-        return new PartyMember(id, id, null, characterClass, false, false, loadout, null, List.of());
+        return new PartyMember(id, id, null, characterClass, false, false, loadout, null, List.of(), 0, Set.of());
     }
 
     private static PartyMember memberWithHealth(String id, CharacterClass characterClass, Integer currentHealth) {
@@ -47,13 +50,13 @@ class CombatServiceTest {
     }
 
     private static PartyMember memberWithHealth(String id, CharacterClass characterClass, Integer currentHealth, Loadout loadout) {
-        return new PartyMember(id, id, null, characterClass, false, false, loadout, currentHealth, List.of());
+        return new PartyMember(id, id, null, characterClass, false, false, loadout, currentHealth, List.of(), 0, Set.of());
     }
 
     private static PartyMember memberWithPoison(String id, CharacterClass characterClass, int power, int turns) {
         ActiveEffect poison = ActiveEffect.damageOverTime("Poison", "A lingering venom saps your health each turn.",
                 "poison", power, turns);
-        return new PartyMember(id, id, null, characterClass, false, false, Loadout.empty(), null, List.of(poison));
+        return new PartyMember(id, id, null, characterClass, false, false, Loadout.empty(), null, List.of(poison), 0, Set.of());
     }
 
     /**
@@ -70,7 +73,7 @@ class CombatServiceTest {
     void setUp() {
         messagingTemplate = mock(SimpMessagingTemplate.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(false),
+        combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(false), new SkillTreeRegistry(),
                 new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
                 messagingTemplate, eventPublisher, new EnemyActionDelay(0));
     }
@@ -255,6 +258,32 @@ class CombatServiceTest {
     }
 
     @Test
+    void startCombatAppliesUnlockedSkillTreeUpgradesToAPlayersAbilities() {
+        // Berserker's root skill upgrades Reckless Strike's numbers — see BerserkerSkillTree.
+        PartyMember p1 = member("p1", CharacterClass.BERSERKER).withUnlockedSkillIds(Set.of("berserker.bloodlust"));
+        List<PartyMember> members = List.of(p1, member("p2", CharacterClass.HEALER));
+
+        CombatStateDto dto = combatService.startCombat(party("ABC123"), members, List.of("p1", "p2"), false);
+
+        CombatantDto p1Dto = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        AbilityDto reckless = p1Dto.abilities().stream()
+                .filter(a -> a.id().equals("berserker.reckless-strike")).findFirst().orElseThrow();
+        assertThat(reckless.effectSummary()).isEqualTo("16 damage, 20% chance to double");
+    }
+
+    @Test
+    void startCombatWithNoUnlockedSkillsLeavesAbilitiesAtTheirBaseNumbers() {
+        List<PartyMember> members = List.of(member("p1", CharacterClass.BERSERKER), member("p2", CharacterClass.HEALER));
+
+        CombatStateDto dto = combatService.startCombat(party("ABC123"), members, List.of("p1", "p2"), false);
+
+        CombatantDto p1Dto = dto.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        AbilityDto reckless = p1Dto.abilities().stream()
+                .filter(a -> a.id().equals("berserker.reckless-strike")).findFirst().orElseThrow();
+        assertThat(reckless.effectSummary()).isEqualTo("12 damage, 20% chance to double");
+    }
+
+    @Test
     void mantleOfTheUsurperBoostsMaxHealthWhileHealthierThanTheLeader() {
         // Mage base max health 70 (see MageClassDefinition) + 7% = 74 (int
         // division rounds 4.9 down to 4).
@@ -389,7 +418,7 @@ class CombatServiceTest {
         Combat combat = new Combat("ABC123", List.of(p1, enemyA, enemyB), List.of("p1", "enemyA", "enemyB"));
         CombatRepository repository = new InMemoryCombatRepository();
         repository.save(combat);
-        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false), new SkillTreeRegistry(),
                 new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
                 messagingTemplate, eventPublisher, new EnemyActionDelay(0));
 
@@ -422,7 +451,7 @@ class CombatServiceTest {
         CombatRepository repository = new InMemoryCombatRepository();
         repository.save(combat);
         EnemyActionDelay mockDelay = mock(EnemyActionDelay.class);
-        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false), new SkillTreeRegistry(),
                 new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
                 messagingTemplate, eventPublisher, mockDelay);
 
@@ -450,7 +479,7 @@ class CombatServiceTest {
         Combat combat = new Combat("ABC123", List.of(p1, p2, enemy), List.of("p1", "p2", "enemy"));
         CombatRepository repository = new InMemoryCombatRepository();
         repository.save(combat);
-        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false), new SkillTreeRegistry(),
                 new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
                 messagingTemplate, eventPublisher, new EnemyActionDelay(0));
 
@@ -488,7 +517,7 @@ class CombatServiceTest {
         Combat combat = new Combat("ABC123", List.of(p1, p2, enemy), List.of("p1", "p2", "enemy"));
         CombatRepository repository = new InMemoryCombatRepository();
         repository.save(combat);
-        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false), new SkillTreeRegistry(),
                 new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
                 messagingTemplate, eventPublisher, new EnemyActionDelay(0));
 
@@ -532,7 +561,7 @@ class CombatServiceTest {
         Combat combat = new Combat("VICT123", List.of(p1, weakEnemy), List.of("p1", "enemy-1"));
         CombatRepository repository = new InMemoryCombatRepository();
         repository.save(combat);
-        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false), new SkillTreeRegistry(),
                 new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
                 messagingTemplate, eventPublisher, new EnemyActionDelay(0));
 

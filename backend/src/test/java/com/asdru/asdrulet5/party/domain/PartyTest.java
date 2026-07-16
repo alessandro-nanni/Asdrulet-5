@@ -438,4 +438,80 @@ class PartyTest {
 
         assertThat(party.isMembersWheelTurn("leader-1")).isFalse();
     }
+
+    @Test
+    void addManaAccumulatesOnTheGivenMemberOnly() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMember("player-2", "Player Two", "avatar2.png");
+
+        party.addMana("leader-1", 3);
+        party.addMana("leader-1", 2);
+
+        assertThat(memberById(party, "leader-1").mana()).isEqualTo(5);
+        assertThat(memberById(party, "player-2").mana()).isEqualTo(0);
+    }
+
+    @Test
+    void unlockingARootSkillSpendsManaAndRecordsTheUnlock() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMana("leader-1", 5);
+
+        party.unlockSkill("leader-1", "root", null, 2);
+
+        PartyMember member = memberById(party, "leader-1");
+        assertThat(member.mana()).isEqualTo(3);
+        assertThat(member.unlockedSkillIds()).containsExactly("root");
+    }
+
+    @Test
+    void unlockingAlreadyUnlockedSkillThrowsAndDoesNotDoubleSpendMana() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMana("leader-1", 5);
+        party.unlockSkill("leader-1", "root", null, 2);
+
+        assertThatThrownBy(() -> party.unlockSkill("leader-1", "root", null, 2))
+                .isInstanceOf(SkillAlreadyUnlockedException.class);
+        assertThat(memberById(party, "leader-1").mana()).isEqualTo(3);
+    }
+
+    @Test
+    void unlockingASkillWithoutItsPrerequisiteThrows() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMana("leader-1", 5);
+
+        assertThatThrownBy(() -> party.unlockSkill("leader-1", "mid", "root", 2))
+                .isInstanceOf(SkillPrerequisiteNotMetException.class);
+        assertThat(memberById(party, "leader-1").mana()).isEqualTo(5);
+        assertThat(memberById(party, "leader-1").unlockedSkillIds()).isEmpty();
+    }
+
+    @Test
+    void unlockingASkillWithoutEnoughManaThrows() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMana("leader-1", 1);
+
+        assertThatThrownBy(() -> party.unlockSkill("leader-1", "root", null, 2))
+                .isInstanceOf(InsufficientManaException.class);
+        assertThat(memberById(party, "leader-1").mana()).isEqualTo(1);
+        assertThat(memberById(party, "leader-1").unlockedSkillIds()).isEmpty();
+    }
+
+    @Test
+    void unlockingAMidTierSkillAfterItsPrerequisiteSucceeds() {
+        Party party = new Party("ABC123", "leader-1", "Leader", "avatar.png");
+        party.addMana("leader-1", 5);
+        party.unlockSkill("leader-1", "root", null, 2);
+
+        party.unlockSkill("leader-1", "mid", "root", 3);
+
+        assertThat(memberById(party, "leader-1").mana()).isZero();
+        assertThat(memberById(party, "leader-1").unlockedSkillIds()).containsExactlyInAnyOrder("root", "mid");
+    }
+
+    private static PartyMember memberById(Party party, String userId) {
+        return party.members().stream()
+                .filter(candidate -> candidate.userId().equals(userId))
+                .findFirst()
+                .orElseThrow();
+    }
 }

@@ -13,6 +13,8 @@ public record PartyMemberDto(
         boolean bot,
         LoadoutDto loadout,
         Integer currentHealth,
-        List<PendingEffectDto> pendingEffects
+        List<PendingEffectDto> pendingEffects,
+        int mana,
+        List<String> unlockedSkillIds
 ) {
 }

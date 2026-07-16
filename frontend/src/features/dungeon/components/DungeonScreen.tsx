@@ -4,10 +4,14 @@ import {useDungeonState} from '../useDungeonState'
 import {DungeonMap} from './DungeonMap'
 import {DungeonTopBar} from './DungeonTopBar'
 import {InventoryScreen} from '../../inventory/components/InventoryScreen'
+import {SkillTreeScreen} from '../../skilltree/components/SkillTreeScreen'
 import {MysteryWheelScreen} from './MysteryWheelScreen'
 import {ShopScreen} from './ShopScreen'
 import {LootRoomScreen} from './LootRoomScreen'
+import {CoinIcon} from '../../../shared/ui/CoinIcon'
+import {ManaIcon} from '../../../shared/ui/ManaIcon'
 import backpackIcon from '../../../assets/ui/backpack.png'
+import skillTreeIcon from '../../../assets/ui/skill-tree.png'
 import type {ClassDefinition} from '../../classes/types'
 import type {LootResult, PartyMember, PartyState, WheelEffect} from '../../party/types'
 import type {DungeonState, RoomType} from '../types'
@@ -80,6 +84,7 @@ export function DungeonScreen({
     const {dungeon, error, applyUpdate} = useDungeonState(code)
     const [isEntering, setIsEntering] = useState(false)
     const [isInventoryOpen, setIsInventoryOpen] = useState(false)
+    const [isSkillTreeOpen, setIsSkillTreeOpen] = useState(false)
     const self = members.find((member) => member.userId === selfId)
     const selfMaxHealth =
         definitions.find((definition) => definition.characterClass === self?.characterClass)?.stats.maxHealth ??
@@ -121,23 +126,44 @@ export function DungeonScreen({
     const isShopActive = enteredRoom?.roomType === 'MERCHANT'
     const isLootRoomActive = enteredRoom?.roomType === 'LOOT'
 
+    const currencyActions = (
+        <>
+            <div className="dungeon-currency-pill" aria-label={`${coins} coins`}>
+                <CoinIcon className="dungeon-currency-pill-icon"/>
+                <span className="dungeon-currency-pill-value">{coins}</span>
+                <button
+                    type="button"
+                    className="dungeon-currency-pill-btn"
+                    onClick={() => setIsInventoryOpen(true)}
+                    aria-label="Open inventory"
+                >
+                    <img src={backpackIcon} alt="" className="dungeon-currency-pill-btn-icon"/>
+                </button>
+            </div>
+            <div className="dungeon-currency-pill" aria-label={`${self?.mana ?? 0} mana`}>
+                <ManaIcon className="dungeon-currency-pill-icon"/>
+                <span className="dungeon-currency-pill-value">{self?.mana ?? 0}</span>
+                <button
+                    type="button"
+                    className="dungeon-currency-pill-btn"
+                    onClick={() => setIsSkillTreeOpen(true)}
+                    aria-label="Open skill tree"
+                >
+                    <img src={skillTreeIcon} alt="" className="dungeon-currency-pill-btn-icon"/>
+                </button>
+            </div>
+        </>
+    )
+
     return (
         <div className="dungeon-screen">
-            {self && <DungeonTopBar member={self} maxHealth={selfMaxHealth} coins={coins}/>}
+            {self && <DungeonTopBar member={self} maxHealth={selfMaxHealth} actions={currencyActions}/>}
             <DungeonMap
                 dungeon={dungeon}
                 members={members}
                 isLeader={isLeader}
                 onSelectNode={isLeader ? handleSelectNode : undefined}
             />
-            <button
-                type="button"
-                className="icon-btn dungeon-inventory-btn"
-                onClick={() => setIsInventoryOpen(true)}
-                aria-label="Open inventory"
-            >
-                <img src={backpackIcon} alt="" className="dungeon-inventory-icon"/>
-            </button>
             {!isLeader && <p className="muted dungeon-waiting">Waiting for the leader to choose a path...</p>}
 
             <div className="dungeon-controls">
@@ -169,6 +195,15 @@ export function DungeonScreen({
                     storage={storage}
                     onApplyUpdate={onApplyUpdate}
                     onClose={() => setIsInventoryOpen(false)}
+                />
+            )}
+
+            {isSkillTreeOpen && self && (
+                <SkillTreeScreen
+                    code={code}
+                    member={self}
+                    onApplyUpdate={onApplyUpdate}
+                    onClose={() => setIsSkillTreeOpen(false)}
                 />
             )}
 

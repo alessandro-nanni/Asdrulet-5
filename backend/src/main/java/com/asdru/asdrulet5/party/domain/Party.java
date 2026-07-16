@@ -73,7 +73,8 @@ public class Party {
         this.code = code;
         this.leaderId = leaderId;
         members.put(leaderId,
-                new PartyMember(leaderId, leaderDisplayName, leaderAvatarUrl, null, true, false, Loadout.empty(), null, List.of()));
+                new PartyMember(leaderId, leaderDisplayName, leaderAvatarUrl, null, true, false, Loadout.empty(), null,
+                        List.of(), 0, Set.of()));
     }
 
     @Synchronized
@@ -84,7 +85,8 @@ public class Party {
         }
         requireRoom();
         PartyMember member = new PartyMember(
-                userId, displayName, avatarUrl, null, userId.equals(leaderId), false, Loadout.empty(), null, List.of());
+                userId, displayName, avatarUrl, null, userId.equals(leaderId), false, Loadout.empty(), null,
+                List.of(), 0, Set.of());
         members.put(userId, member);
         return member;
     }
@@ -98,7 +100,8 @@ public class Party {
     public PartyMember addFakeMember(String displayName) {
         requireRoom();
         String fakeId = "bot-" + code + "-" + fakeMemberSequence.incrementAndGet();
-        PartyMember member = new PartyMember(fakeId, displayName, null, null, false, true, Loadout.empty(), null, List.of());
+        PartyMember member = new PartyMember(fakeId, displayName, null, null, false, true, Loadout.empty(), null,
+                List.of(), 0, Set.of());
         members.put(fakeId, member);
         return member;
     }
@@ -479,5 +482,42 @@ public class Party {
         shopStock.remove(itemId);
         coins -= price;
         addItemToStorage(itemId);
+    }
+
+    /**
+     * Grants userId this much mana — unlike coins, mana is tracked per
+     * member rather than shared across the whole party, since it's spent on
+     * that member's own class's skill tree.
+     */
+    @Synchronized
+    public void addMana(String userId, int amount) {
+        PartyMember member = requireMember(userId);
+        members.put(userId, member.withMana(member.mana() + amount));
+    }
+
+    /**
+     * Unlocks skill tree node nodeId for userId, atomically: validates it
+     * isn't already unlocked, that its prerequisite (parentNodeId, null for
+     * a root node) already is, and that the member can afford manaCost —
+     * same validate-then-mutate shape as {@link #buyFromShop}. The node
+     * itself (id/parentId/manaCost) is resolved from the member's class's
+     * SkillTree by the caller (see PartyService.unlockSkill) — this package
+     * has no notion of classdata's SkillTree/SkillNode types.
+     */
+    @Synchronized
+    public void unlockSkill(String userId, String nodeId, String parentNodeId, int manaCost) {
+        PartyMember member = requireMember(userId);
+        if (member.unlockedSkillIds().contains(nodeId)) {
+            throw new SkillAlreadyUnlockedException(code, userId, nodeId);
+        }
+        if (parentNodeId != null && !member.unlockedSkillIds().contains(parentNodeId)) {
+            throw new SkillPrerequisiteNotMetException(code, userId, nodeId, parentNodeId);
+        }
+        if (member.mana() < manaCost) {
+            throw new InsufficientManaException(code, userId, manaCost, member.mana());
+        }
+        Set<String> updated = new LinkedHashSet<>(member.unlockedSkillIds());
+        updated.add(nodeId);
+        members.put(userId, member.withMana(member.mana() - manaCost).withUnlockedSkillIds(updated));
     }
 }

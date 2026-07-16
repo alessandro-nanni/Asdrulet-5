@@ -106,6 +106,14 @@ public interface AbilityEffect {
     }
 
     /**
+     * Restores the target's stamina outright — e.g. a SELF-targeted utility ability. Same clamped-add shape as {@link #heal(int)}, just for stamina instead of health.
+     */
+    static AbilityEffect restoreStamina(int amount) {
+        requirePositive(amount, "amount");
+        return (actor, target) -> target.restoreStamina(amount);
+    }
+
+    /**
      * Heals the target, and also strips every currently-negative effect off them — see the Healer's ultimate.
      */
     static AbilityEffect healAndClearNegativeEffects(int power) {

@@ -2,6 +2,7 @@ package com.asdru.asdrulet5.combat.web;
 
 import com.asdru.asdrulet5.classdata.domain.Ability;
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
+import com.asdru.asdrulet5.classdata.web.ClassDefinitionMapper;
 import com.asdru.asdrulet5.combat.domain.*;
 import com.asdru.asdrulet5.combat.web.dto.ActiveEffectDto;
 import com.asdru.asdrulet5.combat.web.dto.CombatEventDto;
@@ -56,7 +57,8 @@ public class CombatMapper {
                 primaryAbility != null ? primaryAbility.effectSummary() : null,
                 combatant.totalDamageDealt(),
                 combatant.totalHealingDone(),
-                combatant.totalEffectsApplied()
+                combatant.totalEffectsApplied(),
+                combatant.abilities().stream().map(ClassDefinitionMapper::toDto).toList()
         );
     }
 

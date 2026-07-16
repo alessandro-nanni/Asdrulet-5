@@ -126,4 +126,19 @@ public class PartyExceptionHandler {
     public ResponseEntity<Map<String, String>> handleNotYourLootTurn(NotYourLootTurnException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
     }
+
+    @ExceptionHandler(InsufficientManaException.class)
+    public ResponseEntity<Map<String, String>> handleInsufficientMana(InsufficientManaException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(SkillAlreadyUnlockedException.class)
+    public ResponseEntity<Map<String, String>> handleSkillAlreadyUnlocked(SkillAlreadyUnlockedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(SkillPrerequisiteNotMetException.class)
+    public ResponseEntity<Map<String, String>> handleSkillPrerequisiteNotMet(SkillPrerequisiteNotMetException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+    }
 }

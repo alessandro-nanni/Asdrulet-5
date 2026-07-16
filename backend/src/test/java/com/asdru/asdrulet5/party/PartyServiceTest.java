@@ -2,9 +2,11 @@ package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
+import com.asdru.asdrulet5.classdata.SkillTreeRegistry;
 import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.classdata.domain.Damage;
 import com.asdru.asdrulet5.classdata.domain.Stats;
+import com.asdru.asdrulet5.classdata.exception.UnknownSkillNodeException;
 import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.combat.CombatVictoryEvent;
 import com.asdru.asdrulet5.combat.domain.Combatant;
@@ -72,7 +74,7 @@ class PartyServiceTest {
         roomEntryDelay = new RoomEntryDelay(0);
         partyService = new PartyService(partyRepository, messagingTemplate, dungeonService,
                 combatService, new ItemDefinitionRegistry(), new LootTableRegistry(), new ClassDefinitionRegistry(false),
-                victoryReturnScheduler, roomEntryDelay);
+                new SkillTreeRegistry(), victoryReturnScheduler, roomEntryDelay);
     }
 
     @Test
@@ -238,6 +240,19 @@ class PartyServiceTest {
     }
 
     @Test
+    void combatVictoryGrantsFlatManaToEveryMember() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.joinParty(created.code(), member);
+        when(dungeonService.enterNode(created.code(), "leader-1")).thenReturn(RoomType.FIGHT);
+        partyService.enterRoom(created.code(), "leader-1");
+
+        partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
+
+        List<PartyMemberDto> members = partyService.getState(created.code()).members();
+        assertThat(members).extracting(PartyMemberDto::mana).containsOnly(1);
+    }
+
+    @Test
     void combatVictoryCarriesTheFightsEndingDamageOntoTheMember() {
         // A fight's own outcome must survive into the next room — a member
         // who took damage shouldn't show back up at full health the moment
@@ -297,6 +312,30 @@ class PartyServiceTest {
         assertThat(pending).hasSize(1);
         assertThat(pending.getFirst().name()).isEqualTo("Taunt");
         assertThat(pending.getFirst().remainingTurns()).isEqualTo(2);
+    }
+
+    @Test
+    void unlockSkillSpendsManaAndRecordsTheUnlock() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
+        // Grants 1 mana each — the root skill costs 2.
+        partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
+        partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
+
+        PartyStateDto updated = partyService.unlockSkill(created.code(), "leader-1", "berserker.bloodlust");
+
+        PartyMemberDto member = updated.members().getFirst();
+        assertThat(member.mana()).isZero();
+        assertThat(member.unlockedSkillIds()).containsExactly("berserker.bloodlust");
+    }
+
+    @Test
+    void unlockSkillForUnknownNodeThrows() {
+        PartyStateDto created = partyService.createParty(leader);
+        partyService.selectClass(created.code(), "leader-1", CharacterClass.BERSERKER);
+
+        assertThatThrownBy(() -> partyService.unlockSkill(created.code(), "leader-1", "no-such-node"))
+                .isInstanceOf(UnknownSkillNodeException.class);
     }
 
     @Test

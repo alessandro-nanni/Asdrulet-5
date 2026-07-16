@@ -1,4 +1,5 @@
 import type {CharacterClass} from '../party/types'
+import type {Ability} from '../classes/types'
 
 export type CombatStatus = 'IN_PROGRESS' | 'PARTY_WON' | 'PARTY_LOST'
 
@@ -36,6 +37,10 @@ export interface Combatant {
     totalDamageDealt: number
     totalHealingDone: number
     totalEffectsApplied: number
+    // This combatant's own actual ability list — for a player, reflects
+    // whatever they've unlocked in their class's skill tree, which the
+    // static /api/classes catalog alone can't express (see BattleScreen).
+    abilities: Ability[]
 }
 
 export interface CombatEvent {

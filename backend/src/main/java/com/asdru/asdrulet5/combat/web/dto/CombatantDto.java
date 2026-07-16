@@ -1,5 +1,6 @@
 package com.asdru.asdrulet5.combat.web.dto;
 
+import com.asdru.asdrulet5.classdata.web.dto.AbilityDto;
 import com.asdru.asdrulet5.party.domain.CharacterClass;
 
 import java.util.List;
@@ -26,6 +27,8 @@ public record CombatantDto(
         String attackEffectSummary,
         int totalDamageDealt,
         int totalHealingDone,
-        int totalEffectsApplied
+        int totalEffectsApplied,
+        /** This combatant's own actual ability list — for a player, reflects whatever they've unlocked in their class's skill tree (see classdata.domain.SkillTreeResolver), which the static /api/classes catalog alone can't express. */
+        List<AbilityDto> abilities
 ) {
 }

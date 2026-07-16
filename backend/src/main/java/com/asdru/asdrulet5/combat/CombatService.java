@@ -1,7 +1,10 @@
 package com.asdru.asdrulet5.combat;
 
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
+import com.asdru.asdrulet5.classdata.SkillTreeRegistry;
+import com.asdru.asdrulet5.classdata.domain.Ability;
 import com.asdru.asdrulet5.classdata.domain.ClassDefinition;
+import com.asdru.asdrulet5.classdata.domain.SkillTreeResolver;
 import com.asdru.asdrulet5.classdata.domain.Stats;
 import com.asdru.asdrulet5.classdata.domain.UltimateAbility;
 import com.asdru.asdrulet5.combat.domain.*;
@@ -64,6 +67,7 @@ public class CombatService {
 
     private final CombatRepository combatRepository;
     private final ClassDefinitionRegistry classDefinitionRegistry;
+    private final SkillTreeRegistry skillTreeRegistry;
     private final EnemyDefinitionRegistry enemyDefinitionRegistry;
     private final EnemyEncounterRegistry enemyEncounterRegistry;
     private final ItemDefinitionRegistry itemDefinitionRegistry;
@@ -238,7 +242,13 @@ public class CombatService {
      */
     private PreparedPlayerCombatant toCombatant(PartyMember member, Party party) {
         ClassDefinition definition = classDefinitionRegistry.get(member.characterClass());
-        int ultimateChargeThreshold = definition.abilities().stream()
+        // Reflects whatever the member has actually unlocked in their own
+        // class's skill tree (upgraded numbers, evolved/added abilities) —
+        // not the raw, unmodified catalog every member of the class starts
+        // from. See SkillTreeResolver's own doc.
+        List<Ability> effectiveAbilities = SkillTreeResolver.effectiveAbilities(
+                definition, skillTreeRegistry.get(member.characterClass()), member.unlockedSkillIds());
+        int ultimateChargeThreshold = effectiveAbilities.stream()
                 .filter(UltimateAbility.class::isInstance)
                 .map(UltimateAbility.class::cast)
                 .findFirst()
@@ -252,7 +262,7 @@ public class CombatService {
                 Math.max(0, definition.stats().maxStamina() + sumBonus(passives, ItemPassive::bonusMaxStamina)));
         PlayerCombatant combatant = new PlayerCombatant(
                 member.userId(), member.displayName(), member.characterClass(), stats,
-                ultimateChargeThreshold, definition.abilities(), passives, party);
+                ultimateChargeThreshold, effectiveAbilities, passives, party);
         // Both carried over from whatever the member's last room left them
         // with — a wheel/loot roll, or the ending state of their last fight
         // (see PartyService.syncMembersAfterCombat) — so a fresh Combatant

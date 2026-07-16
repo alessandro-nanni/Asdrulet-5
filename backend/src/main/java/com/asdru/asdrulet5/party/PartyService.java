@@ -2,6 +2,8 @@ package com.asdru.asdrulet5.party;
 
 import com.asdru.asdrulet5.auth.AuthenticatedUser;
 import com.asdru.asdrulet5.classdata.ClassDefinitionRegistry;
+import com.asdru.asdrulet5.classdata.SkillTreeRegistry;
+import com.asdru.asdrulet5.classdata.domain.SkillNode;
 import com.asdru.asdrulet5.combat.CombatService;
 import com.asdru.asdrulet5.combat.CombatVictoryEvent;
 import com.asdru.asdrulet5.combat.domain.Combatant;
@@ -50,6 +52,13 @@ public class PartyService {
      * actual depth, once floors exist, is a one-line change here.
      */
     private static final int CURRENT_FLOOR = 1;
+    /**
+     * Flat mana reward every party member earns on a combat victory —
+     * unlike {@link #rollVictoryCoins}, deliberately not randomized (mana is
+     * spent on each member's own skill tree, so a predictable rate is what
+     * makes retuning skill costs meaningful).
+     */
+    private static final int MANA_REWARD_PER_VICTORY = 1;
     private final PartyRepository partyRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final DungeonService dungeonService;
@@ -57,6 +66,7 @@ public class PartyService {
     private final ItemDefinitionRegistry itemDefinitionRegistry;
     private final LootTableRegistry lootTableRegistry;
     private final ClassDefinitionRegistry classDefinitionRegistry;
+    private final SkillTreeRegistry skillTreeRegistry;
     private final ScheduledExecutorService victoryReturnScheduler;
     private final RoomEntryDelay roomEntryDelay;
     private final SecureRandom random = new SecureRandom();
@@ -375,6 +385,7 @@ public class PartyService {
         Party party = getOrThrow(event.partyCode());
         syncMembersAfterCombat(party, event.partyCode());
         party.addCoins(rollVictoryCoins());
+        party.members().forEach(member -> party.addMana(member.userId(), MANA_REWARD_PER_VICTORY));
         broadcast(party);
         victoryReturnScheduler.schedule(
                 () -> returnToDungeonAfterVictory(event.partyCode()),
@@ -453,6 +464,25 @@ public class PartyService {
         Party party = getOrThrow(code);
         ItemDefinition definition = itemDefinitionRegistry.get(itemId);
         party.equipItem(userId, definition.slot(), itemId);
+        return broadcast(party);
+    }
+
+    /**
+     * Unlocks skill tree node nodeId in userId's own class's skill tree,
+     * spending their own mana — resolves the node's id/parentId/manaCost
+     * from {@link SkillTreeRegistry} (this package has no notion of
+     * classdata's own SkillTree/SkillNode types) and hands them to
+     * {@link Party#unlockSkill} for the actual atomic validate-and-mutate,
+     * same split {@link #buyItem} uses for the shop.
+     */
+    public PartyStateDto unlockSkill(String code, String userId, String nodeId) {
+        Party party = getOrThrow(code);
+        PartyMember member = party.members().stream()
+                .filter(candidate -> candidate.userId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new NotPartyMemberException(code, userId));
+        SkillNode node = skillTreeRegistry.get(member.characterClass()).nodeById(nodeId);
+        party.unlockSkill(userId, nodeId, node.parentId(), node.manaCost());
         return broadcast(party);
     }
 

@@ -27,7 +27,7 @@ public class ClassDefinitionMapper {
         );
     }
 
-    private AbilityDto toDto(Ability ability) {
+    public AbilityDto toDto(Ability ability) {
         return switch (ability) {
             case BasicAbility basic -> new AbilityDto(
                     basic.id(), basic.name(), basic.description(), basic.effectSummary(), basic.targetType(),

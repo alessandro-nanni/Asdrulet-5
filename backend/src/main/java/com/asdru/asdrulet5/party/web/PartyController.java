@@ -113,4 +113,11 @@ public class PartyController {
     public PartyStateDto acknowledgeLootResult(@PathVariable String code, @PathVariable String memberId) {
         return partyService.acknowledgeLootResult(code.toUpperCase(), memberId);
     }
+
+    @PostMapping("/{code}/{memberId}/skills/unlock")
+    public PartyStateDto unlockSkill(@PathVariable String code,
+                                      @PathVariable String memberId,
+                                      @Valid @RequestBody UnlockSkillRequest request) {
+        return partyService.unlockSkill(code.toUpperCase(), memberId, request.nodeId());
+    }
 }

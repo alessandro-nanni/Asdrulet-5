@@ -1,4 +1,4 @@
-import {CoinIcon} from '../../../shared/ui/CoinIcon'
+import type {ReactNode} from 'react'
 import {HeartIcon} from '../../../shared/ui/HeartIcon'
 import {MemberAvatar} from '../../party/components/MemberAvatar'
 import type {PartyMember} from '../../party/types'
@@ -6,10 +6,13 @@ import type {PartyMember} from '../../party/types'
 interface Props {
     member: PartyMember
     maxHealth: number
-    coins: number
+    // Currency pills (coins+inventory, mana+skill-tree) — rendered here,
+    // top-right of the name row, rather than floating over the map, so both
+    // sit next to each other in one place.
+    actions?: ReactNode
 }
 
-export function DungeonTopBar({member, maxHealth, coins}: Props) {
+export function DungeonTopBar({member, maxHealth, actions}: Props) {
     const currentHealth = member.currentHealth ?? maxHealth
     const healthPercent = maxHealth > 0 ? Math.round((currentHealth / maxHealth) * 100) : 0
 
@@ -19,10 +22,7 @@ export function DungeonTopBar({member, maxHealth, coins}: Props) {
             <div className="dungeon-topbar-info">
                 <div className="dungeon-topbar-top-row">
                     <span className="dungeon-topbar-name">{member.displayName}</span>
-                    <div className="dungeon-topbar-coins" aria-label={`${coins} coins`}>
-                        <CoinIcon className="dungeon-topbar-coins-icon"/>
-                        <span className="dungeon-topbar-coins-value">{coins}</span>
-                    </div>
+                    {actions && <div className="dungeon-topbar-actions">{actions}</div>}
                 </div>
                 <div className="dungeon-topbar-health">
                     <HeartIcon className="dungeon-topbar-health-icon"/>

@@ -4,6 +4,7 @@ import com.asdru.asdrulet5.classdata.domain.ActiveEffect;
 import com.asdru.asdrulet5.inventory.domain.Loadout;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * currentHealth is null whenever the member is at full health — matching a
@@ -18,7 +19,12 @@ import java.util.List;
  * PartyService.syncMembersAfterCombat) with that fight's own ending health
  * and still-active effects — so both fields always reflect whatever's
  * carrying into the next room, whether that came from a room's own reward
- * or from how the last battle was left.
+ * or from how the last battle was left. mana is this member's own currency
+ * (unlike the party's shared coins) spent on unlockedSkillIds — the ids of
+ * every {@code SkillNode} this member has unlocked in their own class's
+ * skill tree (see {@code classdata.domain.SkillTreeResolver}, which turns
+ * this set into the member's actual effective ability list once they enter
+ * combat).
  */
 public record PartyMember(
         String userId,
@@ -29,30 +35,43 @@ public record PartyMember(
         boolean bot,
         Loadout loadout,
         Integer currentHealth,
-        List<ActiveEffect> pendingEffects
+        List<ActiveEffect> pendingEffects,
+        int mana,
+        Set<String> unlockedSkillIds
 ) {
 
     public PartyMember {
         pendingEffects = List.copyOf(pendingEffects);
+        unlockedSkillIds = Set.copyOf(unlockedSkillIds);
     }
 
     public PartyMember withCharacterClass(CharacterClass newClass) {
         return new PartyMember(userId, displayName, avatarUrl, newClass, leader, bot, loadout,
-                currentHealth, pendingEffects);
+                currentHealth, pendingEffects, mana, unlockedSkillIds);
     }
 
     public PartyMember withLoadout(Loadout newLoadout) {
         return new PartyMember(userId, displayName, avatarUrl, characterClass, leader, bot, newLoadout,
-                currentHealth, pendingEffects);
+                currentHealth, pendingEffects, mana, unlockedSkillIds);
     }
 
     public PartyMember withCurrentHealth(Integer newCurrentHealth) {
         return new PartyMember(userId, displayName, avatarUrl, characterClass, leader, bot, loadout,
-                newCurrentHealth, pendingEffects);
+                newCurrentHealth, pendingEffects, mana, unlockedSkillIds);
     }
 
     public PartyMember withPendingEffects(List<ActiveEffect> newPendingEffects) {
         return new PartyMember(userId, displayName, avatarUrl, characterClass, leader, bot, loadout,
-                currentHealth, newPendingEffects);
+                currentHealth, newPendingEffects, mana, unlockedSkillIds);
+    }
+
+    public PartyMember withMana(int newMana) {
+        return new PartyMember(userId, displayName, avatarUrl, characterClass, leader, bot, loadout,
+                currentHealth, pendingEffects, newMana, unlockedSkillIds);
+    }
+
+    public PartyMember withUnlockedSkillIds(Set<String> newUnlockedSkillIds) {
+        return new PartyMember(userId, displayName, avatarUrl, characterClass, leader, bot, loadout,
+                currentHealth, pendingEffects, mana, newUnlockedSkillIds);
     }
 }

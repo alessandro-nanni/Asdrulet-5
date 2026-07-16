@@ -40,6 +40,11 @@ export interface PartyMember {
     // Carried into the member's next fight as real ActiveEffects (e.g. a
     // MYSTERY wheel's poison) — see the backend PartyMember's own doc.
     pendingEffects: PendingEffect[]
+    // This member's own currency (unlike coins, not shared party-wide) —
+    // spent unlocking nodes in their own class's skill tree.
+    mana: number
+    // Ids of every skill tree node this member has unlocked so far.
+    unlockedSkillIds: string[]
 }
 
 export interface PartyState {

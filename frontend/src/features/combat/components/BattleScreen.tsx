@@ -188,7 +188,10 @@ export function BattleScreen({code, members, actingAsId}: Props) {
     const selfDefinition = selfCombatant?.characterClass
         ? (definitions.find((definition) => definition.characterClass === selfCombatant.characterClass) ?? null)
         : null
-    const selectedAbility = selfDefinition?.abilities.find((ability) => ability.id === selectedAbilityId) ?? null
+    // Reads from the live combatant's own ability list (reflects unlocked
+    // skill tree upgrades), not the static per-class catalog — selfDefinition
+    // is still used below for base stats, which the skill tree never changes.
+    const selectedAbility = selfCombatant?.abilities.find((ability) => ability.id === selectedAbilityId) ?? null
 
     // Every ability, single-target or area, is confirmed by tapping a
     // highlighted combatant — for an area ability any valid target works
@@ -353,7 +356,7 @@ export function BattleScreen({code, members, actingAsId}: Props) {
                 {combat.status === 'IN_PROGRESS' && isMyTurn && selfCombatant && selfDefinition && (
                     <AbilityActionPanel
                         self={selfCombatant}
-                        abilities={selfDefinition.abilities}
+                        abilities={selfCombatant.abilities}
                         selectedAbility={selectedAbility}
                         isSubmitting={isSubmitting}
                         onSelectAbility={setSelectedAbilityId}
