@@ -203,7 +203,7 @@ public interface AbilityEffect {
      */
     static AbilityEffect tauntAndSelfThorns(int tauntDurationTurns, int thornsDurationTurns) {
         return (actor, target) -> {
-            target.addActiveEffect(ActiveEffect.taunt("Taunt", "taunt", tauntDurationTurns, actor.combatantId()));
+            target.addActiveEffect(ActiveEffect.taunt("Taunt", "taunt", tauntDurationTurns, actor.combatantId(), actor.displayName()));
             actor.addActiveEffect(ActiveEffect.thorns("Thorns", "thorns", thornsDurationTurns));
         };
     }

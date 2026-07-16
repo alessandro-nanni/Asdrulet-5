@@ -13,6 +13,11 @@ public interface EffectTarget {
      */
     String combatantId();
 
+    /**
+     * The player- or author-facing name for this combatant (e.g. "Grog", "Goblin Marauder") — for UI-facing text (see ActiveEffect.taunt), never for identity/matching, which is {@link #combatantId()}'s job.
+     */
+    String displayName();
+
     int currentHealth();
 
     int maxHealth();

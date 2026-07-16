@@ -65,7 +65,7 @@ class CombatTest {
     private static final BasicAbility TAUNT_ENEMY = new BasicAbility(
             "test.taunt-enemy", "Taunt Enemy", "Taunts an enemy.", "1 damage + Taunt for 3 turns",
             TargetType.SINGLE_ENEMY, 10,
-            AbilityEffect.damageAndApplyEffect(1, actor -> ActiveEffect.taunt("Taunt", "taunt", 3, actor.combatantId())));
+            AbilityEffect.damageAndApplyEffect(1, actor -> ActiveEffect.taunt("Taunt", "taunt", 3, actor.combatantId(), actor.displayName())));
 
     private static final BasicAbility GAIN_THORNS = new BasicAbility(
             "test.gain-thorns", "Gain Thorns", "Gains thorns.", "Thorns for 2 turns",
@@ -734,6 +734,25 @@ class CombatTest {
         // Taunt overrides the lowest-health pick — the enemy must attack p1.
         assertThat(findCombatant(combat, "p2").currentHealth()).isEqualTo(40);
         assertThat(findCombatant(combat, "p1").currentHealth()).isLessThan(100);
+    }
+
+    @Test
+    void tauntDescriptionUsesTheTaunterSDisplayNameNotItsCombatantId() {
+        Combatant p1 = new PlayerCombatant(
+                "p1", "Grog", CharacterClass.BERSERKER, new Stats(100, 5, 100), 40, List.of(TAUNT_ENEMY), List.of(), TEST_PARTY);
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 50);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.taunt-enemy", "enemy");
+
+        ActiveEffect tauntEffect = findCombatant(combat, "enemy").activeEffects().stream()
+                .filter(effect -> effect.name().equals("Taunt"))
+                .findFirst().orElseThrow();
+        assertThat(tauntEffect.description()).contains("Grog");
+        assertThat(tauntEffect.description()).doesNotContain("p1");
+        // Actual targeting logic still keys off the real combatant id, not the display name.
+        assertThat(tauntEffect.forcedTargetId()).isEqualTo("p1");
     }
 
     @Test

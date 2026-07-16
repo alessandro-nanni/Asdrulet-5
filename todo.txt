@@ -1,5 +1,4 @@
 
-taunt desc is using id instead of displayname.
 
 the blinking available nodes are visible only to the party leader. fix
 

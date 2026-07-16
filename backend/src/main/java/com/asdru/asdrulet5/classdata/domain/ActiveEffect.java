@@ -135,12 +135,17 @@ public abstract class ActiveEffect {
     /**
      * Restricts the holder's own SINGLE_ENEMY ability choices to whoever
      * applied this — see {@link #forcedTargetId()}. tauntedById is the
-     * taunter's combatant id (typically the caster's own {@code actor.id()}
-     * at the moment this is applied).
+     * taunter's combatant id (typically the caster's own {@code actor.combatantId()}
+     * at the moment this is applied) — that's what target validation actually
+     * checks against. tauntedByDisplayName is the same taunter's player- or
+     * author-facing name, used only for the description text below; kept
+     * separate from tauntedById since the id (e.g. "enemy-2") isn't
+     * meaningful to show a player.
      */
-    public static ActiveEffect taunt(String name, String icon, int durationTurns, String tauntedById) {
+    public static ActiveEffect taunt(String name, String icon, int durationTurns, String tauntedById, String tauntedByDisplayName) {
         requireNonBlank(tauntedById, "tauntedById");
-        return new ActiveEffect(name, "Can only target " + tauntedById + " for " + turnsLabel(durationTurns) + ".", icon, durationTurns) {
+        requireNonBlank(tauntedByDisplayName, "tauntedByDisplayName");
+        return new ActiveEffect(name, "Can only target " + tauntedByDisplayName + " for " + turnsLabel(durationTurns) + ".", icon, durationTurns) {
             @Override
             public String forcedTargetId() {
                 return tauntedById;

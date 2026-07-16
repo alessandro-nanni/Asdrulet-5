@@ -21,7 +21,7 @@ public class PaladinClassDefinition {
                                 "4 damage + Taunt for 2 turns",
                                 TargetType.SINGLE_ENEMY, 25,
                                 AbilityEffect.damageAndApplyEffect(4,
-                                        actor -> ActiveEffect.taunt("Taunt", "taunt", 2, actor.combatantId()))),
+                                        actor -> ActiveEffect.taunt("Taunt", "taunt", 2, actor.combatantId(), actor.displayName()))),
                         new BasicAbility("paladin.protect", "Protect",
                                 "Raises a defensive stance, bracing for impact.",
                                 "+12 defense for 2 turns",
