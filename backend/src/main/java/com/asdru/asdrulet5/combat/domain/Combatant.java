@@ -198,9 +198,29 @@ public abstract class Combatant implements EffectTarget {
 
     @Override
     public void applyHeal(int amount) {
+        int scaledAmount = Math.max(0, (int) Math.round(amount * (1 + healingReceivedPercentBonus() / 100.0)));
         int before = currentHealth;
-        currentHealth = Math.min(stats.maxHealth(), currentHealth + amount);
+        currentHealth = Math.min(stats.maxHealth(), currentHealth + scaledAmount);
         recordEvent(CombatEvent.Kind.HEAL, currentHealth - before, false);
+    }
+
+    /**
+     * Summed fresh from {@link #passives} on every call, same reasoning as
+     * {@link #damagePercentBonus()} — see
+     * {@link CombatantPassive#healingReceivedPercent(EffectTarget)}.
+     */
+    private double healingReceivedPercentBonus() {
+        return passives.stream().mapToDouble(passive -> passive.healingReceivedPercent(this)).sum();
+    }
+
+    /**
+     * Summed fresh from {@link #passives} on every call, same reasoning as
+     * {@link #damagePercentBonus()} — extra stamina a passive grants this
+     * combatant on top of {@code Combat.STAMINA_REGEN_PER_TURN}. See
+     * {@link CombatantPassive#staminaRegenBonus(EffectTarget)}.
+     */
+    public int staminaRegenBonus() {
+        return passives.stream().mapToInt(passive -> passive.staminaRegenBonus(this)).sum();
     }
 
     /**

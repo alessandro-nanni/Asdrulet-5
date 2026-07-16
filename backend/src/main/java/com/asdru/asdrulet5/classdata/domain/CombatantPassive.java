@@ -81,4 +81,26 @@ public interface CombatantPassive {
     default boolean triggersFollowUpAbility() {
         return false;
     }
+
+    /**
+     * Flat percentage modifier applied to healing the wearer receives (e.g.
+     * 20.0 = +20% healing received, -50.0 = -50%). A {@code double} rather
+     * than {@link #damagePercent()}'s {@code int}, since a healing-received
+     * modifier is more likely to need fractional precision (e.g. +12.5%).
+     * Takes wearer, same shape as {@link #damagePercentBonus(EffectTarget)},
+     * for passives whose bonus depends on live combat state. 0 by default.
+     */
+    default double healingReceivedPercent(EffectTarget wearer) {
+        return 0.0;
+    }
+
+    /**
+     * Flat bonus stamina the wearer regenerates at the start of their own
+     * turn, on top of {@code Combat.STAMINA_REGEN_PER_TURN}. Takes wearer,
+     * same shape as {@link #damagePercentBonus(EffectTarget)}, for passives
+     * whose bonus depends on live combat state. 0 by default.
+     */
+    default int staminaRegenBonus(EffectTarget wearer) {
+        return 0;
+    }
 }

@@ -366,10 +366,15 @@ public class PartyService {
      * outcome flows into the next room the same way a wheel result would.
      * Health at (or above) max is normalized back to null, matching the
      * "null means full health" convention everywhere else this field is set.
+     * This only ever runs on a win (see this method's caller), so anyone who
+     * fell during the fight is revived at 1 HP rather than carried over
+     * dead — otherwise they'd walk into the next room (or the next fight)
+     * already at 0 HP with no way to act.
      */
     private void syncMembersAfterCombat(Party party, String combatCode) {
         for (Combatant combatant : combatService.partyCombatantsFor(combatCode)) {
-            Integer health = combatant.currentHealth() >= combatant.maxHealth() ? null : combatant.currentHealth();
+            int revivedHealth = Math.max(1, combatant.currentHealth());
+            Integer health = revivedHealth >= combatant.maxHealth() ? null : revivedHealth;
             party.setMemberHealth(combatant.combatantId(), health);
             party.clearPendingEffects(combatant.combatantId());
             combatant.activeEffects().forEach(effect -> party.addPendingEffect(combatant.combatantId(), effect));

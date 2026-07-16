@@ -1,8 +1,0 @@
-
-
-the blinking available nodes are visible only to the party leader. fix
-
-when some players are dead but the rest of the team wins a combat room, set their hp to 1.
-
-automatically end the turn for a player when they have no stamina left to perform any ability or their ultimate charged. handle the edge case where they finish stamina at the same time their ability grants them their ultimate. It should still let them perform their ultimate.
-

@@ -81,6 +81,26 @@ public class Combat {
     }
 
     /**
+     * Whether combatantId can still do anything this turn: afford at least
+     * one of their basic abilities, or their ultimate is charged. Checked by
+     * CombatService right after every {@link #useAbility} to auto-end a
+     * turn with nothing left to spend — evaluated against whatever state the
+     * ability just left them in, so a hit that both drains their last
+     * stamina and (via its own damage) finishes charging their ultimate in
+     * the very same call is judged by that post-action state, not a stale
+     * pre-action one; they're correctly still considered able to act (their
+     * now-ready ultimate) instead of being cut off from using it.
+     */
+    @Synchronized
+    public boolean hasViableAction(String combatantId) {
+        Combatant combatant = requireCombatant(combatantId);
+        return combatant.abilities().stream().anyMatch(ability -> switch (ability) {
+            case BasicAbility basic -> combatant.hasStamina(basic.staminaCost());
+            case UltimateAbility ignored -> combatant.ultimateReady();
+        });
+    }
+
+    /**
      * Spends whatever the ability costs (stamina for a basic, charge for an
      * ultimate), applies it to every resolved target, fires the resulting
      * hooks, and rolls a Twitching Talisman-style follow-up — the exact
@@ -358,7 +378,7 @@ public class Combat {
                 continue;
             }
             if (!next.enemy()) {
-                next.restoreStamina(STAMINA_REGEN_PER_TURN);
+                next.restoreStamina(STAMINA_REGEN_PER_TURN + next.staminaRegenBonus());
                 return StepOutcome.ALLY_TURN;
             }
             resolveEnemyTurn(next);

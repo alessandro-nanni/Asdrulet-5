@@ -117,26 +117,54 @@ public class CombatService {
     private record PreparedPlayerCombatant(PlayerCombatant combatant, List<ItemPassive> passives) {
     }
 
+    /**
+     * A single player action, followed by an auto-end-turn check: once the
+     * actor can no longer afford any basic ability and their ultimate isn't
+     * charged either, there's nothing left for them to legally do, so their
+     * turn ends right here instead of leaving them stuck with a live turn
+     * and no legal action to take. That check runs strictly after the
+     * ability above has already resolved — including whatever ultimate
+     * charge it just granted — so a hit that both drains the last of their
+     * stamina and finishes charging their ultimate in the very same call is
+     * judged correctly: {@code Combat.hasViableAction} sees the
+     * now-ready ultimate and the auto-end is skipped.
+     */
     public CombatStateDto useAbility(String code, String actorId, String abilityId, String targetId) {
         Combat combat = getOrThrow(code);
         combat.useAbility(actorId, abilityId, targetId);
+        CombatStateDto dto = broadcast(combat);
+        if (combat.status() == CombatStatus.IN_PROGRESS && !combat.hasViableAction(actorId)) {
+            combat.beginEndTurn(actorId);
+            dto = stepUntilAllyTurnOrCombatEnd(combat);
+        }
         publishVictoryIfWon(combat);
-        return broadcast(combat);
+        return dto;
     }
 
     /**
-     * Unlike {@link #useAbility} (a single player action, one broadcast),
-     * ending a turn can cascade through several enemies before control
-     * returns to the next ally — see {@code Combat.advanceOneStep}'s own
-     * doc. Stepping (and broadcasting) one enemy at a time here, with a
-     * pause in between, is what stops a multi-enemy fight from having every
-     * enemy's attack land in the very same instant on the frontend: each
-     * broadcast now represents exactly one actor's action, the same
-     * granularity a player's own turn already has.
+     * Unlike a single player action above (one broadcast), ending a turn can
+     * cascade through several enemies before control returns to the next
+     * ally — see {@link #stepUntilAllyTurnOrCombatEnd}.
      */
     public CombatStateDto endTurn(String code, String actorId) {
         Combat combat = getOrThrow(code);
         combat.beginEndTurn(actorId);
+        CombatStateDto dto = stepUntilAllyTurnOrCombatEnd(combat);
+        publishVictoryIfWon(combat);
+        return dto;
+    }
+
+    /**
+     * Drives {@code Combat.advanceOneStep} — and so {@code Combat.resolveEnemyTurn}
+     * — one enemy at a time, whether the turn ended because a player
+     * explicitly clicked "End Turn" or because {@link #useAbility} auto-ended
+     * it above. Broadcasting (and pausing) once per enemy, rather than only
+     * after a multi-enemy cascade finishes entirely, is what stops every
+     * enemy's attack from landing in the very same instant on the frontend:
+     * each broadcast represents exactly one actor's action, the same
+     * granularity a player's own turn already has.
+     */
+    private CombatStateDto stepUntilAllyTurnOrCombatEnd(Combat combat) {
         CombatStateDto dto;
         Combat.StepOutcome outcome;
         do {
@@ -146,7 +174,6 @@ public class CombatService {
                 enemyActionDelay.sleep();
             }
         } while (outcome == Combat.StepOutcome.ENEMY_ACTED);
-        publishVictoryIfWon(combat);
         return dto;
     }
 

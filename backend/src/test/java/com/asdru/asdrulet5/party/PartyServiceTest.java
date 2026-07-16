@@ -253,6 +253,22 @@ class PartyServiceTest {
     }
 
     @Test
+    void combatVictoryRevivesAFallenMemberAtOneHp() {
+        // A member who died mid-fight shouldn't carry that dead (0 HP) state
+        // into the next room just because the party won overall — they
+        // should be able to at least act once they arrive.
+        PartyStateDto created = partyService.createParty(leader);
+        Combatant combatant = playerCombatant("leader-1", 100);
+        combatant.applyDamage(Damage.of(100));
+        assertThat(combatant.alive()).isFalse();
+        when(combatService.partyCombatantsFor(created.code())).thenReturn(List.of(combatant));
+
+        partyService.onCombatVictory(new CombatVictoryEvent(created.code()));
+
+        assertThat(partyService.getState(created.code()).members().getFirst().currentHealth()).isEqualTo(1);
+    }
+
+    @Test
     void combatVictoryNormalizesFullEndingHealthToNull() {
         // Matches the "null means full health" convention used everywhere
         // else this field is set (e.g. the wheel's FULL_HEAL).

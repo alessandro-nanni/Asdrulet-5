@@ -359,7 +359,11 @@ export function DungeonMap({dungeon, members, isLeader, onSelectNode}: Props) {
                             isCurrent ? 'is-current' : '',
                             isHome && !isCurrent ? 'is-home' : '',
                             isClearedOther && !isCurrent ? 'is-visited' : '',
-                            isChoice && isClickable ? 'is-selectable' : '',
+                            // Purely visual — everyone in the party should see which
+                            // rooms are open next, not just whoever can actually click
+                            // them (isClickable, still leader-only, only gates the
+                            // onClick/role/aria-label below).
+                            isChoice ? 'is-selectable' : '',
                         ]
                             .filter(Boolean)
                             .join(' ')

@@ -361,6 +361,90 @@ class CombatServiceTest {
     }
 
     @Test
+    void useAbilityAutoEndsTurnWhenNoStaminaLeftAndUltimateNotReady() {
+        BasicAbility onlyMove = new BasicAbility(
+                "test.jab", "Jab", "A quick jab.", "1 damage", TargetType.SINGLE_ENEMY, 100,
+                AbilityEffect.damage(1));
+        UltimateAbility bigUltimate = new UltimateAbility(
+                "test.ultimate", "Ultimate", "A big hit.", "50 damage", TargetType.SINGLE_ENEMY, 1000,
+                AbilityEffect.damage(50));
+        Combatant p1 = new PlayerCombatant(
+                "p1", "p1", CharacterClass.BERSERKER, new Stats(100, 0, 100), 1000,
+                List.of(onlyMove, bigUltimate), List.of(), party("ABC123"));
+        Combatant p2 = new PlayerCombatant(
+                "p2", "p2", CharacterClass.HEALER, new Stats(100, 0, 100), 1000, List.of(), List.of(), party("ABC123"));
+        Combatant enemy = weakEnemy();
+        Combat combat = new Combat("ABC123", List.of(p1, p2, enemy), List.of("p1", "p2", "enemy"));
+        CombatRepository repository = new InMemoryCombatRepository();
+        repository.save(combat);
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+                new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
+                messagingTemplate, eventPublisher, new EnemyActionDelay(0));
+
+        CombatStateDto updated = service.useAbility("ABC123", "p1", "test.jab", "enemy");
+
+        // p1 spent the last of their stamina (100 of 100) on their only
+        // basic, and their ultimate (needs 1000 charge, this hit granted
+        // only ~1) isn't remotely ready — nothing left to do, so their turn
+        // auto-ends onto p2 without them having to click "End Turn".
+        assertThat(updated.currentTurnCombatantId()).isEqualTo("p2");
+    }
+
+    @Test
+    void useAbilityDoesNotAutoEndTurnWhenTheSameHitBothDrainsStaminaAndChargesTheUltimate() {
+        // Ultimate charge grows off actual damage dealt (see AbilityEffect.dealDamage),
+        // so a 40-damage hit against a 0-defense target grants ~40 charge —
+        // set the threshold to exactly that, so this one hit both drains the
+        // last of p1's stamina AND finishes charging their ultimate.
+        BasicAbility lastMove = new BasicAbility(
+                "test.finisher", "Finisher", "Drains the last of your stamina.", "40 damage",
+                TargetType.SINGLE_ENEMY, 100, AbilityEffect.damage(40));
+        UltimateAbility ultimate = new UltimateAbility(
+                "test.ultimate", "Ultimate", "A big hit.", "60 damage", TargetType.SINGLE_ENEMY, 40,
+                AbilityEffect.damage(60));
+        Combatant p1 = new PlayerCombatant(
+                "p1", "p1", CharacterClass.BERSERKER, new Stats(100, 0, 100), 40,
+                List.of(lastMove, ultimate), List.of(), party("ABC123"));
+        Combatant p2 = new PlayerCombatant(
+                "p2", "p2", CharacterClass.HEALER, new Stats(100, 0, 100), 1000, List.of(), List.of(), party("ABC123"));
+        Combatant enemy = new EnemyCombatant(
+                "enemy", "enemy", "test-enemy", new Stats(200, 0, 0), 0,
+                List.of(new BasicAbility("test-enemy.claw", "Claw", "A swipe.", "1 damage",
+                        TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(1))),
+                List.of());
+        Combat combat = new Combat("ABC123", List.of(p1, p2, enemy), List.of("p1", "p2", "enemy"));
+        CombatRepository repository = new InMemoryCombatRepository();
+        repository.save(combat);
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+                new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
+                messagingTemplate, eventPublisher, new EnemyActionDelay(0));
+
+        CombatStateDto updated = service.useAbility("ABC123", "p1", "test.finisher", "enemy");
+
+        // Stamina is now 0 (can't afford Finisher again), but that same hit
+        // also finished charging the ultimate — the turn must NOT auto-end.
+        assertThat(updated.currentTurnCombatantId()).isEqualTo("p1");
+        CombatantDto p1Dto = updated.combatants().stream().filter(c -> c.id().equals("p1")).findFirst().orElseThrow();
+        assertThat(p1Dto.currentStamina()).isEqualTo(0);
+        assertThat(p1Dto.ultimateCharge()).isGreaterThanOrEqualTo(40);
+
+        // And they really can still act: the now-ready ultimate goes through.
+        int enemyHealthBeforeUltimate = updated.combatants().stream()
+                .filter(c -> c.id().equals("enemy")).findFirst().orElseThrow().currentHealth();
+        CombatStateDto afterUltimate = service.useAbility("ABC123", "p1", "test.ultimate", "enemy");
+        int enemyHealthAfterUltimate = afterUltimate.combatants().stream()
+                .filter(c -> c.id().equals("enemy")).findFirst().orElseThrow().currentHealth();
+        assertThat(enemyHealthAfterUltimate).isLessThan(enemyHealthBeforeUltimate);
+    }
+
+    private static Combatant weakEnemy() {
+        return new EnemyCombatant("enemy", "enemy", "test-enemy", new Stats(200, 0, 0), 0,
+                List.of(new BasicAbility("test-enemy.claw", "Claw", "A swipe.", "1 damage",
+                        TargetType.SINGLE_ENEMY, 0, AbilityEffect.damage(1))),
+                List.of());
+    }
+
+    @Test
     void useAbilityThatDefeatsTheLastEnemyPublishesVictoryEvent() {
         BasicAbility strike = new BasicAbility(
                 "test.strike", "Strike", "A basic attack.", "20 damage", TargetType.SINGLE_ENEMY, 10,
