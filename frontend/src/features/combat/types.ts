@@ -33,6 +33,9 @@ export interface Combatant {
     attackName: string | null
     attackDescription: string | null
     attackEffectSummary: string | null
+    totalDamageDealt: number
+    totalHealingDone: number
+    totalEffectsApplied: number
 }
 
 export interface CombatEvent {

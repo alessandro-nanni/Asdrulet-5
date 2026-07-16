@@ -53,7 +53,10 @@ public class CombatMapper {
                 combatant.activeEffects().stream().map(CombatMapper::toDto).toList(),
                 primaryAbility != null ? primaryAbility.name() : null,
                 primaryAbility != null ? primaryAbility.description() : null,
-                primaryAbility != null ? primaryAbility.effectSummary() : null
+                primaryAbility != null ? primaryAbility.effectSummary() : null,
+                combatant.totalDamageDealt(),
+                combatant.totalHealingDone(),
+                combatant.totalEffectsApplied()
         );
     }
 

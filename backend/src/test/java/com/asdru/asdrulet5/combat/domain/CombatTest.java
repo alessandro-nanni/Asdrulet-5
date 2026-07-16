@@ -82,6 +82,11 @@ class CombatTest {
             TargetType.SELF, 10,
             AbilityEffect.applyEffect(() -> ActiveEffect.strength("Strength", "strength", 10, 2)));
 
+    private static final BasicAbility TAUNT_AND_THORNS_ALL = new BasicAbility(
+            "test.taunt-and-thorns-all", "Taunt And Thorns All", "Taunts every enemy and gains thorns.",
+            "Taunt for 2 turns + self Thorns for 2 turns", TargetType.ALL_ENEMIES, 10,
+            AbilityEffect.tauntAndSelfThorns(2, 2));
+
     private static Combatant player(String id, List<Ability> abilities) {
         return player(id, abilities, List.of());
     }
@@ -249,6 +254,111 @@ class CombatTest {
         // Enemy hasn't acted yet; p2 heals themselves at full health, should stay capped at max.
         combat.useAbility("p2", "test.mend", "p2");
         assertThat(findCombatant(combat, "p2").currentHealth()).isEqualTo(100);
+    }
+
+    @Test
+    void totalDamageDealtAccumulatesOnTheActorAcrossMultipleAbilityUses() {
+        Combatant p1 = player("p1", List.of(STRIKE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 6, 10);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.strike", "enemy");
+        combat.endTurn("p1");
+        combat.useAbility("p2", "test.strike", "enemy");
+
+        // Mitigation = 6 / (6 + 25); round(20 * (1 - 6/31)) = 16 damage per strike.
+        assertThat(findCombatant(combat, "p1").totalDamageDealt()).isEqualTo(16);
+        assertThat(findCombatant(combat, "p2").totalDamageDealt()).isEqualTo(16);
+        // The target of the damage doesn't accrue any of its own.
+        assertThat(findCombatant(combat, "enemy").totalDamageDealt()).isEqualTo(0);
+    }
+
+    @Test
+    void totalHealingDoneAccumulatesOnTheHealerNotTheRecipient() {
+        Combatant p1 = player("p1", List.of(MEND));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 200);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+        p2.applyDamage(Damage.of(50));
+
+        combat.useAbility("p1", "test.mend", "p2");
+
+        assertThat(findCombatant(combat, "p1").totalHealingDone()).isEqualTo(15);
+        assertThat(findCombatant(combat, "p2").totalHealingDone()).isEqualTo(0);
+    }
+
+    @Test
+    void overhealAgainstAnAlreadyFullTargetDoesNotCountTowardTotalHealingDone() {
+        Combatant p1 = player("p1", List.of(MEND));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 200);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.mend", "p2");
+
+        assertThat(findCombatant(combat, "p2").currentHealth()).isEqualTo(100);
+        assertThat(findCombatant(combat, "p1").totalHealingDone()).isEqualTo(0);
+    }
+
+    @Test
+    void totalEffectsAppliedCountsASelfTargetedBuffOnce() {
+        Combatant p1 = player("p1", List.of(BRACE));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.brace", "p1");
+
+        assertThat(findCombatant(combat, "p1").totalEffectsApplied()).isEqualTo(1);
+    }
+
+    @Test
+    void totalEffectsAppliedCountsAnAllyTargetedEffectOnTheCasterNotTheRecipient() {
+        Combatant p1 = player("p1", List.of(FREEZE_ALLY));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.freeze-ally", "p2");
+
+        assertThat(findCombatant(combat, "p1").totalEffectsApplied()).isEqualTo(1);
+        assertThat(findCombatant(combat, "p2").totalEffectsApplied()).isEqualTo(0);
+    }
+
+    @Test
+    void reapplyingASameNamedBuffCountsAsAnotherEffectApplied() {
+        Combatant p1 = player("p1", List.of(PUMP_UP));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemy = enemy("enemy", 200, 5, 1);
+        Combat combat = twoPlayersOneEnemy(p1, p2, enemy);
+
+        combat.useAbility("p1", "test.pump-up", "p1");
+        combat.endTurn("p1");
+        combat.endTurn("p2");
+        combat.useAbility("p1", "test.pump-up", "p1");
+
+        // Still just one active effect on p1 (refreshed, not stacked — see
+        // reapplyingSameNamedBuffRefreshesDurationInsteadOfStacking), but two
+        // distinct applications toward the stat.
+        assertThat(findCombatant(combat, "p1").activeEffects()).hasSize(1);
+        assertThat(findCombatant(combat, "p1").totalEffectsApplied()).isEqualTo(2);
+    }
+
+    @Test
+    void totalEffectsAppliedCountsBothTheResolvedTargetsAndTheActorsOwnSideEffect() {
+        Combatant p1 = player("p1", List.of(TAUNT_AND_THORNS_ALL));
+        Combatant p2 = player("p2", List.of(STRIKE));
+        Combatant enemyA = enemy("enemyA", 200, 5, 1);
+        Combatant enemyB = enemy("enemyB", 200, 5, 1);
+        Combat combat = new Combat("ABC123", List.of(p1, p2, enemyA, enemyB), List.of("p1", "p2", "enemyA", "enemyB"));
+
+        combat.useAbility("p1", "test.taunt-and-thorns-all", null);
+
+        // One Taunt applied per enemy (2), plus Thorns refreshed on the actor
+        // once per enemy resolved (see AbilityEffect.tauntAndSelfThorns) — 4 total.
+        assertThat(findCombatant(combat, "p1").totalEffectsApplied()).isEqualTo(4);
+        assertThat(findCombatant(combat, "enemyA").totalEffectsApplied()).isEqualTo(0);
     }
 
     @Test
@@ -850,6 +960,11 @@ class CombatTest {
         // damage against defense 5; Thorns reflects 10% of that (4) back.
         assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 42);
         assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 4);
+        // The reflected hit counts toward p1's own total damage dealt, even
+        // though p1 never directly targeted the enemy this fight — on top of
+        // the enemy's own 42 from its one landed attack.
+        assertThat(findCombatant(combat, "p1").totalDamageDealt()).isEqualTo(4);
+        assertThat(findCombatant(combat, "enemy").totalDamageDealt()).isEqualTo(42);
     }
 
     @Test
@@ -867,6 +982,9 @@ class CombatTest {
         // heals the attacker (p1) for 10% of that (1) back.
         assertThat(findCombatant(combat, "enemy").currentHealth()).isEqualTo(200 - 17);
         assertThat(findCombatant(combat, "p1").currentHealth()).isEqualTo(100 - 30 + 1);
+        // The Golden Touch heal counts toward p1's own total healing done,
+        // even though p1 never cast anything that heals.
+        assertThat(findCombatant(combat, "p1").totalHealingDone()).isEqualTo(1);
     }
 
     @Test

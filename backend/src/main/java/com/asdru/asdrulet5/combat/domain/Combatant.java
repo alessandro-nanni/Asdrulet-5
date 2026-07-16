@@ -65,6 +65,27 @@ public abstract class Combatant implements EffectTarget {
      * The most recent {@link Damage} this combatant took — read by {@code Combat.resolveDamageHooks} to recover whether the hit that just landed was critical, since that method otherwise only sees the net health delta. Starts as a harmless zero, non-critical placeholder.
      */
     private Damage lastDamageTaken = Damage.of(0);
+    /**
+     * Running totals across the whole fight, for the end-of-battle stats
+     * summary (who dealt the most damage/healed the most) — accumulated
+     * either by {@code Combat.applyEffectToTargets}/{@code resolveDamageHooks}
+     * from each ability application's actual (post-mitigation, post-clamp)
+     * health delta on its target, or directly by an {@link ActiveEffect}
+     * that deals damage/heals someone other than the ability's own resolved
+     * target (see Thorns' reflect and Golden Touch's on-hit heal, both of
+     * which call {@link #recordDamageDealt}/{@link #recordHealingDone}
+     * themselves via the {@link EffectTarget} contract).
+     */
+    private int totalDamageDealt = 0;
+    private int totalHealingDone = 0;
+    /**
+     * Count of buff/debuff applications (fresh or a same-named refresh —
+     * both go through {@link #addActiveEffect}) this combatant has caused
+     * across the whole fight, for the same end-of-battle summary — see
+     * {@code Combat.applyEffectToTargets}'s new-object-identity diff against
+     * {@link #activeEffects} before/after each ability application.
+     */
+    private int totalEffectsApplied = 0;
 
     protected Combatant(String combatantId, String displayName, Stats stats, int ultimateChargeThreshold,
                         List<Ability> abilities, List<? extends CombatantPassive> passives) {
@@ -234,6 +255,40 @@ public abstract class Combatant implements EffectTarget {
         if (actualAmount > 0) {
             events.add(new CombatEvent(combatantId, kind, actualAmount, critical));
         }
+    }
+
+    /**
+     * Called either by {@code Combat.resolveDamageHooks} with the actual
+     * damage this combatant just dealt to the ability's own resolved target,
+     * or directly by an {@link ActiveEffect} (e.g. Thorns) reflecting damage
+     * back onto someone else entirely — see {@link #totalDamageDealt}.
+     * Public only because {@link EffectTarget} requires it, the same way
+     * {@link #applyDamage} already does.
+     */
+    @Override
+    public void recordDamageDealt(int amount) {
+        totalDamageDealt += amount;
+    }
+
+    /**
+     * Called either by {@code Combat.applyEffectToTargets} with the actual
+     * healing this combatant just did to the ability's own resolved target,
+     * or directly by an {@link ActiveEffect} (e.g. Golden Touch) healing
+     * whoever just triggered it — see {@link #totalHealingDone}. Public only
+     * because {@link EffectTarget} requires it, the same way {@link #applyHeal}
+     * already does.
+     */
+    @Override
+    public void recordHealingDone(int amount) {
+        totalHealingDone += amount;
+    }
+
+    /**
+     * Called by {@code Combat.applyEffectToTargets} with however many active
+     * effects this combatant just caused to be added (see {@link #totalEffectsApplied}).
+     */
+    void recordEffectsApplied(int count) {
+        totalEffectsApplied += count;
     }
 
     @Override

@@ -1406,6 +1406,30 @@ p {
 
 .battle-result {
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.battle-stats-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.battle-stat-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.battle-stat-label {
+    color: var(--text-muted);
+}
+
+.battle-stat-value {
+    font-weight: 700;
 }
 
 .battle-waiting {

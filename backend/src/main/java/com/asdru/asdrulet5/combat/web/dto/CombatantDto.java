@@ -23,6 +23,9 @@ public record CombatantDto(
         List<ActiveEffectDto> activeEffects,
         String attackName,
         String attackDescription,
-        String attackEffectSummary
+        String attackEffectSummary,
+        int totalDamageDealt,
+        int totalHealingDone,
+        int totalEffectsApplied
 ) {
 }

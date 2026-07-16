@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react'
+import {Link} from 'react-router-dom'
 import {useCombatState} from '../useCombatState'
 import {useClassDefinitions} from '../../classes/useClassDefinitions'
 import {endTurn, useAbility} from '../api'
@@ -20,6 +21,29 @@ const ATTACK_DURATION_MS = 500
 const FLOAT_DURATION_MS = 1100
 const FLOAT_SPREAD_PX = 22
 const FLOAT_STAGGER_MS = 90
+
+interface TopContributor {
+    displayName: string
+    amount: number
+}
+
+// Whoever's own running total (accumulated server-side across the whole
+// fight, not just the most recent action) is highest wins the spot — null if
+// nobody on either side ever actually dealt/healed a positive amount, so a
+// short fight with no healer, say, just omits that row instead of crowning
+// someone at 0.
+function topContributor(
+    combatants: CombatState['combatants'],
+    stat: 'totalDamageDealt' | 'totalHealingDone' | 'totalEffectsApplied',
+): TopContributor | null {
+    return combatants.reduce<TopContributor | null>((best, combatant) => {
+        const amount = combatant[stat]
+        if (amount <= 0 || (best && amount <= best.amount)) {
+            return best
+        }
+        return {displayName: combatant.displayName, amount}
+    }, null)
+}
 
 export function BattleScreen({code, members, actingAsId}: Props) {
     const {combat, error, applyUpdate} = useCombatState(code)
@@ -155,6 +179,9 @@ export function BattleScreen({code, members, actingAsId}: Props) {
 
     const enemies = combat.combatants.filter((combatant) => combatant.enemy)
     const allies = combat.combatants.filter((combatant) => !combatant.enemy)
+    const topDamageDealer = topContributor(combat.combatants, 'totalDamageDealt')
+    const topHealer = topContributor(combat.combatants, 'totalHealingDone')
+    const topEffectsApplier = topContributor(combat.combatants, 'totalEffectsApplied')
     const isMyTurn = combat.currentTurnCombatantId === actingAsId
     const selfCombatant = combat.combatants.find((combatant) => combatant.id === actingAsId) ?? null
     const selfMember = members.find((member) => member.userId === actingAsId) ?? null
@@ -273,6 +300,39 @@ export function BattleScreen({code, members, actingAsId}: Props) {
                 {combat.status !== 'IN_PROGRESS' && (
                     <section className="battle-result">
                         <h2 className="section-title">{combat.status === 'PARTY_WON' ? 'Victory!' : 'Defeat...'}</h2>
+
+                        <div className="battle-stats-summary">
+                            {topDamageDealer && (
+                                <p className="battle-stat-row">
+                                    <span className="battle-stat-label">Most damage dealt</span>
+                                    <span className="battle-stat-value">
+                                        {topDamageDealer.displayName} — {topDamageDealer.amount}
+                                    </span>
+                                </p>
+                            )}
+                            {topHealer && (
+                                <p className="battle-stat-row">
+                                    <span className="battle-stat-label">Most healing done</span>
+                                    <span className="battle-stat-value">
+                                        {topHealer.displayName} — {topHealer.amount}
+                                    </span>
+                                </p>
+                            )}
+                            {topEffectsApplier && (
+                                <p className="battle-stat-row">
+                                    <span className="battle-stat-label">Most effects applied</span>
+                                    <span className="battle-stat-value">
+                                        {topEffectsApplier.displayName} — {topEffectsApplier.amount}
+                                    </span>
+                                </p>
+                            )}
+                        </div>
+
+                        {combat.status === 'PARTY_LOST' && (
+                            <Link to="/" className="btn btn-primary btn-block">
+                                Return to Lobby
+                            </Link>
+                        )}
                     </section>
                 )}
 

@@ -33,6 +33,20 @@ public interface EffectTarget {
     void applyHeal(int amount);
 
     /**
+     * Folds {@code amount} into this combatant's running end-of-battle
+     * "total damage dealt" — called directly by an effect that deals damage
+     * to someone other than the ability's own resolved target (see Thorns),
+     * since combat.domain.Combat's own actor-applies-to-target bookkeeping
+     * only ever watches the resolved target's health.
+     */
+    void recordDamageDealt(int amount);
+
+    /**
+     * Same as {@link #recordDamageDealt}, but for the "total healing done" running total (see Golden Touch).
+     */
+    void recordHealingDone(int amount);
+
+    /**
      * Restores stamina, capped at max — same clamped-add shape as {@link #applyHeal}, just for the other resource.
      */
     void restoreStamina(int amount);

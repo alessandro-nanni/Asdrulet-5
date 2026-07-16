@@ -143,10 +143,47 @@ public class Combat {
     private void applyEffectToTargets(Combatant actor, AbilityEffect effect, List<Combatant> targets) {
         for (Combatant target : targets) {
             int healthBefore = target.currentHealth();
+            List<ActiveEffect> targetEffectsBefore = target.activeEffects();
+            // Only worth a separate snapshot when actor and target actually
+            // differ — an ALL_ENEMIES ability like Taunt-and-self-Thorns
+            // applies one effect to the resolved target and, as a side
+            // effect, another straight onto the actor itself; a SELF ability
+            // (actor == target) would otherwise have this double-count the
+            // very same addActiveEffect call against both snapshots.
+            List<ActiveEffect> actorEffectsBefore = actor == target ? null : actor.activeEffects();
             effect.apply(actor, target);
             resolveDamageHooks(actor, target, healthBefore);
+            int healthAfter = target.currentHealth();
+            if (healthAfter > healthBefore) {
+                actor.recordHealingDone(healthAfter - healthBefore);
+            }
+            int effectsApplied = countNewEffects(targetEffectsBefore, target.activeEffects());
+            if (actorEffectsBefore != null) {
+                effectsApplied += countNewEffects(actorEffectsBefore, actor.activeEffects());
+            }
+            if (effectsApplied > 0) {
+                actor.recordEffectsApplied(effectsApplied);
+            }
         }
         effect.applyToTeam(actor, aliveAllies(actor));
+    }
+
+    /**
+     * How many effects in {@code after} weren't present (by reference) in
+     * {@code before} — {@link Combatant#addActiveEffect} always attaches a
+     * freshly-constructed {@link ActiveEffect} instance, even when it's just
+     * refreshing an existing same-named buff/debuff in place, so a new
+     * reference reliably means "an application just happened" without
+     * needing {@code ActiveEffect} to define its own equality.
+     */
+    private int countNewEffects(List<ActiveEffect> before, List<ActiveEffect> after) {
+        int count = 0;
+        for (ActiveEffect candidate : after) {
+            if (before.stream().noneMatch(existing -> existing == candidate)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private boolean triggersFollowUp(Combatant actor) {
@@ -181,6 +218,7 @@ public class Combat {
         if (damageDealt <= 0) {
             return;
         }
+        actor.recordDamageDealt(damageDealt);
         Damage damage = new Damage(damageDealt, target.lastDamageTaken().critical());
         actor.passives().forEach(passive -> passive.onDamageDealt(actor, target, damage));
         target.passives().forEach(passive -> passive.onDamageTaken(target, actor, damage));

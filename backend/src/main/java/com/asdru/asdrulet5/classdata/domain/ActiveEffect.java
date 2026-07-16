@@ -166,8 +166,16 @@ public abstract class ActiveEffect {
                 + turnsLabel(durationTurns) + ".", icon, durationTurns) {
             @Override
             public void onDamageTaken(EffectTarget holder, EffectTarget attacker, Damage damage) {
+                int healthBefore = attacker.currentHealth();
                 // A reflected hit isn't itself a fresh crit roll.
                 attacker.applyDamage(Damage.of(Math.max(1, damage.amount() / 10)));
+                // holder is the one reflecting here, not attacker — this bypasses
+                // the ability-resolution path combat.domain.Combat's own damage
+                // bookkeeping watches, so it has to record itself.
+                int actualDamage = healthBefore - attacker.currentHealth();
+                if (actualDamage > 0) {
+                    holder.recordDamageDealt(actualDamage);
+                }
             }
         };
     }
@@ -180,7 +188,15 @@ public abstract class ActiveEffect {
                 + turnsLabel(durationTurns) + ".", icon, durationTurns) {
             @Override
             public void onDamageTaken(EffectTarget holder, EffectTarget attacker, Damage damage) {
+                int healthBefore = attacker.currentHealth();
                 attacker.applyHeal(Math.max(1, damage.amount() / 10));
+                // attacker heals themselves here — this bypasses the
+                // ability-resolution path combat.domain.Combat's own healing
+                // bookkeeping watches, so it has to record itself.
+                int actualHeal = attacker.currentHealth() - healthBefore;
+                if (actualHeal > 0) {
+                    attacker.recordHealingDone(actualHeal);
+                }
             }
 
             @Override
