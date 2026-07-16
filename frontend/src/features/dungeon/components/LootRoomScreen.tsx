@@ -26,10 +26,17 @@ const ANNOUNCE_PAUSE_MS = 3000
 export function LootRoomScreen({code, selfId, members, lootResults, turnOrder, onApplyUpdate}: Props) {
     const {definitions} = useItemDefinitions()
     const [isOpening, setIsOpening] = useState(false)
-    const [hasLooted, setHasLooted] = useState(selfId in lootResults)
     const [error, setError] = useState<string | null>(null)
 
     const definitionsById = new Map(definitions.map((definition) => [definition.id, definition]))
+    // Derived straight from the current lootResults prop, not tracked as its
+    // own state — the dungeon-entry broadcast (which mounts this screen) and
+    // the party-state broadcast (which carries a freshly-reset lootResults
+    // for the new room) travel on separate WebSocket topics with no
+    // ordering guarantee, so a useState seeded once at mount could freeze in
+    // whichever one happened to arrive first, including a stale "already
+    // looted" from the previous chest.
+    const hasLooted = selfId in lootResults
     const selfResult = lootResults[selfId] ?? null
     const showResult = hasLooted && !isOpening && selfResult != null
     const nextToLootId = turnOrder.find((id) => !(id in lootResults)) ?? null
@@ -72,7 +79,6 @@ export function LootRoomScreen({code, selfId, members, lootResults, turnOrder, o
         try {
             const updated = await lootChest(code, selfId)
             onApplyUpdate(updated)
-            setHasLooted(true)
             setTimeout(() => setIsOpening(false), OPEN_DURATION_MS)
         } catch {
             setError('Could not open the chest. Try again.')
@@ -141,13 +147,28 @@ export function LootRoomScreen({code, selfId, members, lootResults, turnOrder, o
 
                 <ul className="loot-member-list">
                     {members.map((member) => {
-                        const result = lootResults[member.userId]
+                        const isSelf = member.userId === selfId
+                        // Self's own find is deliberately held back until showResult
+                        // (i.e. until the opening animation has actually finished) —
+                        // otherwise it leaks into this list the instant the server
+                        // responds, well before the chest visibly finishes opening.
+                        // Nothing else drives another member's own opening animation
+                        // from here, so their row just reflects the server the moment
+                        // it's recorded.
+                        const revealed = isSelf ? showResult : member.userId in lootResults
+                        const result = revealed ? lootResults[member.userId] : undefined
                         const isNext = member.userId === nextToLootId
+                        const label = result
+                            ? summarize(result)
+                            : isSelf && isOpening
+                                ? 'Opening…'
+                                : isNext
+                                    ? 'Looting now…'
+                                    : 'Waiting to loot…'
                         return (
                             <li key={member.userId} className={`loot-member-row${isNext ? ' is-current-turn' : ''}`}>
                                 <span>{member.displayName}</span>
-                                <span
-                                    className="muted">{result ? summarize(result) : isNext ? 'Looting now…' : 'Waiting to loot…'}</span>
+                                <span className="muted">{label}</span>
                             </li>
                         )
                     })}

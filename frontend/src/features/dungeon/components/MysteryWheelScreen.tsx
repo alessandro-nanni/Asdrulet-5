@@ -93,7 +93,6 @@ function rotationFor(effect: WheelEffect, pool: WheelEffect[]): number {
 export function MysteryWheelScreen({code, selfId, members, wheelResults, turnOrder, onApplyUpdate}: Props) {
     const [rotation, setRotation] = useState(0)
     const [isSpinning, setIsSpinning] = useState(false)
-    const [hasSpun, setHasSpun] = useState(selfId in wheelResults)
     const [error, setError] = useState<string | null>(null)
     // Frozen the instant this client's own spin is submitted, so the wheel this
     // player is watching keeps the layout (and thus the landing angle) it had
@@ -101,6 +100,14 @@ export function MysteryWheelScreen({code, selfId, members, wheelResults, turnOrd
     // moment later. Anyone not mid-spin just renders the live pool directly.
     const [spinPoolSnapshot, setSpinPoolSnapshot] = useState<WheelEffect[] | null>(null)
 
+    // Derived straight from the current wheelResults prop, not tracked as its
+    // own state — the dungeon-entry broadcast (which mounts this screen) and
+    // the party-state broadcast (which carries a freshly-reset wheelResults
+    // for the new room) travel on separate WebSocket topics with no
+    // ordering guarantee, so a useState seeded once at mount could freeze in
+    // whichever one happened to arrive first, including a stale spin from
+    // the previous wheel.
+    const hasSpun = selfId in wheelResults
     const selfResult = wheelResults[selfId] ?? null
     const showResult = hasSpun && !isSpinning && selfResult != null
     const claimedEffects = new Set(Object.values(wheelResults))
@@ -141,8 +148,13 @@ export function MysteryWheelScreen({code, selfId, members, wheelResults, turnOrd
             const effect = updated.wheelResults[selfId]
             setRotation(rotationFor(effect, poolAtSpinTime))
             onApplyUpdate(updated)
-            setHasSpun(true)
-            setTimeout(() => setIsSpinning(false), SPIN_DURATION_MS)
+            setTimeout(() => {
+                setIsSpinning(false)
+                // Releases the frozen layout so the wheel re-renders against
+                // the live (now one-slice-smaller) pool — without this it
+                // never revealed that a segment had actually been claimed.
+                setSpinPoolSnapshot(null)
+            }, SPIN_DURATION_MS)
         } catch {
             setError('Could not spin the wheel. Try again.')
             setIsSpinning(false)
@@ -245,14 +257,28 @@ export function MysteryWheelScreen({code, selfId, members, wheelResults, turnOrd
 
                 <ul className="wheel-member-list">
                     {members.map((member) => {
-                        const effect = wheelResults[member.userId]
+                        const isSelf = member.userId === selfId
+                        // Self's own result is deliberately held back until showResult
+                        // (i.e. until the spin animation has actually finished) —
+                        // otherwise it leaks into this list the instant the server
+                        // responds, well before the wheel visibly stops turning.
+                        // Nothing else drives another member's own spin animation
+                        // from here, so their row just reflects the server the moment
+                        // it's recorded.
+                        const revealed = isSelf ? showResult : member.userId in wheelResults
+                        const effect = revealed ? wheelResults[member.userId] : undefined
                         const isNext = member.userId === nextToSpinId
+                        const label = effect
+                            ? EFFECT_INFO[effect].title
+                            : isSelf && isSpinning
+                                ? 'Spinning…'
+                                : isNext
+                                    ? 'Spinning now…'
+                                    : 'Waiting to spin…'
                         return (
                             <li key={member.userId} className={`wheel-member-row${isNext ? ' is-current-turn' : ''}`}>
                                 <span>{member.displayName}</span>
-                                <span className="muted">
-                  {effect ? EFFECT_INFO[effect].title : isNext ? "Spinning now…" : 'Waiting to spin…'}
-                </span>
+                                <span className="muted">{label}</span>
                             </li>
                         )
                     })}

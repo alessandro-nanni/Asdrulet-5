@@ -1,11 +1,3 @@
-extract item logic from Combat service and add a PlayerCombatant wearer parameter to delegate the combat context dependant logic there. it should also make the need for overly specific methods like damagePercentIfHealthierThanLeader obsolete as it will be easier to get from the wearer. Each character should have a way to get a reference to their party to get easy access to the leader data.
-
-fix the wheel not removing a slice when it gets a result, and pre announcing the result next to the player as soon as its spun.
-the same for the loot chest. annoucing rewards before the animation finishes
-
-entering two chest rooms causes an issue with the ui where some buttons aren't visible. maybe not all data reset?
-
-Enemies are doing their abilities at the same time. Add an animation just like what players have to show add a bit of clarity and delay
 
 taunt desc is using id instead of displayname.
 

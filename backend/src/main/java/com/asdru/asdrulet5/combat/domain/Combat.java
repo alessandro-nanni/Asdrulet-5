@@ -176,12 +176,57 @@ public class Combat {
 
     @Synchronized
     public void endTurn(String actorId) {
+        beginEndTurn(actorId);
+        advanceTurn();
+        lastEvents = drainAllEvents();
+    }
+
+    /**
+     * The "ending my own turn" half of {@link #endTurn} — validates and runs
+     * the actor's own onEndTurn hooks, but doesn't advance anywhere yet.
+     * Split out so CombatService's paced, one-broadcast-per-enemy
+     * orchestration (see {@link #advanceOneStep}) can drive the rest itself
+     * instead of getting the whole cascade back in one shot; {@link #endTurn}
+     * itself still just does both halves back to back, unchanged, for every
+     * other caller.
+     */
+    @Synchronized
+    public void beginEndTurn(String actorId) {
         requireInProgress();
         requireCurrentTurn(actorId);
         Combatant actor = requireCombatant(actorId);
         actor.passives().forEach(passive -> passive.onEndTurn(actor));
-        advanceTurn();
+    }
+
+    /**
+     * What a single {@link #advanceOneStep} call resolved into.
+     */
+    public enum StepOutcome {
+        /** Landed on a living, unprevented ally — a human needs to act next. */
+        ALLY_TURN,
+        /** Resolved exactly one enemy's own attack. */
+        ENEMY_ACTED,
+        /** That enemy's attack (or a DoT tick) just ended the fight. */
+        COMBAT_ENDED
+    }
+
+    /**
+     * Like {@link #advanceTurn}, but stops after resolving at most one
+     * enemy's own action instead of cascading through every enemy in one
+     * shot — see CombatService.endTurn: broadcasting (and pausing) once per
+     * call, rather than only after a multi-enemy cascade finishes entirely,
+     * is what gives each enemy in a fight the same one-at-a-time visibility
+     * a player's own turn already has. {@link #advanceTurn} itself (used by
+     * {@link #endTurn} directly, and so every other caller including every
+     * domain-level test) is untouched — it still resolves the whole cascade
+     * atomically, just now by repeatedly calling the same {@link #resolveNextEntry}
+     * this delegates to.
+     */
+    @Synchronized
+    public StepOutcome advanceOneStep() {
+        StepOutcome outcome = resolveNextEntry();
         lastEvents = drainAllEvents();
+        return outcome;
     }
 
     private List<CombatEvent> drainAllEvents() {
@@ -270,7 +315,28 @@ public class Combat {
         return forcedId == null ? Optional.empty() : Optional.ofNullable(combatants.get(forcedId));
     }
 
+    /**
+     * Resolves every enemy in the current cascade in one shot, atomically —
+     * the original, single-broadcast-per-endTurn behavior every non-CombatService
+     * caller (in particular every domain-level test) still gets.
+     */
     private void advanceTurn() {
+        while (resolveNextEntry() == StepOutcome.ENEMY_ACTED) {
+            // Keep going — same loop this method always ran, just expressed
+            // as repeated calls to the shared per-entry primitive below.
+        }
+    }
+
+    /**
+     * Moves to the very next entry in turn order and resolves it: skips the
+     * dead, ticks active effects and fires onStartTurn for whoever's next,
+     * then either hands off to a living ally, resolves one enemy's own
+     * attack, or (if prevented, e.g. Frozen) silently moves on to whoever's
+     * after that — all within this same call, since a skipped turn has
+     * nothing worth pausing on. Callers decide when to drain lastEvents;
+     * this only touches turn state.
+     */
+    private StepOutcome resolveNextEntry() {
         for (int i = 0; i < turnSequence.size() * 2; i++) {
             currentTurnIndex = (currentTurnIndex + 1) % turnSequence.size();
             Combatant next = combatants.get(turnSequence.get(currentTurnIndex));
@@ -293,12 +359,10 @@ public class Combat {
             }
             if (!next.enemy()) {
                 next.restoreStamina(STAMINA_REGEN_PER_TURN);
-                return;
+                return StepOutcome.ALLY_TURN;
             }
             resolveEnemyTurn(next);
-            if (status != CombatStatus.IN_PROGRESS) {
-                return;
-            }
+            return status != CombatStatus.IN_PROGRESS ? StepOutcome.COMBAT_ENDED : StepOutcome.ENEMY_ACTED;
         }
         throw new IllegalStateException("Unable to find next combatant to act");
     }

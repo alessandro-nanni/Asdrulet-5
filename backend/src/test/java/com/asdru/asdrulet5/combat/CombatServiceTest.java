@@ -16,6 +16,7 @@ import com.asdru.asdrulet5.party.domain.Party;
 import com.asdru.asdrulet5.party.domain.PartyMember;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -71,7 +72,7 @@ class CombatServiceTest {
         eventPublisher = mock(ApplicationEventPublisher.class);
         combatService = new CombatService(new InMemoryCombatRepository(), new ClassDefinitionRegistry(false),
                 new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
-                messagingTemplate, eventPublisher);
+                messagingTemplate, eventPublisher, new EnemyActionDelay(0));
     }
 
     @Test
@@ -302,6 +303,64 @@ class CombatServiceTest {
     }
 
     @Test
+    void endTurnBroadcastsSeparatelyForEachEnemyInACascadeWithTheirOwnIdCurrent() {
+        BasicAbility weakAttack = new BasicAbility(
+                "test-enemy.claw", "Claw", "A swipe.", "1 damage", TargetType.SINGLE_ENEMY, 0,
+                AbilityEffect.damage(1));
+        Combatant p1 = new PlayerCombatant(
+                "p1", "p1", CharacterClass.BERSERKER, new Stats(100, 0, 100), 100, List.of(), List.of(), party("ABC123"));
+        Combatant enemyA = new EnemyCombatant(
+                "enemyA", "enemyA", "test-enemy", new Stats(50, 0, 0), 0, List.of(weakAttack), List.of());
+        Combatant enemyB = new EnemyCombatant(
+                "enemyB", "enemyB", "test-enemy", new Stats(50, 0, 0), 0, List.of(weakAttack), List.of());
+        Combat combat = new Combat("ABC123", List.of(p1, enemyA, enemyB), List.of("p1", "enemyA", "enemyB"));
+        CombatRepository repository = new InMemoryCombatRepository();
+        repository.save(combat);
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+                new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
+                messagingTemplate, eventPublisher, new EnemyActionDelay(0));
+
+        CombatStateDto updated = service.endTurn("ABC123", "p1");
+
+        // One broadcast per enemy action, plus one more once control hands
+        // back to p1 — not a single lump-sum broadcast covering both
+        // enemies' attacks at once.
+        ArgumentCaptor<CombatStateDto> captor = ArgumentCaptor.forClass(CombatStateDto.class);
+        verify(messagingTemplate, times(3)).convertAndSend(eq("/topic/party/ABC123/combat"), captor.capture());
+        List<CombatStateDto> broadcasts = captor.getAllValues();
+        assertThat(broadcasts.get(0).currentTurnCombatantId()).isEqualTo("enemyA");
+        assertThat(broadcasts.get(1).currentTurnCombatantId()).isEqualTo("enemyB");
+        assertThat(broadcasts.get(2).currentTurnCombatantId()).isEqualTo("p1");
+        assertThat(updated.currentTurnCombatantId()).isEqualTo("p1");
+    }
+
+    @Test
+    void endTurnPausesBetweenEachEnemysActionButNotAfterTheLast() {
+        BasicAbility weakAttack = new BasicAbility(
+                "test-enemy.claw", "Claw", "A swipe.", "1 damage", TargetType.SINGLE_ENEMY, 0,
+                AbilityEffect.damage(1));
+        Combatant p1 = new PlayerCombatant(
+                "p1", "p1", CharacterClass.BERSERKER, new Stats(100, 0, 100), 100, List.of(), List.of(), party("ABC123"));
+        Combatant enemyA = new EnemyCombatant(
+                "enemyA", "enemyA", "test-enemy", new Stats(50, 0, 0), 0, List.of(weakAttack), List.of());
+        Combatant enemyB = new EnemyCombatant(
+                "enemyB", "enemyB", "test-enemy", new Stats(50, 0, 0), 0, List.of(weakAttack), List.of());
+        Combat combat = new Combat("ABC123", List.of(p1, enemyA, enemyB), List.of("p1", "enemyA", "enemyB"));
+        CombatRepository repository = new InMemoryCombatRepository();
+        repository.save(combat);
+        EnemyActionDelay mockDelay = mock(EnemyActionDelay.class);
+        CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
+                new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
+                messagingTemplate, eventPublisher, mockDelay);
+
+        service.endTurn("ABC123", "p1");
+
+        // Paced after enemyA's action and after enemyB's, but not once more
+        // after control hands back to p1 — nothing left to wait on there.
+        verify(mockDelay, times(2)).sleep();
+    }
+
+    @Test
     void useAbilityThatDefeatsTheLastEnemyPublishesVictoryEvent() {
         BasicAbility strike = new BasicAbility(
                 "test.strike", "Strike", "A basic attack.", "20 damage", TargetType.SINGLE_ENEMY, 10,
@@ -318,7 +377,7 @@ class CombatServiceTest {
         repository.save(combat);
         CombatService service = new CombatService(repository, new ClassDefinitionRegistry(false),
                 new EnemyDefinitionRegistry(), new EnemyEncounterRegistry(), new ItemDefinitionRegistry(),
-                messagingTemplate, eventPublisher);
+                messagingTemplate, eventPublisher, new EnemyActionDelay(0));
 
         CombatStateDto updated = service.useAbility("VICT123", "p1", "test.strike", "enemy-1");
 

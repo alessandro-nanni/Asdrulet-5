@@ -44,13 +44,14 @@ export function BattleScreen({code, members, actingAsId}: Props) {
 
     // Diff the previous combat snapshot against the new one to figure out who
     // hit/healed whom, since the server only ever pushes full-state snapshots.
-    // Damage/heals never cross the ally/enemy line except one way: player
-    // abilities only ever damage the enemy or heal/buff allies, and the enemy's
-    // one auto-attack only ever damages an ally — so whichever side got hurt
-    // tells us the actor unambiguously. (We can't infer the actor from whether
-    // currentTurnCombatantId changed: in a 1-ally party the turn sequence is
-    // just [ally, enemy], so ending your turn cycles right back to you and the
-    // id looks unchanged even though the enemy acted in between.)
+    // The backend broadcasts once per individual actor's action — including
+    // once per enemy within a multi-enemy end-turn cascade, each paced apart
+    // (see CombatService.endTurn) — so whoever's currentTurnCombatantId is an
+    // enemy right now is reliably the one who just acted; the server pauses
+    // right on them for exactly this reason. Otherwise (a player's own
+    // ability use, or an ally's turn just beginning) currentTurnCombatantId
+    // doesn't change while they're still mid-turn, so previous still
+    // correctly points at them.
     useEffect(() => {
         if (!combat) {
             return
@@ -74,12 +75,10 @@ export function BattleScreen({code, members, actingAsId}: Props) {
             }
 
             if (hitTargets.length > 0 || healedTargets.length > 0) {
-                const damagedAllyId = combat.combatants.find(
-                    (combatant) => !combatant.enemy && hitTargets.includes(combatant.id),
-                )?.id
-                const actorId = damagedAllyId
-                    ? (combat.combatants.find((combatant) => combatant.enemy)?.id ?? null)
-                    : previous.currentTurnCombatantId
+                const currentActor = combat.combatants.find(
+                    (combatant) => combatant.id === combat.currentTurnCombatantId,
+                )
+                const actorId = currentActor?.enemy ? currentActor.id : previous.currentTurnCombatantId
                 if (actorId) {
                     setAttackerId(actorId)
                     setTimeout(() => setAttackerId((current) => (current === actorId ? null : current)), ATTACK_DURATION_MS)

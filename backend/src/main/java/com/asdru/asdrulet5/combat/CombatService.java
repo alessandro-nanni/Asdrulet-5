@@ -50,6 +50,7 @@ public class CombatService {
     private final ItemDefinitionRegistry itemDefinitionRegistry;
     private final SimpMessagingTemplate messagingTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final EnemyActionDelay enemyActionDelay;
     private final SecureRandom random = new SecureRandom();
 
     /**
@@ -123,11 +124,30 @@ public class CombatService {
         return broadcast(combat);
     }
 
+    /**
+     * Unlike {@link #useAbility} (a single player action, one broadcast),
+     * ending a turn can cascade through several enemies before control
+     * returns to the next ally — see {@code Combat.advanceOneStep}'s own
+     * doc. Stepping (and broadcasting) one enemy at a time here, with a
+     * pause in between, is what stops a multi-enemy fight from having every
+     * enemy's attack land in the very same instant on the frontend: each
+     * broadcast now represents exactly one actor's action, the same
+     * granularity a player's own turn already has.
+     */
     public CombatStateDto endTurn(String code, String actorId) {
         Combat combat = getOrThrow(code);
-        combat.endTurn(actorId);
+        combat.beginEndTurn(actorId);
+        CombatStateDto dto;
+        Combat.StepOutcome outcome;
+        do {
+            outcome = combat.advanceOneStep();
+            dto = broadcast(combat);
+            if (outcome == Combat.StepOutcome.ENEMY_ACTED) {
+                enemyActionDelay.sleep();
+            }
+        } while (outcome == Combat.StepOutcome.ENEMY_ACTED);
         publishVictoryIfWon(combat);
-        return broadcast(combat);
+        return dto;
     }
 
     /**
